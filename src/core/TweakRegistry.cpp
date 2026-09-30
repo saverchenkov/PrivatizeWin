@@ -141,8 +141,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         Tweak t;
         t.id = "AI_COPILOT";
         t.category = L"AI & Copilot";
-        t.title = L"Disable the Windows #COPILOT#";
-        t.description = L"The Windows #COPILOT# is based on ChatGPT from OpenAI and is an extension to the AI in the Microsoft search engine Bing. In order for this AI to provide answers, further system information is transmitted in addition to the user queries. To prevent this, #COPILOT# can be disabled.";
+        t.title = L"Disable the Windows Copilot";
+        t.description = L"The Windows Copilot is based on ChatGPT from OpenAI and is an extension to the AI in the Microsoft search engine Bing. In order for this AI to provide answers, further system information is transmitted in addition to the user queries. To prevent this, Copilot can be disabled.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Both;
@@ -178,8 +178,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         Tweak t;
         t.id = "C102";
         t.category = L"AI & Copilot";
-        t.title = L"Disable the #COPILOT# button from the taskbar";
-        t.description = L"Removes the #COPILOT# icon from the taskbar so that the search using AI (artificial intelligence) is no longer available. This setting can be used to disable this option.";
+        t.title = L"Disable the Copilot button from the taskbar";
+        t.description = L"Removes the Copilot icon from the taskbar so that the search using AI (artificial intelligence) is no longer available. This setting can be used to disable this option.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
@@ -190,8 +190,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         Tweak t;
         t.id = "AI_SEARCH_HIGHLIGHTS";
         t.category = L"AI & Copilot";
-        t.title = L"Disable Bing Chat eligibility in Windows #COPILOT#";
-        t.description = L"Controls whether the user is eligible to use Bing Chat features within the Windows #COPILOT#. When disabled, this prevents access to Bing Chat functionality in #COPILOT#, even if the feature would otherwise be available in the user's region and Windows build.";
+        t.title = L"Disable Bing Chat eligibility in Windows Copilot";
+        t.description = L"Controls whether the user is eligible to use Bing Chat features within the Windows Copilot. When disabled, this prevents access to Bing Chat functionality in Copilot, even if the feature would otherwise be available in the user's region and Windows build.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
@@ -202,8 +202,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         Tweak t;
         t.id = "AI_RECALL_DATA";
         t.category = L"AI & Copilot";
-        t.title = L"Disable Windows #COPILOT#+ Recall";
-        t.description = L"This setting deactivates the new Windows #COPILOT#+ Recall feature. This is a component that constantly creates screenshots, evaluates their content and makes the data available via an application. Both to the user himself and to other applications that have the corresponding authorizations. Disabling the Recall feature is strongly recommended.";
+        t.title = L"Disable Windows Copilot+ Recall";
+        t.description = L"This setting deactivates the new Windows Copilot+ Recall feature. This is a component that constantly creates screenshots, evaluates their content and makes the data available via an application. Both to the user himself and to other applications that have the corresponding authorizations. Disabling the Recall feature is strongly recommended.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Both;

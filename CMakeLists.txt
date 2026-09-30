@@ -51,6 +51,8 @@ set(SOURCES
     src/ui/DarkMode.cpp
     src/ui/ScheduleDialog.h
     src/ui/ScheduleDialog.cpp
+    src/ui/DetailsView.h
+    src/ui/DetailsView.cpp
     src/ui/MainWindow.h
     src/ui/MainWindow.cpp
     res/resource.h

@@ -7,19 +7,22 @@
 #include <vector>
 #include <memory>
 #include "../core/Types.h"
+#include "DetailsView.h"
 
 namespace PrivatizeWin {
-
-// C++ Core Guidelines:
-// R.11: Avoid calling new and delete explicitly
-// F.16: Pass string types by string_view
-// ES.48: Avoid casts
-// Enum.3: Use enum class
 
 enum class SplitterDragMode {
     None,
     Vertical,   // between TreeView and ListView
     Horizontal  // between top panes and bottom Details pane
+};
+
+enum class FilterMode {
+    All,
+    UnprotectedOnly,
+    ProtectedOnly,
+    SafeOnly,
+    PendingChanges
 };
 
 class MainWindow {
@@ -30,7 +33,7 @@ public:
     static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     explicit MainWindow(HWND hWnd);
-    ~MainWindow() = default;
+    ~MainWindow();
 
     MainWindow(const MainWindow&) = delete;
     MainWindow& operator=(const MainWindow&) = delete;
@@ -44,13 +47,17 @@ private:
     void OnNotify(NMHDR* pnmhdr);
     void OnContextMenu(HWND hWnd, int x, int y);
     void OnKeyDown(WPARAM vk);
+    LRESULT OnCustomDraw(NMHDR* pnmhdr);
 
+    void InitializeFonts();
+    void InitializeTreeIcons();
     void InitializeControls();
     void PopulateCategories();
-    void PopulateListView(std::wstring_view category = L"All Settings", std::wstring_view filter = L"");
+    void PopulateListView(std::wstring_view category = L"All Settings", std::wstring_view filter = L"", FilterMode mode = FilterMode::All);
     void UpdateDetailsPane(int selectedIndex);
     void UpdateStatusBar();
     void UpdateSelectAllCheckboxState();
+    void ToggleCurrentTweakFromDetails();
 
     void ApplyTemplate(std::string_view templateName);
     void ApplyCurrentSelection();
@@ -71,6 +78,8 @@ private:
     HWND m_hWnd{ nullptr };
     HWND m_hToolbar{ nullptr };
     HWND m_hSearchEdit{ nullptr };
+    HWND m_hFilterCombo{ nullptr };
+    HWND m_hLblMatchCount{ nullptr };
     HWND m_hTemplateCombo{ nullptr };
     HWND m_hChkSelectAll{ nullptr };
     HWND m_hBtnApply{ nullptr };
@@ -79,16 +88,27 @@ private:
 
     HWND m_hTreeView{ nullptr };
     HWND m_hListView{ nullptr };
-    HWND m_hDetailsEdit{ nullptr };
+    HWND m_hDetailsView{ nullptr };
     HWND m_hStatusBar{ nullptr };
+    HWND m_hProgressBar{ nullptr };
+
+    HFONT m_hFontRegular{ nullptr };
+    HFONT m_hFontBold{ nullptr };
+    HFONT m_hFontTitle{ nullptr };
+    HFONT m_hFontCode{ nullptr };
+    HFONT m_hFontBadge{ nullptr };
+
+    HIMAGELIST m_hTreeImageList{ nullptr };
+    HIMAGELIST m_hRowImageList{ nullptr };
 
     std::wstring m_currentCategory{ L"All Settings" };
     std::wstring m_currentFilter;
+    FilterMode m_filterMode{ FilterMode::All };
     std::vector<Tweak> m_displayedTweaks;
     std::vector<bool> m_checkedStates;
 
-    int m_splitterX{ 240 };
-    int m_splitterY{ 380 };
+    int m_splitterX{ 250 };
+    int m_splitterY{ 390 };
     SplitterDragMode m_dragMode{ SplitterDragMode::None };
 };
 
