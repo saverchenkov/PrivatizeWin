@@ -8,6 +8,7 @@
 **Modern, Minimalist Windows Privacy & Telemetry Silencer**  
 *A lightweight, transparent, open-source alternative to O&O ShutUp10++.*
 
+[![CI & Release Build](https://github.com/saverchenkov/PrivatizeWin/actions/workflows/ci.yml/badge.svg)](https://github.com/saverchenkov/PrivatizeWin/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/Standard-C%2B%2B20-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B20)
 [![ISO C++ Core Guidelines](https://img.shields.io/badge/Guidelines-ISO%20CppCoreGuidelines-success.svg)](https://github.com/isocpp/CppCoreGuidelines)
@@ -68,19 +69,6 @@
 * **Master "Check All" Header:** One-click toggle in the toolbar to check or uncheck all visible settings, with intelligent tri-state support.
 * **Full Multi-Select Support:** Select multiple rows using `Ctrl` or `Shift`, press `Ctrl+A` to select all, or tap `Spacebar` to toggle check states across all highlighted rows.
 * **Right-Click Context Menu:** Right-click any row to access quick actions: *Check Selected*, *Uncheck Selected*, *Invert Selection*, *Apply Selected Immediately*, *Copy Tweak ID*, and *Copy Details*.
-| TWEAK: Disable Windows Recall Automated Screen Snapshots [AI_RECALL]               |
-| CATEGORY: AI & Copilot  |  RECOMMENDATION: SAFE (Recommended for all users)         |
-|                                                                                    |
-| DESCRIPTION:                                                                       |
-| Disables Microsoft Recall from recording screenshots of your desktop, apps, etc.  |
-|                                                                                    |
-| AFFECTED REGISTRY KEYS:                                                            |
-|   * [HKLM\] SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot -> DisableAIData=1  |
-|   * [HKCU\] SOFTWARE\Microsoft\Windows\CurrentVersion\Recall -> EnableRecall=0     |
-+------------------------------------------------------------------------------------+
-| Privatized: 20 / 27 settings | Active Category: All Settings | Administrator       |
-+------------------------------------------------------------------------------------+
-```
 
 ---
 
