@@ -1,6 +1,9 @@
 #include <windows.h>
 #include "resource.h"
 
+// Application Icon
+IDI_APPICON ICON "icon.ico"
+
 // Manifest is handled by CMake / manifest tool
 
 // Main Application Menu

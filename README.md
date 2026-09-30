@@ -2,6 +2,9 @@
 
 <div align="center">
 
+<img src="assets/logo.png" width="160" height="160" alt="PrivatizeWin Logo" />
+
+### PrivatizeWin
 **Modern, Minimalist Windows Privacy & Telemetry Silencer**  
 *A lightweight, transparent, open-source alternative to O&O ShutUp10++.*
 

@@ -26,6 +26,8 @@ bool MainWindow::RegisterClass(HINSTANCE hInstance) {
     wc.lpszClassName = L"PrivatizeWin_MainWindow";
     wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_APPICON));
+    wc.hIconSm = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_APPICON));
     wc.lpszMenuName = L"MAINMENU";
     return (RegisterClassExW(&wc) != 0);
 }
@@ -73,6 +75,12 @@ MainWindow::MainWindow(HWND hWnd) : m_hWnd(hWnd) {}
 
 void MainWindow::OnCreate() {
     DarkMode::ApplyToWindow(m_hWnd);
+
+    const HICON hIcon = LoadIconW(GetModuleHandle(nullptr), MAKEINTRESOURCEW(IDI_APPICON));
+    if (hIcon) {
+        SendMessage(m_hWnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+        SendMessage(m_hWnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+    }
 
     INITCOMMONCONTROLSEX icex{};
     icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
