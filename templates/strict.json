@@ -1,0 +1,33 @@
+{
+  "name": "strict",
+  "description": "Strict privacy configuration. Disables all telemetry, web search suggestions, Edge telemetry, and AI recall.",
+  "tweaks": {
+    "TEL_DIAGTRACK": true,
+    "TEL_DMWAP": true,
+    "TEL_DIAGDATA": true,
+    "TEL_AIT": true,
+    "TEL_CEIP": true,
+    "TEL_FEEDBACK": true,
+    "TEL_CRASHDUMP": true,
+    "AI_COPILOT": true,
+    "AI_RECALL": true,
+    "AI_SEARCH_HIGHLIGHTS": true,
+    "SRCH_BING_START": true,
+    "SRCH_CORTANA": true,
+    "SRCH_CLOUD": true,
+    "PRIV_AD_ID": true,
+    "PRIV_TAILORED": true,
+    "PRIV_KEYSTROKES": true,
+    "PRIV_TIMELINE": true,
+    "OUT_HIDE_TOGGLE": true,
+    "OUT_BLOCK_MIGRATE": true,
+    "OFFICE_TELEMETRY": true,
+    "EDGE_METRICS": true,
+    "EDGE_SHOPPING": true,
+    "EDGE_SEARCH_SUGGEST": true,
+    "WU_DELIVERY_OPT": true,
+    "WU_AUTO_REBOOT": true,
+    "LOCK_SPOTLIGHT_ADS": true,
+    "SHELL_PROMOTED_APPS": true
+  }
+}

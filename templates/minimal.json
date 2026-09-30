@@ -1,0 +1,13 @@
+{
+  "name": "minimal",
+  "description": "Minimal configuration. Disables only core diagnostic services and telemetry reporting.",
+  "tweaks": {
+    "TEL_DIAGTRACK": true,
+    "TEL_DMWAP": true,
+    "TEL_DIAGDATA": true,
+    "TEL_AIT": true,
+    "TEL_CEIP": true,
+    "TEL_FEEDBACK": true,
+    "TEL_CRASHDUMP": true
+  }
+}

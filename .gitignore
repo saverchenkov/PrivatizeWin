@@ -1,0 +1,28 @@
+# Build artifacts
+build/
+bin/
+out/
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.lib
+*.res
+
+# Visual Studio files
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# Temporary and editor files
+.idea/
+.vscode/
+*.swp
+*~
