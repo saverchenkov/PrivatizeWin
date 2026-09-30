@@ -46,7 +46,7 @@ void TemplateManager::InitializeBuiltinTemplates() {
         p.description = "Disables only low-level OS telemetry services and diagnostic data collection.";
         p.isBuiltin = true;
         for (const auto& t : allTweaks) {
-            p.tweakStates[t.id] = (t.id.rfind("TEL_", 0) == 0);
+            p.tweakStates[t.id] = (t.category == L"Telemetry & Diagnostics");
         }
         m_templates[p.name] = p;
     }

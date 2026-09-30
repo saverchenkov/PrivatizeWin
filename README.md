@@ -13,7 +13,8 @@
 [![C++20](https://img.shields.io/badge/Standard-C%2B%2B20-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B20)
 [![ISO C++ Core Guidelines](https://img.shields.io/badge/Guidelines-ISO%20CppCoreGuidelines-success.svg)](https://github.com/isocpp/CppCoreGuidelines)
 [![Platform: Windows 10 / 11](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6.svg)](https://microsoft.com)
-[![Footprint: < 500 KB](https://img.shields.io/badge/Binary%20Size-%3C%20500%20KB-brightgreen.svg)]()
+[![Footprint: < 1 MB](https://img.shields.io/badge/Binary%20Size-%3C%201%20MB-brightgreen.svg)]()
+[![Settings: 260 Tweaks](https://img.shields.io/badge/Catalog-260%20Exhaustive%20Settings-blueviolet.svg)]()
 
 </div>
 
@@ -21,7 +22,8 @@
 
 ## ⚡ Highlights
 
-* **Sub-500 KB Single Executable:** Written in clean modern **C++20** with pure Win32 API. Zero runtime bloat, 0ms startup time, zero DLL dependencies.
+* **Sub-1 MB Single Executable:** Written in clean modern **C++20** with pure Win32 API. Zero runtime bloat, instant startup time, zero DLL dependencies.
+* **Exhaustive 260-Setting Catalog:** Reverse-engineered complete coverage of all privacy, telemetry, security, and tracking settings from O&O ShutUp10++ across 17 structured categories.
 * **Master-Detail Utility UX:** Built using native Common Controls (`SysTreeView32` + `SysListView32`) in the classic, battle-tested Sysinternals / Device Manager style. No webviews, no electron, no lag.
 * **Full Modern Windows 11 & 24H2 Coverage:** Shuts down Windows Copilot, Recall snapshot recordings, dynamic MSN taskbar search widgets, forced web Outlook migration, Edge shopping trackers, and Delivery Optimization.
 * **Dual GUI & Headless CLI:** Run interactively, or invoke headless via terminal and automated deployment scripts (`--apply-template`, `--dry-run`, `--status --output json`).
@@ -42,14 +44,15 @@
 +------------------------+--[||]-----------------------------------------------------+
 | Categories             |  ||  [x] Privacy Tweak      | Status    | Safety  | Scope |
 |------------------------+--||-------------------------+-----------+---------+-------|
-| > All Settings (27)    |  ||  [x] Disable Telemetry  | Protected | Safe    | HKLM  |
-|   Telemetry & Diag (7) |  ||  [x] Disable DiagTrack  | Protected | Safe    | Svc   |
-|   AI & Copilot (3)     |  ||  [x] Disable Copilot    | Protected | Safe    | Both  |
-|   Cortana & Search (3) |  ||  [x] Disable Recall AI  | Protected | Safe    | Both  |
-|   Privacy & Tracking (4|  ||  [x] Bing in Start      | Protected | Safe    | HKCU  |
-|   Office & Outlook (3) |  ||  [x] Block Web Outlook  | Protected | Safe    | HKCU  |
-|   Microsoft Edge (3)   |  ||  [x] Disable Edge Svc   | Protected | Safe    | HKLM  |
-|   Windows Update (2)   |  ||  [x] Disable P2P Updates| Protected | Safe    | HKLM  |
+| > All Settings (260)   |  ||  [x] Disable Telemetry  | Protected | Safe    | HKLM  |
+|   Telemetry & Diag (10)|  ||  [x] Disable DiagTrack  | Protected | Safe    | Svc   |
+|   AI & Copilot (12)    |  ||  [x] Disable Copilot    | Protected | Safe    | Both  |
+|   Cortana & Search (15)|  ||  [x] Disable Recall AI  | Protected | Safe    | Both  |
+|   Edge Browser (56)    |  ||  [x] Bing in Start      | Protected | Safe    | HKCU  |
+|   App Permissions (43) |  ||  [x] Block Web Outlook  | Protected | Safe    | HKCU  |
+|   Office & Outlook (22)|  ||  [x] Disable Edge Svc   | Protected | Safe    | HKLM  |
+|   Privacy & Track (24) |  ||  [x] Disable P2P Updates| Protected | Safe    | HKLM  |
+|   Windows Update (11)  |  ||  ...                   | ...       | ...     | ...   |
 +========================+==[==]=====================================================+
 | TWEAK: Disable Windows Recall Automated Screen Snapshots [AI_RECALL]               |
 | CATEGORY: AI & Copilot  |  RECOMMENDATION: SAFE (Recommended for all users)         |
@@ -61,7 +64,7 @@
 |   * [HKLM\] SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot -> DisableAIData=1  |
 |   * [HKCU\] SOFTWARE\Microsoft\Windows\CurrentVersion\Recall -> EnableRecall=0     |
 +------------------------------------------------------------------------------------+
-| Privatized: 20 / 27 settings | Active Category: All Settings | Administrator       |
+| Privatized: 159 / 260 settings | Active Category: All Settings | Administrator     |
 +------------------------------------------------------------------------------------+
 ```
 
@@ -204,7 +207,7 @@ cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 
 # 4. Binary output located at:
-# .\build\PrivatizeWin.exe  (< 500 KB)
+# .\build\PrivatizeWin.exe  (< 1 MB standalone single executable)
 ```
 
 ---
