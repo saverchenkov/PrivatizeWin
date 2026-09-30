@@ -1,3 +1,9 @@
+#pragma once
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "DetailsView.h"
 #include "../../res/resource.h"
 #include <commctrl.h>
@@ -21,7 +27,7 @@ bool DetailsView::RegisterClass(HINSTANCE hInstance) {
 
 HWND DetailsView::Create(HWND hParent, HINSTANCE hInstance, int id, int x, int y, int width, int height) {
     return CreateWindowExW(
-        WS_EX_CLIENTEDGE,
+        0, // Clean borderless container inside splitter frame
         DETAILS_VIEW_CLASS,
         L"",
         WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_VSCROLL,
@@ -47,14 +53,14 @@ LRESULT CALLBACK DetailsView::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
             pThis->m_hBtnToggle = CreateWindowW(
                 WC_BUTTONW, L"Enable Protection",
                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-                0, 0, 160, 26, hWnd,
+                0, 0, 140, 26, hWnd,
                 reinterpret_cast<HMENU>(IDC_DETAILS_BTN_TOGGLE), hInst, nullptr
             );
 
             pThis->m_hBtnCopy = CreateWindowW(
                 WC_BUTTONW, L"Copy Info",
                 WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-                0, 0, 90, 26, hWnd,
+                0, 0, 85, 26, hWnd,
                 reinterpret_cast<HMENU>(IDC_DETAILS_BTN_COPY), hInst, nullptr
             );
 
@@ -154,9 +160,9 @@ void DetailsView::SetCheckedState(bool isChecked) {
     m_isChecked = isChecked;
     if (m_hBtnToggle) {
         if (m_isChecked) {
-            SetWindowTextW(m_hBtnToggle, L"[X] Protected");
+            SetWindowTextW(m_hBtnToggle, L"Protected (Active)");
         } else {
-            SetWindowTextW(m_hBtnToggle, L"[ ] Default (Enable)");
+            SetWindowTextW(m_hBtnToggle, L"Enable Protection");
         }
     }
     InvalidateRect(m_hWnd, nullptr, FALSE);
@@ -166,7 +172,7 @@ void DetailsView::OnSize(int width, int height) {
     // Header action buttons
     const int btnTop = 10;
     const int copyWidth = 85;
-    const int toggleWidth = 145;
+    const int toggleWidth = 140;
     const int gap = 8;
     const int rightMargin = 16;
 
@@ -297,7 +303,7 @@ void DetailsView::DrawBadge(HDC hdc, int x, int y, int height, const std::wstrin
 
     SIZE sz{};
     GetTextExtentPoint32W(hdc, text.c_str(), static_cast<int>(text.length()), &sz);
-    const int badgeWidth = sz.cx + 16;
+    const int badgeWidth = sz.cx + 20;
     outWidth = badgeWidth;
 
     HBRUSH hBr = CreateSolidBrush(bg);
@@ -315,7 +321,7 @@ void DetailsView::DrawBadge(HDC hdc, int x, int y, int height, const std::wstrin
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, textCol);
     RECT rcText{ x, y, x + badgeWidth, y + height };
-    DrawTextW(hdc, text.c_str(), -1, &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    DrawTextW(hdc, text.c_str(), -1, &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
     SelectObject(hdc, oldFont);
 }
@@ -366,7 +372,7 @@ void DetailsView::OnPaint(HDC hdc) {
         SetTextColor(memDC, colTextSecondary);
         SelectObject(memDC, m_hFontRegular);
         RECT rcPrompt{ 20, 24, width - 20, headerHeight };
-        DrawTextW(memDC, L"Select any privacy setting from the list above to view its technical details, safety impact, and registry keys.", -1, &rcPrompt, DT_LEFT | DT_SINGLELINE);
+        DrawTextW(memDC, L"Select any privacy setting from the list above to view its technical details, safety impact, and registry keys.", -1, &rcPrompt, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX);
     } else {
         const auto& t = m_currentTweak.value();
 
@@ -377,7 +383,7 @@ void DetailsView::OnPaint(HDC hdc) {
 
         const int maxTitleWidth = width - 260; // Leave room for top-right action buttons
         RECT rcTitle{ 16, 10, 16 + maxTitleWidth, 34 };
-        DrawTextW(memDC, t.title.c_str(), -1, &rcTitle, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+        DrawTextW(memDC, t.title.c_str(), -1, &rcTitle, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 
         // Badges Row at Y = 40
         int badgeX = 16;
@@ -444,26 +450,26 @@ void DetailsView::OnPaint(HDC hdc) {
         SetTextColor(memDC, colSectionHdr);
         SelectObject(memDC, m_hFontBold ? m_hFontBold : m_hFontRegular);
         RECT rcHdrDesc{ leftMargin, curY, leftMargin + contentWidth, curY + 18 };
-        DrawTextW(memDC, L"DESCRIPTION", -1, &rcHdrDesc, DT_LEFT | DT_SINGLELINE);
+        DrawTextW(memDC, L"DESCRIPTION", -1, &rcHdrDesc, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX);
         curY += 20;
 
         SetTextColor(memDC, colTextPrimary);
         SelectObject(memDC, m_hFontRegular);
         RECT rcDescCalc{ leftMargin, curY, leftMargin + contentWidth, curY + 10000 };
-        const int descHeight = DrawTextW(memDC, t.description.c_str(), -1, &rcDescCalc, DT_LEFT | DT_WORDBREAK);
+        const int descHeight = DrawTextW(memDC, t.description.c_str(), -1, &rcDescCalc, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
         curY += descHeight + 16;
 
         // --- Section: Privacy Impact ---
         SetTextColor(memDC, colSectionHdr);
         SelectObject(memDC, m_hFontBold ? m_hFontBold : m_hFontRegular);
         RECT rcHdrImpact{ leftMargin, curY, leftMargin + contentWidth, curY + 18 };
-        DrawTextW(memDC, L"PRIVACY IMPACT & RATIONALE", -1, &rcHdrImpact, DT_LEFT | DT_SINGLELINE);
+        DrawTextW(memDC, L"PRIVACY IMPACT & RATIONALE", -1, &rcHdrImpact, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX);
         curY += 20;
 
         // Card container for impact
         RECT rcImpactCalc{ leftMargin + 10, curY + 6, leftMargin + contentWidth - 10, curY + 10000 };
         SelectObject(memDC, m_hFontRegular);
-        const int impactTextHeight = DrawTextW(memDC, t.impact.c_str(), -1, &rcImpactCalc, DT_CALCRECT | DT_WORDBREAK);
+        const int impactTextHeight = DrawTextW(memDC, t.impact.c_str(), -1, &rcImpactCalc, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
         const int cardHeight = impactTextHeight + 16;
 
         HBRUSH hBrImpact = CreateSolidBrush(m_isDark ? RGB(28, 38, 52) : RGB(242, 247, 255));
@@ -478,7 +484,7 @@ void DetailsView::OnPaint(HDC hdc) {
 
         RECT rcImpactText{ leftMargin + 10, curY + 8, leftMargin + contentWidth - 10, curY + cardHeight - 8 };
         SetTextColor(memDC, m_isDark ? RGB(180, 210, 250) : RGB(20, 60, 120));
-        DrawTextW(memDC, t.impact.c_str(), -1, &rcImpactText, DT_LEFT | DT_WORDBREAK);
+        DrawTextW(memDC, t.impact.c_str(), -1, &rcImpactText, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
         curY += cardHeight + 16;
 
         // --- Section: Technical Specifications (Registry & Services) ---
@@ -486,7 +492,7 @@ void DetailsView::OnPaint(HDC hdc) {
             SetTextColor(memDC, colSectionHdr);
             SelectObject(memDC, m_hFontBold ? m_hFontBold : m_hFontRegular);
             RECT rcHdrTech{ leftMargin, curY, leftMargin + contentWidth, curY + 18 };
-            DrawTextW(memDC, L"TECHNICAL SPECIFICATIONS (REGISTRY & SERVICES)", -1, &rcHdrTech, DT_LEFT | DT_SINGLELINE);
+            DrawTextW(memDC, L"TECHNICAL SPECIFICATIONS (REGISTRY & SERVICES)", -1, &rcHdrTech, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX);
             curY += 20;
 
             std::wstringstream codeStream;
@@ -502,7 +508,7 @@ void DetailsView::OnPaint(HDC hdc) {
             std::wstring codeText = codeStream.str();
             SelectObject(memDC, m_hFontCode ? m_hFontCode : m_hFontRegular);
             RECT rcCodeCalc{ leftMargin + 10, curY + 8, leftMargin + contentWidth - 10, curY + 10000 };
-            const int codeTextHeight = DrawTextW(memDC, codeText.c_str(), -1, &rcCodeCalc, DT_CALCRECT | DT_WORDBREAK);
+            const int codeTextHeight = DrawTextW(memDC, codeText.c_str(), -1, &rcCodeCalc, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
             const int codeCardHeight = codeTextHeight + 16;
 
             HBRUSH hBrCode = CreateSolidBrush(m_isDark ? RGB(24, 26, 30) : RGB(246, 248, 251));
@@ -517,7 +523,7 @@ void DetailsView::OnPaint(HDC hdc) {
 
             RECT rcCodeText{ leftMargin + 10, curY + 8, leftMargin + contentWidth - 10, curY + codeCardHeight - 8 };
             SetTextColor(memDC, m_isDark ? RGB(200, 215, 235) : RGB(35, 45, 60));
-            DrawTextW(memDC, codeText.c_str(), -1, &rcCodeText, DT_LEFT | DT_WORDBREAK);
+            DrawTextW(memDC, codeText.c_str(), -1, &rcCodeText, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
             curY += codeCardHeight + 20;
         }
 

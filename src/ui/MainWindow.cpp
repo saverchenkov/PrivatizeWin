@@ -1,3 +1,9 @@
+#pragma once
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "MainWindow.h"
 #include "DarkMode.h"
 #include "ScheduleDialog.h"
@@ -30,7 +36,7 @@ bool MainWindow::RegisterClass(HINSTANCE hInstance) {
     wc.lpfnWndProc = MainWindow::WndProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = L"PrivatizeWin_MainWindow";
-    wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
+    wc.hbrBackground = nullptr; // Handled in WM_ERASEBKGND
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_APPICON));
     wc.hIconSm = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_APPICON));
@@ -44,7 +50,7 @@ HWND MainWindow::Create(HINSTANCE hInstance) {
         L"PrivatizeWin_MainWindow",
         L"PrivatizeWin - Windows Privacy & Telemetry Silencer",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1100, 750,
+        CW_USEDEFAULT, CW_USEDEFAULT, 1140, 760,
         nullptr, nullptr, hInstance, nullptr
     );
 }
@@ -61,6 +67,38 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
         case WM_SIZE:
             s_pMainWnd->OnSize(LOWORD(lParam), HIWORD(lParam));
             return 0;
+        case WM_ERASEBKGND: {
+            HDC hdc = reinterpret_cast<HDC>(wParam);
+            RECT rcClient{};
+            GetClientRect(hWnd, &rcClient);
+            const int w = rcClient.right - rcClient.left;
+
+            const bool isDark = DarkMode::IsDarkModeActive();
+            const COLORREF colBar = isDark ? RGB(38, 40, 44) : RGB(246, 248, 250);
+            const COLORREF colLine = isDark ? RGB(55, 58, 64) : RGB(220, 224, 230);
+            const COLORREF colBg = isDark ? RGB(28, 28, 30) : RGB(240, 242, 245);
+
+            // Fill base background
+            HBRUSH hBrBg = CreateSolidBrush(colBg);
+            FillRect(hdc, &rcClient, hBrBg);
+            DeleteObject(hBrBg);
+
+            // Top toolbar bar background (Height: 46px)
+            RECT rcTopBar{ 0, 0, w, 46 };
+            HBRUSH hBrBar = CreateSolidBrush(colBar);
+            FillRect(hdc, &rcTopBar, hBrBar);
+            DeleteObject(hBrBar);
+
+            // Top toolbar separator line
+            HPEN hPen = CreatePen(PS_SOLID, 1, colLine);
+            HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, hPen));
+            MoveToEx(hdc, 0, 46, nullptr);
+            LineTo(hdc, w, 46);
+            SelectObject(hdc, oldPen);
+            DeleteObject(hPen);
+
+            return 1;
+        }
         case WM_COMMAND:
             s_pMainWnd->OnCommand(LOWORD(wParam), reinterpret_cast<HWND>(lParam));
             return 0;
@@ -96,14 +134,14 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 
             // Hover over vertical splitter
             if (pt.x >= s_pMainWnd->m_splitterX - 4 && pt.x <= s_pMainWnd->m_splitterX + 6 &&
-                pt.y >= 52 && pt.y < s_pMainWnd->m_splitterY) {
+                pt.y >= 48 && pt.y < s_pMainWnd->m_splitterY) {
                 SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
                 return TRUE;
             }
 
             // Hover over horizontal splitter
             if (pt.y >= s_pMainWnd->m_splitterY - 4 && pt.y <= s_pMainWnd->m_splitterY + 6 &&
-                pt.y >= 52 && pt.x >= 10 && pt.x <= rcClient.right - 10) {
+                pt.y >= 48 && pt.x >= 10 && pt.x <= rcClient.right - 10) {
                 SetCursor(LoadCursor(nullptr, IDC_SIZENS));
                 return TRUE;
             }
@@ -116,13 +154,13 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             GetClientRect(hWnd, &rcClient);
 
             if (x >= s_pMainWnd->m_splitterX - 4 && x <= s_pMainWnd->m_splitterX + 6 &&
-                y >= 52 && y < s_pMainWnd->m_splitterY) {
+                y >= 48 && y < s_pMainWnd->m_splitterY) {
                 s_pMainWnd->m_dragMode = SplitterDragMode::Vertical;
                 SetCapture(hWnd);
                 return 0;
             }
             if (y >= s_pMainWnd->m_splitterY - 4 && y <= s_pMainWnd->m_splitterY + 6 &&
-                y >= 52 && x >= 10 && x <= rcClient.right - 10) {
+                y >= 48 && x >= 10 && x <= rcClient.right - 10) {
                 s_pMainWnd->m_dragMode = SplitterDragMode::Horizontal;
                 SetCapture(hWnd);
                 return 0;
@@ -139,9 +177,9 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
                 const int height = rcClient.bottom - rcClient.top;
 
                 if (s_pMainWnd->m_dragMode == SplitterDragMode::Vertical) {
-                    s_pMainWnd->m_splitterX = std::clamp(x, 160, width - 260);
+                    s_pMainWnd->m_splitterX = (std::clamp)(x, 180, width - 280);
                 } else if (s_pMainWnd->m_dragMode == SplitterDragMode::Horizontal) {
-                    s_pMainWnd->m_splitterY = std::clamp(y, 160, height - 140);
+                    s_pMainWnd->m_splitterY = (std::clamp)(y, 160, height - 140);
                 }
                 s_pMainWnd->OnSize(width, height);
                 return 0;
@@ -254,34 +292,36 @@ void MainWindow::OnCreate() {
 }
 
 void MainWindow::InitializeControls() {
-    // Toolbar Container
-    m_hToolbar = CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_NOTIFY, 0, 0, 1100, 50, m_hWnd, nullptr, nullptr, nullptr);
+    HINSTANCE hInst = GetModuleHandle(nullptr);
 
-    // 1. Search Box
-    m_hSearchEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | WS_TABSTOP,
-        12, 11, 210, 26, m_hToolbar, reinterpret_cast<HMENU>(IDC_SEARCH_EDIT), nullptr, nullptr);
+    // 1. Search Box (Direct child of m_hWnd)
+    m_hSearchEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | WS_TABSTOP,
+        10, 10, 180, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_SEARCH_EDIT), hInst, nullptr);
     SendMessage(m_hSearchEdit, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
-    SendMessage(m_hSearchEdit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Filter settings (Ctrl+F)..."));
+    SendMessage(m_hSearchEdit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Filter tweaks (Ctrl+F)..."));
 
-    // 2. Filter Dropdown (Smart Filter Chips)
-    m_hFilterCombo = CreateWindowW(WC_COMBOBOXW, L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
-        228, 11, 160, 200, m_hToolbar, reinterpret_cast<HMENU>(IDC_FILTER_COMBO), nullptr, nullptr);
+    // 2. Filter Dropdown
+    m_hFilterCombo = CreateWindowW(WC_COMBOBOXW, L"",
+        WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
+        196, 10, 135, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_FILTER_COMBO), hInst, nullptr);
     SendMessage(m_hFilterCombo, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
     SendMessage(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"All Settings"));
     SendMessage(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Unprotected Only"));
     SendMessage(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Protected Only"));
     SendMessage(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Safe (Recommended)"));
-    SendMessage(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Pending Changes"));
     SendMessage(m_hFilterCombo, CB_SETCURSEL, 0, 0);
 
     // 3. Match Count Label
-    m_hLblMatchCount = CreateWindowW(L"STATIC", L"260 of 260 shown", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
-        395, 14, 115, 20, m_hToolbar, reinterpret_cast<HMENU>(IDC_LBL_MATCH_COUNT), nullptr, nullptr);
+    m_hLblMatchCount = CreateWindowW(L"STATIC", L"260 of 260 shown",
+        WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+        338, 13, 95, 20, m_hWnd, reinterpret_cast<HMENU>(IDC_LBL_MATCH_COUNT), hInst, nullptr);
     SendMessage(m_hLblMatchCount, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
     // 4. Template Selector
-    m_hTemplateCombo = CreateWindowW(WC_COMBOBOXW, L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
-        520, 11, 160, 200, m_hToolbar, reinterpret_cast<HMENU>(IDC_TPL_COMBO), nullptr, nullptr);
+    m_hTemplateCombo = CreateWindowW(WC_COMBOBOXW, L"",
+        WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
+        440, 10, 150, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_TPL_COMBO), hInst, nullptr);
     SendMessage(m_hTemplateCombo, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
     SendMessage(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Recommended (Safe)"));
     SendMessage(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Strict Privacy"));
@@ -290,27 +330,31 @@ void MainWindow::InitializeControls() {
     SendMessage(m_hTemplateCombo, CB_SETCURSEL, 0, 0);
 
     // 5. Check All Checkbox
-    m_hChkSelectAll = CreateWindowW(WC_BUTTONW, L"Check All", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP,
-        690, 14, 85, 20, m_hToolbar, reinterpret_cast<HMENU>(IDC_CHK_CHECK_ALL), nullptr, nullptr);
+    m_hChkSelectAll = CreateWindowW(WC_BUTTONW, L"Check All",
+        WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP,
+        598, 13, 80, 20, m_hWnd, reinterpret_cast<HMENU>(IDC_CHK_CHECK_ALL), hInst, nullptr);
     SendMessage(m_hChkSelectAll, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
     // 6. Action Buttons
-    m_hBtnRefresh = CreateWindowW(WC_BUTTONW, L"Refresh", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        785, 11, 68, 26, m_hToolbar, reinterpret_cast<HMENU>(IDC_BTN_REFRESH), nullptr, nullptr);
+    m_hBtnRefresh = CreateWindowW(WC_BUTTONW, L"Refresh",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        684, 10, 66, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_REFRESH), hInst, nullptr);
     SendMessage(m_hBtnRefresh, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
-    m_hBtnRevert = CreateWindowW(WC_BUTTONW, L"Revert Defaults", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        858, 11, 105, 26, m_hToolbar, reinterpret_cast<HMENU>(IDC_BTN_REVERT), nullptr, nullptr);
+    m_hBtnRevert = CreateWindowW(WC_BUTTONW, L"Revert Defaults",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        756, 10, 106, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_REVERT), hInst, nullptr);
     SendMessage(m_hBtnRevert, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
-    m_hBtnApply = CreateWindowW(WC_BUTTONW, L"Apply Changes", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP,
-        968, 11, 115, 26, m_hToolbar, reinterpret_cast<HMENU>(IDC_BTN_APPLY), nullptr, nullptr);
+    m_hBtnApply = CreateWindowW(WC_BUTTONW, L"Apply Changes",
+        WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP,
+        868, 10, 115, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_APPLY), hInst, nullptr);
     SendMessage(m_hBtnApply, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontBold), TRUE);
 
-    // Category TreeView
+    // Category TreeView (Default width 285px to avoid text clipping)
     m_hTreeView = CreateWindowExW(WS_EX_CLIENTEDGE, WC_TREEVIEWW, L"",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS | TVS_SHOWSELALWAYS,
-        10, 52, m_splitterX - 15, m_splitterY - 54, m_hWnd, reinterpret_cast<HMENU>(IDC_TREE_CATEGORIES), nullptr, nullptr);
+        10, 48, m_splitterX - 15, m_splitterY - 50, m_hWnd, reinterpret_cast<HMENU>(IDC_TREE_CATEGORIES), hInst, nullptr);
     SendMessage(m_hTreeView, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
     if (m_hTreeImageList) {
         TreeView_SetImageList(m_hTreeView, m_hTreeImageList, TVSIL_NORMAL);
@@ -321,7 +365,7 @@ void MainWindow::InitializeControls() {
     // Main ListView (Multi-Select Enabled)
     m_hListView = CreateWindowExW(WS_EX_CLIENTEDGE, WC_LISTVIEWW, L"",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS,
-        m_splitterX + 5, 52, 1100 - m_splitterX - 15, m_splitterY - 54, m_hWnd, reinterpret_cast<HMENU>(IDC_LIST_TWEAKS), nullptr, nullptr);
+        m_splitterX + 5, 48, 1140 - m_splitterX - 15, m_splitterY - 50, m_hWnd, reinterpret_cast<HMENU>(IDC_LIST_TWEAKS), hInst, nullptr);
     SendMessage(m_hListView, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
     ListView_SetExtendedListViewStyle(m_hListView, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER);
 
@@ -339,7 +383,7 @@ void MainWindow::InitializeControls() {
 
     lvc.iSubItem = 0;
     lvc.pszText = const_cast<LPWSTR>(L"Privacy Setting / Tweak");
-    lvc.cx = 440;
+    lvc.cx = 450;
     ListView_InsertColumn(m_hListView, 0, &lvc);
 
     lvc.iSubItem = 1;
@@ -349,17 +393,17 @@ void MainWindow::InitializeControls() {
 
     lvc.iSubItem = 2;
     lvc.pszText = const_cast<LPWSTR>(L"Safety Level");
-    lvc.cx = 120;
+    lvc.cx = 115;
     ListView_InsertColumn(m_hListView, 2, &lvc);
 
     lvc.iSubItem = 3;
     lvc.pszText = const_cast<LPWSTR>(L"Scope");
-    lvc.cx = 90;
+    lvc.cx = 85;
     ListView_InsertColumn(m_hListView, 3, &lvc);
 
     // Modern Details View (Card Layout Inspector)
-    m_hDetailsView = DetailsView::Create(m_hWnd, GetModuleHandle(nullptr), IDC_DETAILS_VIEW,
-        10, m_splitterY + 6, 1100 - 20, 200);
+    m_hDetailsView = DetailsView::Create(m_hWnd, hInst, IDC_DETAILS_VIEW,
+        10, m_splitterY + 4, 1140 - 20, 200);
 
     auto* pDV = reinterpret_cast<DetailsView*>(GetWindowLongPtrW(m_hDetailsView, GWLP_USERDATA));
     if (pDV) {
@@ -368,47 +412,66 @@ void MainWindow::InitializeControls() {
     }
 
     // Status Bar
-    m_hStatusBar = CreateWindowW(STATUSCLASSNAMEW, L"", WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP, 0, 0, 0, 0, m_hWnd, reinterpret_cast<HMENU>(IDC_STATUSBAR), nullptr, nullptr);
-    int sbParts[] = { 250, 390, 750, -1 };
+    m_hStatusBar = CreateWindowW(STATUSCLASSNAMEW, L"", WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP, 0, 0, 0, 0, m_hWnd, reinterpret_cast<HMENU>(IDC_STATUSBAR), hInst, nullptr);
+    int sbParts[] = { 230, 380, 720, -1 };
     SendMessage(m_hStatusBar, SB_SETPARTS, 4, reinterpret_cast<LPARAM>(sbParts));
     SendMessage(m_hStatusBar, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
-    // Embedded Progress Bar in Status Bar
+    // Embedded Progress Bar in Status Bar (Part 1)
     m_hProgressBar = CreateWindowExW(0, PROGRESS_CLASSW, nullptr,
         WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
-        0, 0, 0, 0, m_hStatusBar, reinterpret_cast<HMENU>(IDC_STATUS_PROGRESS), GetModuleHandle(nullptr), nullptr);
+        0, 0, 0, 0, m_hStatusBar, reinterpret_cast<HMENU>(IDC_STATUS_PROGRESS), hInst, nullptr);
 }
 
 void MainWindow::OnSize(int width, int height) {
-    if (m_hToolbar) {
-        MoveWindow(m_hToolbar, 0, 0, width, 50, TRUE);
+    // 1. Responsive Toolbar Layout (Prevents Any Overlap)
+    const int btnY = 10;
+    const int applyW = 115;
+    const int revertW = 106;
+    const int refreshW = 66;
+    const int chkAllW = 80;
+    const int tplW = 150;
 
-        // Reposition toolbar action buttons from right
-        const int btnY = 11;
-        const int applyW = 120;
-        const int revertW = 110;
-        const int refreshW = 70;
-        const int chkAllW = 85;
-        const int tplW = 160;
+    int rightX = width - 12;
 
-        int rightX = width - 12;
+    rightX -= applyW;
+    if (m_hBtnApply) MoveWindow(m_hBtnApply, rightX, btnY, applyW, 26, TRUE);
 
-        rightX -= applyW;
-        if (m_hBtnApply) MoveWindow(m_hBtnApply, rightX, btnY, applyW, 26, TRUE);
+    rightX -= (revertW + 6);
+    if (m_hBtnRevert) MoveWindow(m_hBtnRevert, rightX, btnY, revertW, 26, TRUE);
 
-        rightX -= (revertW + 6);
-        if (m_hBtnRevert) MoveWindow(m_hBtnRevert, rightX, btnY, revertW, 26, TRUE);
+    rightX -= (refreshW + 6);
+    if (m_hBtnRefresh) MoveWindow(m_hBtnRefresh, rightX, btnY, refreshW, 26, TRUE);
 
-        rightX -= (refreshW + 6);
-        if (m_hBtnRefresh) MoveWindow(m_hBtnRefresh, rightX, btnY, refreshW, 26, TRUE);
+    rightX -= (chkAllW + 8);
+    if (m_hChkSelectAll) MoveWindow(m_hChkSelectAll, rightX, btnY + 3, chkAllW, 20, TRUE);
 
-        rightX -= (chkAllW + 10);
-        if (m_hChkSelectAll) MoveWindow(m_hChkSelectAll, rightX, btnY + 3, chkAllW, 20, TRUE);
+    rightX -= (tplW + 8);
+    if (m_hTemplateCombo) MoveWindow(m_hTemplateCombo, rightX, btnY, tplW, 200, TRUE);
 
-        rightX -= (tplW + 10);
-        if (m_hTemplateCombo) MoveWindow(m_hTemplateCombo, rightX, btnY, tplW, 200, TRUE);
+    // Left toolbar controls
+    int searchW = 180;
+    int filterW = 135;
+    int matchW = 95;
+
+    // Graceful adaptation for narrower windows
+    const bool showMatch = (rightX >= 435);
+    if (m_hLblMatchCount) {
+        ShowWindow(m_hLblMatchCount, showMatch ? SW_SHOW : SW_HIDE);
     }
 
+    if (!showMatch) {
+        searchW = (std::max)(120, (rightX - 20) / 2);
+        filterW = (std::max)(110, (rightX - 20) / 2);
+    }
+
+    if (m_hSearchEdit) MoveWindow(m_hSearchEdit, 10, btnY, searchW, 26, TRUE);
+    if (m_hFilterCombo) MoveWindow(m_hFilterCombo, 10 + searchW + 6, btnY, filterW, 200, TRUE);
+    if (m_hLblMatchCount && showMatch) {
+        MoveWindow(m_hLblMatchCount, 10 + searchW + 6 + filterW + 8, btnY + 3, matchW, 20, TRUE);
+    }
+
+    // 2. Status Bar and Embedded Progress Bar
     int sbHeight = 24;
     if (m_hStatusBar) {
         SendMessage(m_hStatusBar, WM_SIZE, 0, 0);
@@ -416,7 +479,6 @@ void MainWindow::OnSize(int width, int height) {
         GetWindowRect(m_hStatusBar, &rcSb);
         sbHeight = rcSb.bottom - rcSb.top;
 
-        // Position progress bar in part 1
         RECT rcPart1{};
         SendMessage(m_hStatusBar, SB_GETRECT, 1, reinterpret_cast<LPARAM>(&rcPart1));
         if (m_hProgressBar) {
@@ -424,20 +486,31 @@ void MainWindow::OnSize(int width, int height) {
         }
     }
 
-    const int contentHeight = height - 52 - sbHeight - 8;
+    // 3. Main Splitters and Panes
+    const int topY = 48;
+    const int contentHeight = height - topY - sbHeight - 6;
     if (m_splitterY > contentHeight - 90) m_splitterY = contentHeight - 120;
     if (m_splitterY < 160) m_splitterY = 160;
-    if (m_splitterX > width - 240) m_splitterX = width - 240;
-    if (m_splitterX < 160) m_splitterX = 160;
+    if (m_splitterX > width - 260) m_splitterX = width - 260;
+    if (m_splitterX < 180) m_splitterX = 180;
+
+    const int listHeight = m_splitterY - topY - 2;
 
     // TreeView (Left)
-    MoveWindow(m_hTreeView, 10, 52, m_splitterX - 15, m_splitterY - 54, TRUE);
+    MoveWindow(m_hTreeView, 10, topY, m_splitterX - 15, listHeight, TRUE);
 
     // ListView (Right)
-    MoveWindow(m_hListView, m_splitterX + 5, 52, width - m_splitterX - 15, m_splitterY - 54, TRUE);
+    const int listX = m_splitterX + 5;
+    const int listWidth = width - listX - 10;
+    MoveWindow(m_hListView, listX, topY, listWidth, listHeight, TRUE);
+
+    // Auto-stretch column 0 to eliminate empty right gap
+    const int fixedCols = 135 + 115 + 85 + 25; // Status + Safety + Scope + scrollbar reserve
+    const int col0Width = (std::max)(320, listWidth - fixedCols);
+    ListView_SetColumnWidth(m_hListView, 0, col0Width);
 
     // Details View (Bottom)
-    const int detailsTop = m_splitterY + 6;
+    const int detailsTop = m_splitterY + 4;
     const int detailsHeight = height - detailsTop - sbHeight - 4;
     if (detailsHeight > 0 && m_hDetailsView) {
         MoveWindow(m_hDetailsView, 10, detailsTop, width - 20, detailsHeight, TRUE);
@@ -716,7 +789,7 @@ void MainWindow::UpdateStatusBar() {
     std::wstring part2 = L"Category: " + m_currentCategory + L" (" + std::to_wstring(m_displayedTweaks.size()) + L" shown)";
     SendMessage(m_hStatusBar, SB_SETTEXTW, 2, reinterpret_cast<LPARAM>(part2.c_str()));
 
-    SendMessage(m_hStatusBar, SB_SETTEXTW, 3, reinterpret_cast<LPARAM>(L"🛡️ Administrator (Full Elevation)"));
+    SendMessage(m_hStatusBar, SB_SETTEXTW, 3, reinterpret_cast<LPARAM>(L"Administrator (Elevated)"));
 }
 
 void MainWindow::OnContextMenu(HWND hWnd, int x, int y) {
@@ -916,7 +989,7 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
         break;
     case IDM_HELP_ABOUT:
         MessageBoxW(m_hWnd,
-            L"PrivatizeWin v1.0\n"
+            L"PrivatizeWin v1.1\n"
             L"Open-source Windows Privacy & Telemetry Silencer\n"
             L"Minimalist, zero-footprint Sysinternals-grade utility.\n\n"
             L"Copyright (C) 2026 PrivatizeWin Project (MIT License)",
