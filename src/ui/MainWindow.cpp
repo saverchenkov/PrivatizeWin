@@ -5,6 +5,7 @@
 #include "../core/TweakRegistry.h"
 #include "../core/TemplateManager.h"
 #include "../core/RestorePoint.h"
+#include <windowsx.h>
 #include <commctrl.h>
 #include <commdlg.h>
 #include <shellapi.h>
@@ -38,7 +39,7 @@ HWND MainWindow::Create(HINSTANCE hInstance) {
         L"PrivatizeWin_MainWindow",
         L"PrivatizeWin - Windows Privacy & Telemetry Silencer",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1024, 700,
+        CW_USEDEFAULT, CW_USEDEFAULT, 1060, 720,
         nullptr, nullptr, hInstance, nullptr
     );
 }
@@ -61,6 +62,90 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
         case WM_NOTIFY:
             s_pMainWnd->OnNotify(reinterpret_cast<NMHDR*>(lParam));
             return 0;
+        case WM_CONTEXTMENU: {
+            const int x = GET_X_LPARAM(lParam);
+            const int y = GET_Y_LPARAM(lParam);
+            s_pMainWnd->OnContextMenu(reinterpret_cast<HWND>(wParam), x, y);
+            return 0;
+        }
+        case WM_SETCURSOR: {
+            POINT pt{};
+            GetCursorPos(&pt);
+            ScreenToClient(hWnd, &pt);
+            RECT rcClient{};
+            GetClientRect(hWnd, &rcClient);
+
+            if (s_pMainWnd->m_dragMode == SplitterDragMode::Vertical) {
+                SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+                return TRUE;
+            }
+            if (s_pMainWnd->m_dragMode == SplitterDragMode::Horizontal) {
+                SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+                return TRUE;
+            }
+
+            // Hover over vertical splitter
+            if (pt.x >= s_pMainWnd->m_splitterX - 4 && pt.x <= s_pMainWnd->m_splitterX + 6 &&
+                pt.y >= 45 && pt.y < s_pMainWnd->m_splitterY) {
+                SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+                return TRUE;
+            }
+
+            // Hover over horizontal splitter
+            if (pt.y >= s_pMainWnd->m_splitterY - 4 && pt.y <= s_pMainWnd->m_splitterY + 6 &&
+                pt.y >= 45 && pt.x >= 10 && pt.x <= rcClient.right - 10) {
+                SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+                return TRUE;
+            }
+            break;
+        }
+        case WM_LBUTTONDOWN: {
+            const int x = GET_X_LPARAM(lParam);
+            const int y = GET_Y_LPARAM(lParam);
+            RECT rcClient{};
+            GetClientRect(hWnd, &rcClient);
+
+            if (x >= s_pMainWnd->m_splitterX - 4 && x <= s_pMainWnd->m_splitterX + 6 &&
+                y >= 45 && y < s_pMainWnd->m_splitterY) {
+                s_pMainWnd->m_dragMode = SplitterDragMode::Vertical;
+                SetCapture(hWnd);
+                return 0;
+            }
+            if (y >= s_pMainWnd->m_splitterY - 4 && y <= s_pMainWnd->m_splitterY + 6 &&
+                y >= 45 && x >= 10 && x <= rcClient.right - 10) {
+                s_pMainWnd->m_dragMode = SplitterDragMode::Horizontal;
+                SetCapture(hWnd);
+                return 0;
+            }
+            break;
+        }
+        case WM_MOUSEMOVE: {
+            if (s_pMainWnd->m_dragMode != SplitterDragMode::None) {
+                const int x = GET_X_LPARAM(lParam);
+                const int y = GET_Y_LPARAM(lParam);
+                RECT rcClient{};
+                GetClientRect(hWnd, &rcClient);
+                const int width = rcClient.right - rcClient.left;
+                const int height = rcClient.bottom - rcClient.top;
+
+                if (s_pMainWnd->m_dragMode == SplitterDragMode::Vertical) {
+                    s_pMainWnd->m_splitterX = std::clamp(x, 140, width - 220);
+                } else if (s_pMainWnd->m_dragMode == SplitterDragMode::Horizontal) {
+                    s_pMainWnd->m_splitterY = std::clamp(y, 140, height - 120);
+                }
+                s_pMainWnd->OnSize(width, height);
+                return 0;
+            }
+            break;
+        }
+        case WM_LBUTTONUP: {
+            if (s_pMainWnd->m_dragMode != SplitterDragMode::None) {
+                s_pMainWnd->m_dragMode = SplitterDragMode::None;
+                ReleaseCapture();
+                return 0;
+            }
+            break;
+        }
         case WM_DESTROY:
             s_pMainWnd.reset();
             PostQuitMessage(0);
@@ -101,21 +186,21 @@ void MainWindow::InitializeControls() {
     const auto hFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
 
     // Toolbar Container
-    m_hToolbar = CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_NOTIFY, 0, 0, 1024, 45, m_hWnd, nullptr, nullptr, nullptr);
+    m_hToolbar = CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_NOTIFY, 0, 0, 1060, 45, m_hWnd, nullptr, nullptr, nullptr);
 
     // Search Label & Edit
     HWND hLblSearch = CreateWindowW(L"STATIC", L"Search:", WS_CHILD | WS_VISIBLE, 12, 14, 50, 20, m_hToolbar, nullptr, nullptr, nullptr);
     SendMessage(hLblSearch, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
-    m_hSearchEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | WS_TABSTOP, 65, 10, 200, 24, m_hToolbar, reinterpret_cast<HMENU>(IDC_SEARCH_EDIT), nullptr, nullptr);
+    m_hSearchEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | WS_TABSTOP, 65, 10, 180, 24, m_hToolbar, reinterpret_cast<HMENU>(IDC_SEARCH_EDIT), nullptr, nullptr);
     SendMessage(m_hSearchEdit, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
     SendMessage(m_hSearchEdit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Filter tweaks (Ctrl+F)..."));
 
     // Template Selector
-    HWND hLblTpl = CreateWindowW(L"STATIC", L"Preset:", WS_CHILD | WS_VISIBLE, 280, 14, 50, 20, m_hToolbar, nullptr, nullptr, nullptr);
+    HWND hLblTpl = CreateWindowW(L"STATIC", L"Preset:", WS_CHILD | WS_VISIBLE, 260, 14, 45, 20, m_hToolbar, nullptr, nullptr, nullptr);
     SendMessage(hLblTpl, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
-    m_hTemplateCombo = CreateWindowW(WC_COMBOBOXW, L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP, 335, 10, 180, 200, m_hToolbar, reinterpret_cast<HMENU>(IDC_TPL_COMBO), nullptr, nullptr);
+    m_hTemplateCombo = CreateWindowW(WC_COMBOBOXW, L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP, 310, 10, 175, 200, m_hToolbar, reinterpret_cast<HMENU>(IDC_TPL_COMBO), nullptr, nullptr);
     SendMessage(m_hTemplateCombo, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
     SendMessage(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Recommended (Safe)"));
     SendMessage(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Strict Privacy"));
@@ -123,27 +208,32 @@ void MainWindow::InitializeControls() {
     SendMessage(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Factory Defaults"));
     SendMessage(m_hTemplateCombo, CB_SETCURSEL, 0, 0);
 
+    // Check All Checkbox (On Top)
+    m_hChkSelectAll = CreateWindowW(WC_BUTTONW, L"Check All", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX | WS_TABSTOP,
+        500, 12, 90, 20, m_hToolbar, reinterpret_cast<HMENU>(IDC_CHK_CHECK_ALL), nullptr, nullptr);
+    SendMessage(m_hChkSelectAll, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
+
     // Action Buttons
-    m_hBtnApply = CreateWindowW(WC_BUTTONW, L"Apply Changes", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 530, 9, 120, 26, m_hToolbar, reinterpret_cast<HMENU>(IDC_BTN_APPLY), nullptr, nullptr);
+    m_hBtnApply = CreateWindowW(WC_BUTTONW, L"Apply Changes", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 600, 9, 115, 26, m_hToolbar, reinterpret_cast<HMENU>(IDC_BTN_APPLY), nullptr, nullptr);
     SendMessage(m_hBtnApply, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
-    m_hBtnRevert = CreateWindowW(WC_BUTTONW, L"Revert Defaults", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 660, 9, 120, 26, m_hToolbar, reinterpret_cast<HMENU>(IDC_BTN_REVERT), nullptr, nullptr);
+    m_hBtnRevert = CreateWindowW(WC_BUTTONW, L"Revert Defaults", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 725, 9, 115, 26, m_hToolbar, reinterpret_cast<HMENU>(IDC_BTN_REVERT), nullptr, nullptr);
     SendMessage(m_hBtnRevert, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
-    m_hBtnRefresh = CreateWindowW(WC_BUTTONW, L"Refresh", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 790, 9, 80, 26, m_hToolbar, reinterpret_cast<HMENU>(IDC_BTN_REFRESH), nullptr, nullptr);
+    m_hBtnRefresh = CreateWindowW(WC_BUTTONW, L"Refresh", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 850, 9, 75, 26, m_hToolbar, reinterpret_cast<HMENU>(IDC_BTN_REFRESH), nullptr, nullptr);
     SendMessage(m_hBtnRefresh, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
     // Category TreeView
     m_hTreeView = CreateWindowExW(WS_EX_CLIENTEDGE, WC_TREEVIEWW, L"",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS | TVS_SHOWSELALWAYS,
-        10, 50, m_splitterX - 15, m_splitterY - 55, m_hWnd, reinterpret_cast<HMENU>(IDC_TREE_CATEGORIES), nullptr, nullptr);
+        10, 48, m_splitterX - 15, m_splitterY - 50, m_hWnd, reinterpret_cast<HMENU>(IDC_TREE_CATEGORIES), nullptr, nullptr);
     SendMessage(m_hTreeView, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
     DarkMode::ApplyToControl(m_hTreeView);
 
-    // Main ListView
+    // Main ListView (Multi-Select Enabled: no LVS_SINGLESEL)
     m_hListView = CreateWindowExW(WS_EX_CLIENTEDGE, WC_LISTVIEWW, L"",
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS,
-        m_splitterX, 50, 1024 - m_splitterX - 20, m_splitterY - 55, m_hWnd, reinterpret_cast<HMENU>(IDC_LIST_TWEAKS), nullptr, nullptr);
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS,
+        m_splitterX + 5, 48, 1060 - m_splitterX - 15, m_splitterY - 50, m_hWnd, reinterpret_cast<HMENU>(IDC_LIST_TWEAKS), nullptr, nullptr);
     SendMessage(m_hListView, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
     ListView_SetExtendedListViewStyle(m_hListView, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER);
     DarkMode::ApplyToControl(m_hListView);
@@ -175,7 +265,7 @@ void MainWindow::InitializeControls() {
     // Details Edit Control
     m_hDetailsEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
         WS_CHILD | WS_VISIBLE | ES_MULTILINE | ES_READONLY | WS_VSCROLL,
-        10, m_splitterY + 5, 1024 - 30, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_EDIT_DETAILS), nullptr, nullptr);
+        10, m_splitterY + 6, 1060 - 20, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_EDIT_DETAILS), nullptr, nullptr);
     SendMessage(m_hDetailsEdit, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
     DarkMode::ApplyToControl(m_hDetailsEdit);
 
@@ -198,16 +288,18 @@ void MainWindow::OnSize(int width, int height) {
 
     const int contentHeight = height - 45 - sbHeight - 10;
     if (m_splitterY > contentHeight - 80) m_splitterY = contentHeight - 120;
-    if (m_splitterY < 150) m_splitterY = 150;
+    if (m_splitterY < 140) m_splitterY = 140;
+    if (m_splitterX > width - 200) m_splitterX = width - 200;
+    if (m_splitterX < 140) m_splitterX = 140;
 
-    // TreeView
-    MoveWindow(m_hTreeView, 10, 48, m_splitterX - 15, m_splitterY - 48, TRUE);
+    // TreeView (Left)
+    MoveWindow(m_hTreeView, 10, 48, m_splitterX - 15, m_splitterY - 50, TRUE);
 
-    // ListView
-    MoveWindow(m_hListView, m_splitterX + 5, 48, width - m_splitterX - 15, m_splitterY - 48, TRUE);
+    // ListView (Right)
+    MoveWindow(m_hListView, m_splitterX + 5, 48, width - m_splitterX - 15, m_splitterY - 50, TRUE);
 
-    // Details
-    const int detailsTop = m_splitterY + 8;
+    // Details (Bottom)
+    const int detailsTop = m_splitterY + 6;
     const int detailsHeight = height - detailsTop - sbHeight - 5;
     if (detailsHeight > 0) {
         MoveWindow(m_hDetailsEdit, 10, detailsTop, width - 20, detailsHeight, TRUE);
@@ -285,10 +377,36 @@ void MainWindow::PopulateListView(std::wstring_view category, std::wstring_view 
         ListView_SetCheckState(m_hListView, i, isProtected);
     }
 
+    UpdateSelectAllCheckboxState();
+
     if (!m_displayedTweaks.empty()) {
         UpdateDetailsPane(0);
     } else {
         SetWindowTextW(m_hDetailsEdit, L"No settings found matching current category and search filter.");
+    }
+}
+
+void MainWindow::UpdateSelectAllCheckboxState() {
+    if (!m_hChkSelectAll) return;
+    const int total = static_cast<int>(m_displayedTweaks.size());
+    if (total == 0) {
+        SendMessage(m_hChkSelectAll, BM_SETCHECK, BST_UNCHECKED, 0);
+        return;
+    }
+
+    int checkedCount = 0;
+    for (int i = 0; i < total; ++i) {
+        if (ListView_GetCheckState(m_hListView, i)) {
+            checkedCount++;
+        }
+    }
+
+    if (checkedCount == total) {
+        SendMessage(m_hChkSelectAll, BM_SETCHECK, BST_CHECKED, 0);
+    } else if (checkedCount == 0) {
+        SendMessage(m_hChkSelectAll, BM_SETCHECK, BST_UNCHECKED, 0);
+    } else {
+        SendMessage(m_hChkSelectAll, BM_SETCHECK, BST_INDETERMINATE, 0);
     }
 }
 
@@ -346,6 +464,143 @@ void MainWindow::UpdateStatusBar() {
     SendMessage(m_hStatusBar, SB_SETTEXTW, 2, reinterpret_cast<LPARAM>(L"Mode: Administrator (Full Elevation)"));
 }
 
+void MainWindow::OnContextMenu(HWND hWnd, int x, int y) {
+    if (hWnd != m_hListView && GetParent(hWnd) != m_hListView) {
+        return;
+    }
+
+    if (x == -1 && y == -1) {
+        // Invoked via keyboard Menu key
+        const int focus = ListView_GetNextItem(m_hListView, -1, LVNI_FOCUSED);
+        if (focus != -1) {
+            RECT rcItem{};
+            ListView_GetItemRect(m_hListView, focus, &rcItem, LVIR_BOUNDS);
+            POINT pt{ rcItem.left + 50, rcItem.bottom };
+            ClientToScreen(m_hListView, &pt);
+            x = pt.x;
+            y = pt.y;
+        } else {
+            POINT pt{ 100, 100 };
+            ClientToScreen(m_hListView, &pt);
+            x = pt.x;
+            y = pt.y;
+        }
+    }
+
+    const int selectedCount = ListView_GetSelectedCount(m_hListView);
+
+    HMENU hMenu = CreatePopupMenu();
+    AppendMenuW(hMenu, MF_STRING, IDM_CTX_PROTECT_SELECTED, L"Check Selected (Enable Protection)\tSpace");
+    AppendMenuW(hMenu, MF_STRING, IDM_CTX_DEFAULT_SELECTED, L"Uncheck Selected (Set to Default)");
+    AppendMenuW(hMenu, MF_STRING, IDM_CTX_INVERT_SELECTED, L"Invert Selected Check State");
+    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(hMenu, MF_STRING, IDM_CTX_APPLY_SELECTED, L"Apply Selected Tweaks Immediately");
+    AppendMenuW(hMenu, MF_STRING, IDM_CTX_SELECT_ALL, L"Select All Items\tCtrl+A");
+    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(hMenu, MF_STRING, IDM_CTX_COPY_ID, L"Copy Tweak ID(s)");
+    AppendMenuW(hMenu, MF_STRING, IDM_CTX_COPY_DETAILS, L"Copy Tweak Details");
+
+    if (selectedCount == 0) {
+        EnableMenuItem(hMenu, IDM_CTX_PROTECT_SELECTED, MF_BYCOMMAND | MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_CTX_DEFAULT_SELECTED, MF_BYCOMMAND | MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_CTX_INVERT_SELECTED, MF_BYCOMMAND | MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_CTX_APPLY_SELECTED, MF_BYCOMMAND | MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_CTX_COPY_ID, MF_BYCOMMAND | MF_GRAYED);
+        EnableMenuItem(hMenu, IDM_CTX_COPY_DETAILS, MF_BYCOMMAND | MF_GRAYED);
+    }
+
+    TrackPopupMenuEx(hMenu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON, x, y, m_hWnd, nullptr);
+    DestroyMenu(hMenu);
+}
+
+void MainWindow::SetSelectedItemsChecked(bool checked) {
+    int i = -1;
+    while ((i = ListView_GetNextItem(m_hListView, i, LVNI_SELECTED)) != -1) {
+        ListView_SetCheckState(m_hListView, i, checked ? TRUE : FALSE);
+    }
+    UpdateSelectAllCheckboxState();
+}
+
+void MainWindow::InvertSelectedItemsChecked() {
+    int i = -1;
+    while ((i = ListView_GetNextItem(m_hListView, i, LVNI_SELECTED)) != -1) {
+        const BOOL cur = ListView_GetCheckState(m_hListView, i);
+        ListView_SetCheckState(m_hListView, i, !cur);
+    }
+    UpdateSelectAllCheckboxState();
+}
+
+void MainWindow::SelectAllListItems() {
+    for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
+        ListView_SetItemState(m_hListView, i, LVIS_SELECTED, LVIS_SELECTED);
+    }
+}
+
+void MainWindow::CopySelectedTweakIds() {
+    std::wstringstream ss;
+    int i = -1;
+    while ((i = ListView_GetNextItem(m_hListView, i, LVNI_SELECTED)) != -1) {
+        const auto& t = m_displayedTweaks[i];
+        ss << std::wstring(t.id.begin(), t.id.end()) << L"\r\n";
+    }
+
+    std::wstring text = ss.str();
+    if (text.empty()) return;
+
+    if (OpenClipboard(m_hWnd)) {
+        EmptyClipboard();
+        const size_t bytes = (text.length() + 1) * sizeof(wchar_t);
+        HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, bytes);
+        if (hMem) {
+            memcpy(GlobalLock(hMem), text.c_str(), bytes);
+            GlobalUnlock(hMem);
+            SetClipboardData(CF_UNICODETEXT, hMem);
+        }
+        CloseClipboard();
+    }
+}
+
+void MainWindow::CopySelectedTweakDetails() {
+    const int focus = ListView_GetNextItem(m_hListView, -1, LVNI_FOCUSED);
+    if (focus < 0 || focus >= static_cast<int>(m_displayedTweaks.size())) return;
+
+    const auto& t = m_displayedTweaks[focus];
+    std::wstringstream ss;
+    ss << L"Tweak: " << t.title << L" [" << std::wstring(t.id.begin(), t.id.end()) << L"]\r\n";
+    ss << L"Category: " << t.category << L"\r\n";
+    ss << L"Description: " << t.description << L"\r\n";
+    ss << L"Impact: " << t.impact << L"\r\n";
+
+    std::wstring text = ss.str();
+    if (OpenClipboard(m_hWnd)) {
+        EmptyClipboard();
+        const size_t bytes = (text.length() + 1) * sizeof(wchar_t);
+        HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, bytes);
+        if (hMem) {
+            memcpy(GlobalLock(hMem), text.c_str(), bytes);
+            GlobalUnlock(hMem);
+            SetClipboardData(CF_UNICODETEXT, hMem);
+        }
+        CloseClipboard();
+    }
+}
+
+void MainWindow::ApplySelectedItemsOnly() {
+    const int count = ListView_GetSelectedCount(m_hListView);
+    if (count == 0) return;
+
+    int applied = 0;
+    int i = -1;
+    while ((i = ListView_GetNextItem(m_hListView, i, LVNI_SELECTED)) != -1) {
+        const bool checked = (ListView_GetCheckState(m_hListView, i) != 0);
+        const bool ok = TweakRegistry::Instance().ApplyTweak(m_displayedTweaks[i].id, checked, UserSelectionMode::AllUsers, {});
+        if (ok) applied++;
+    }
+
+    RefreshAuditState();
+    MessageBoxW(m_hWnd, (std::to_wstring(applied) + L" selected setting(s) applied.").c_str(), L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
+}
+
 void MainWindow::OnCommand(int id, HWND hCtrl) {
     switch (id) {
     case IDM_FILE_EXPORT:
@@ -378,6 +633,7 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
             const BOOL cur = ListView_GetCheckState(m_hListView, i);
             ListView_SetCheckState(m_hListView, i, !cur);
         }
+        UpdateSelectAllCheckboxState();
         break;
     case IDM_ACT_REFRESH:
     case IDC_BTN_REFRESH:
@@ -402,6 +658,35 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
         break;
     case IDM_HELP_GITHUB:
         ShellExecuteW(nullptr, L"open", L"https://github.com/saverchenkov/PrivatizeWin", nullptr, nullptr, SW_SHOWNORMAL);
+        break;
+    case IDC_CHK_CHECK_ALL: {
+        const LRESULT state = SendMessage(m_hChkSelectAll, BM_GETCHECK, 0, 0);
+        const bool shouldCheck = (state == BST_CHECKED);
+        for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
+            ListView_SetCheckState(m_hListView, i, shouldCheck ? TRUE : FALSE);
+        }
+        break;
+    }
+    case IDM_CTX_PROTECT_SELECTED:
+        SetSelectedItemsChecked(true);
+        break;
+    case IDM_CTX_DEFAULT_SELECTED:
+        SetSelectedItemsChecked(false);
+        break;
+    case IDM_CTX_INVERT_SELECTED:
+        InvertSelectedItemsChecked();
+        break;
+    case IDM_CTX_APPLY_SELECTED:
+        ApplySelectedItemsOnly();
+        break;
+    case IDM_CTX_SELECT_ALL:
+        SelectAllListItems();
+        break;
+    case IDM_CTX_COPY_ID:
+        CopySelectedTweakIds();
+        break;
+    case IDM_CTX_COPY_DETAILS:
+        CopySelectedTweakDetails();
         break;
     case IDC_SEARCH_EDIT:
         if (HIWORD(reinterpret_cast<DWORD_PTR>(hCtrl)) == EN_CHANGE || (hCtrl == nullptr && GetFocus() == m_hSearchEdit)) {
@@ -453,6 +738,26 @@ void MainWindow::OnNotify(NMHDR* pnmhdr) {
             if (pnmv->uNewState & LVIS_SELECTED) {
                 UpdateDetailsPane(pnmv->iItem);
             }
+            // Checkbox state changed
+            if ((pnmv->uNewState & LVIS_STATEIMAGEMASK) != (pnmv->uOldState & LVIS_STATEIMAGEMASK)) {
+                UpdateSelectAllCheckboxState();
+            }
+        } else if (pnmhdr->code == LVN_KEYDOWN) {
+            auto* pnkd = reinterpret_cast<NMLVKEYDOWN*>(pnmhdr);
+            if (pnkd->wVKey == VK_SPACE) {
+                const int selCount = ListView_GetSelectedCount(m_hListView);
+                if (selCount > 1) {
+                    const int first = ListView_GetNextItem(m_hListView, -1, LVNI_SELECTED);
+                    const BOOL target = !ListView_GetCheckState(m_hListView, first);
+                    SetSelectedItemsChecked(target != 0);
+                }
+            } else if (pnkd->wVKey == 'A' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+                SelectAllListItems();
+            }
+        } else if (pnmhdr->code == NM_RCLICK) {
+            POINT pt{};
+            GetCursorPos(&pt);
+            OnContextMenu(m_hListView, pt.x, pt.y);
         }
     }
 }
@@ -467,6 +772,7 @@ void MainWindow::ApplyTemplate(std::string_view templateName) {
         const bool shouldCheck = (it != tpl->tweakStates.end()) ? it->second : false;
         ListView_SetCheckState(m_hListView, i, shouldCheck);
     }
+    UpdateSelectAllCheckboxState();
 }
 
 void MainWindow::ApplyCurrentSelection() {
@@ -565,6 +871,7 @@ void MainWindow::ImportConfiguration() {
                     ListView_SetCheckState(m_hListView, i, it->second);
                 }
             }
+            UpdateSelectAllCheckboxState();
             MessageBoxW(m_hWnd, L"Configuration successfully imported. Review the checkboxes and click 'Apply Changes'.", L"Import Configuration", MB_OK | MB_ICONINFORMATION);
         } else {
             MessageBoxW(m_hWnd, L"Invalid or corrupted JSON template file.", L"Error", MB_OK | MB_ICONERROR);

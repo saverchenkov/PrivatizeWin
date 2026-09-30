@@ -37,19 +37,37 @@
 +------------------------------------------------------------------------------------+
 | [File]  [Templates]  [Actions]  [Tools]  [Help]                                    |
 +------------------------------------------------------------------------------------+
-| [ Filter tweaks (Ctrl+F)...        [x] ] [Preset: Recommended (Safe) v] [Apply]   |
-+------------------------+-----------------------------------------------------------+
-| Categories             | [x] Privacy Tweak           | Status    | Safety  | Scope |
-|------------------------+-----------------------------+-----------+---------+-------|
-| > All Settings (27)    | [x] Disable Telemetry (AIT) | Protected | Safe    | HKLM  |
-|   Telemetry & Diag (7) | [x] Disable DiagTrack Svc   | Protected | Safe    | Svc   |
-|   AI & Copilot (3)     | [x] Disable Windows Copilot | Protected | Safe    | Both  |
-|   Cortana & Search (3) | [x] Disable Recall Snapshots| Protected | Safe    | Both  |
-|   Privacy & Tracking (4| [x] Bing Search in Start    | Protected | Safe    | HKCU  |
-|   Office & Outlook (3) | [x] Block Outlook Web App   | Protected | Safe    | HKCU  |
-|   Microsoft Edge (3)   | [x] Disable Edge Telemetry  | Protected | Safe    | HKLM  |
-|   Windows Update (2)   | [x] Disable P2P Updates     | Protected | Safe    | HKLM  |
-+------------------------+-----------------------------------------------------------+
+| [ Filter (Ctrl+F)... ] [Preset: Recommended v] [ ] Check All  [Apply] [Revert] [ ] |
++------------------------+--[||]-----------------------------------------------------+
+| Categories             |  ||  [x] Privacy Tweak      | Status    | Safety  | Scope |
+|------------------------+--||-------------------------+-----------+---------+-------|
+| > All Settings (27)    |  ||  [x] Disable Telemetry  | Protected | Safe    | HKLM  |
+|   Telemetry & Diag (7) |  ||  [x] Disable DiagTrack  | Protected | Safe    | Svc   |
+|   AI & Copilot (3)     |  ||  [x] Disable Copilot    | Protected | Safe    | Both  |
+|   Cortana & Search (3) |  ||  [x] Disable Recall AI  | Protected | Safe    | Both  |
+|   Privacy & Tracking (4|  ||  [x] Bing in Start      | Protected | Safe    | HKCU  |
+|   Office & Outlook (3) |  ||  [x] Block Web Outlook  | Protected | Safe    | HKCU  |
+|   Microsoft Edge (3)   |  ||  [x] Disable Edge Svc   | Protected | Safe    | HKLM  |
+|   Windows Update (2)   |  ||  [x] Disable P2P Updates| Protected | Safe    | HKLM  |
++========================+==[==]=====================================================+
+| TWEAK: Disable Windows Recall Automated Screen Snapshots [AI_RECALL]               |
+| CATEGORY: AI & Copilot  |  RECOMMENDATION: SAFE (Recommended for all users)         |
+|                                                                                    |
+| DESCRIPTION:                                                                       |
+| Disables Microsoft Recall from recording screenshots of your desktop, apps, etc.  |
+|                                                                                    |
+| AFFECTED REGISTRY KEYS:                                                            |
+|   * [HKLM\] SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot -> DisableAIData=1  |
+|   * [HKCU\] SOFTWARE\Microsoft\Windows\CurrentVersion\Recall -> EnableRecall=0     |
++------------------------------------------------------------------------------------+
+| Privatized: 20 / 27 settings | Active Category: All Settings | Administrator       |
++------------------------------------------------------------------------------------+
+```
+
+* **Interactive Resizable Panels:** Click and drag the vertical splitter (`||`) to resize the category rail or the horizontal splitter (`==`) to expand the detail inspector.
+* **Master "Check All" Header:** One-click toggle in the toolbar to check or uncheck all visible settings, with intelligent tri-state support.
+* **Full Multi-Select Support:** Select multiple rows using `Ctrl` or `Shift`, press `Ctrl+A` to select all, or tap `Spacebar` to toggle check states across all highlighted rows.
+* **Right-Click Context Menu:** Right-click any row to access quick actions: *Check Selected*, *Uncheck Selected*, *Invert Selection*, *Apply Selected Immediately*, *Copy Tweak ID*, and *Copy Details*.
 | TWEAK: Disable Windows Recall Automated Screen Snapshots [AI_RECALL]               |
 | CATEGORY: AI & Copilot  |  RECOMMENDATION: SAFE (Recommended for all users)         |
 |                                                                                    |
