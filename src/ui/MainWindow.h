@@ -107,8 +107,8 @@ private:
     std::vector<Tweak> m_displayedTweaks;
     std::vector<bool> m_checkedStates;
 
-    int m_splitterX{ 250 };
-    int m_splitterY{ 390 };
+    int m_splitterX{ 285 };
+    int m_splitterY{ 410 };
     SplitterDragMode m_dragMode{ SplitterDragMode::None };
 };
 

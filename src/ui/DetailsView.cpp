@@ -185,6 +185,11 @@ void DetailsView::OnSize(int width, int height) {
 
     // Scrollbar calculation
     const int visibleBodyHeight = height - 70;
+    const int maxScroll = (std::max)(0, m_totalContentHeight - visibleBodyHeight);
+    if (m_scrollY > maxScroll) {
+        m_scrollY = maxScroll;
+    }
+
     SCROLLINFO si{};
     si.cbSize = sizeof(si);
     si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
@@ -193,6 +198,8 @@ void DetailsView::OnSize(int width, int height) {
     si.nPage = (visibleBodyHeight > 0) ? visibleBodyHeight : 1;
     si.nPos = m_scrollY;
     SetScrollInfo(m_hWnd, SB_VERT, &si, TRUE);
+
+    InvalidateRect(m_hWnd, nullptr, FALSE);
 }
 
 void DetailsView::OnVScroll(WORD scrollCode, short pos) {

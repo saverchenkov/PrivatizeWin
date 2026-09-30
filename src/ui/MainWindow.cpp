@@ -41,6 +41,7 @@ bool MainWindow::RegisterClass(HINSTANCE hInstance) {
     wc.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_APPICON));
     wc.hIconSm = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_APPICON));
     wc.lpszMenuName = L"MAINMENU";
+    wc.style = CS_HREDRAW | CS_VREDRAW;
     return (RegisterClassExW(&wc) != 0);
 }
 
@@ -64,9 +65,24 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 
     if (s_pMainWnd) {
         switch (uMsg) {
+        case WM_GETMINMAXINFO: {
+            auto* pMMI = reinterpret_cast<MINMAXINFO*>(lParam);
+            pMMI->ptMinTrackSize.x = 760;
+            pMMI->ptMinTrackSize.y = 480;
+            return 0;
+        }
         case WM_SIZE:
             s_pMainWnd->OnSize(LOWORD(lParam), HIWORD(lParam));
             return 0;
+        case WM_CTLCOLORSTATIC: {
+            HDC hdcStatic = reinterpret_cast<HDC>(wParam);
+            const bool isDark = DarkMode::IsDarkModeActive();
+            SetBkMode(hdcStatic, TRANSPARENT);
+            SetTextColor(hdcStatic, isDark ? RGB(200, 205, 215) : RGB(40, 45, 55));
+            static HBRUSH s_hBrBarLight = CreateSolidBrush(RGB(246, 248, 250));
+            static HBRUSH s_hBrBarDark = CreateSolidBrush(RGB(38, 40, 44));
+            return reinterpret_cast<INT_PTR>(isDark ? s_hBrBarDark : s_hBrBarLight);
+        }
         case WM_ERASEBKGND: {
             HDC hdc = reinterpret_cast<HDC>(wParam);
             RECT rcClient{};
@@ -77,6 +93,7 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             const COLORREF colBar = isDark ? RGB(38, 40, 44) : RGB(246, 248, 250);
             const COLORREF colLine = isDark ? RGB(55, 58, 64) : RGB(220, 224, 230);
             const COLORREF colBg = isDark ? RGB(28, 28, 30) : RGB(240, 242, 245);
+            const COLORREF colSplitter = isDark ? RGB(50, 52, 58) : RGB(218, 222, 228);
 
             // Fill base background
             HBRUSH hBrBg = CreateSolidBrush(colBg);
@@ -94,6 +111,20 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, hPen));
             MoveToEx(hdc, 0, 46, nullptr);
             LineTo(hdc, w, 46);
+
+            // Subtle splitter guidelines
+            if (s_pMainWnd) {
+                HPEN hPenSplitter = CreatePen(PS_SOLID, 1, colSplitter);
+                SelectObject(hdc, hPenSplitter);
+                MoveToEx(hdc, s_pMainWnd->m_splitterX, 48, nullptr);
+                LineTo(hdc, s_pMainWnd->m_splitterX, s_pMainWnd->m_splitterY - 2);
+
+                MoveToEx(hdc, 10, s_pMainWnd->m_splitterY + 1, nullptr);
+                LineTo(hdc, w - 10, s_pMainWnd->m_splitterY + 1);
+
+                DeleteObject(hPenSplitter);
+            }
+
             SelectObject(hdc, oldPen);
             DeleteObject(hPen);
 
@@ -177,11 +208,12 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
                 const int height = rcClient.bottom - rcClient.top;
 
                 if (s_pMainWnd->m_dragMode == SplitterDragMode::Vertical) {
-                    s_pMainWnd->m_splitterX = (std::clamp)(x, 180, width - 280);
+                    s_pMainWnd->m_splitterX = (std::clamp)(x, 180, width - 260);
                 } else if (s_pMainWnd->m_dragMode == SplitterDragMode::Horizontal) {
                     s_pMainWnd->m_splitterY = (std::clamp)(y, 160, height - 140);
                 }
                 s_pMainWnd->OnSize(width, height);
+                InvalidateRect(hWnd, nullptr, FALSE);
                 return 0;
             }
             break;
@@ -356,6 +388,7 @@ void MainWindow::InitializeControls() {
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS | TVS_SHOWSELALWAYS,
         10, 48, m_splitterX - 15, m_splitterY - 50, m_hWnd, reinterpret_cast<HMENU>(IDC_TREE_CATEGORIES), hInst, nullptr);
     SendMessage(m_hTreeView, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
+    SendMessage(m_hTreeView, TVM_SETEXTENDEDSTYLE, TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
     if (m_hTreeImageList) {
         TreeView_SetImageList(m_hTreeView, m_hTreeImageList, TVSIL_NORMAL);
     }
@@ -424,16 +457,17 @@ void MainWindow::InitializeControls() {
 }
 
 void MainWindow::OnSize(int width, int height) {
-    // 1. Responsive Toolbar Layout (Prevents Any Overlap)
+    // 1. Responsive Toolbar Layout (Prevents Any Overlap Under Any Dimension)
     const int btnY = 10;
-    const int applyW = 115;
-    const int revertW = 106;
-    const int refreshW = 66;
-    const int chkAllW = 80;
-    const int tplW = 150;
+    const int applyW = 112;
+    const int revertW = 104;
+    const int refreshW = 64;
+    const int chkAllW = 78;
+    const int tplW = 140;
 
     int rightX = width - 12;
 
+    // Fixed essential action buttons positioned from right edge
     rightX -= applyW;
     if (m_hBtnApply) MoveWindow(m_hBtnApply, rightX, btnY, applyW, 26, TRUE);
 
@@ -446,29 +480,52 @@ void MainWindow::OnSize(int width, int height) {
     rightX -= (chkAllW + 8);
     if (m_hChkSelectAll) MoveWindow(m_hChkSelectAll, rightX, btnY + 3, chkAllW, 20, TRUE);
 
-    rightX -= (tplW + 8);
-    if (m_hTemplateCombo) MoveWindow(m_hTemplateCombo, rightX, btnY, tplW, 200, TRUE);
+    // Responsive collapsing:
+    // If width >= 940: Show template combo on the right
+    // If width < 940: Hide template combo (accessible in Templates menu) to prevent cramped toolbar
+    const bool showTpl = (width >= 940);
+    if (m_hTemplateCombo) {
+        if (showTpl) {
+            rightX -= (tplW + 8);
+            MoveWindow(m_hTemplateCombo, rightX, btnY, tplW, 200, TRUE);
+            ShowWindow(m_hTemplateCombo, SW_SHOW);
+        } else {
+            ShowWindow(m_hTemplateCombo, SW_HIDE);
+        }
+    }
 
-    // Left toolbar controls
-    int searchW = 180;
-    int filterW = 135;
-    int matchW = 95;
+    // Left toolbar controls: Search box, Filter dropdown, Match count
+    // Guaranteed boundary: left controls must end at least 12px before rightX
+    const int maxLeftW = (std::max)(120, rightX - 12 - 10); // 10 is left margin
 
-    // Graceful adaptation for narrower windows
-    const bool showMatch = (rightX >= 435);
+    // Breakpoint for match count label
+    const bool showMatch = (width >= 1060 && maxLeftW >= 420);
     if (m_hLblMatchCount) {
         ShowWindow(m_hLblMatchCount, showMatch ? SW_SHOW : SW_HIDE);
     }
 
-    if (!showMatch) {
-        searchW = (std::max)(120, (rightX - 20) / 2);
-        filterW = (std::max)(110, (rightX - 20) / 2);
-    }
+    int searchW = 180;
+    int filterW = 130;
+    const int matchW = 90;
 
-    if (m_hSearchEdit) MoveWindow(m_hSearchEdit, 10, btnY, searchW, 26, TRUE);
-    if (m_hFilterCombo) MoveWindow(m_hFilterCombo, 10 + searchW + 6, btnY, filterW, 200, TRUE);
-    if (m_hLblMatchCount && showMatch) {
+    if (showMatch) {
+        int spaceForSearchFilter = maxLeftW - matchW - 14;
+        searchW = (std::min)(220, (std::max)(120, spaceForSearchFilter * 58 / 100));
+        filterW = (std::min)(150, (std::max)(100, spaceForSearchFilter - searchW));
+        if (m_hSearchEdit) MoveWindow(m_hSearchEdit, 10, btnY, searchW, 26, TRUE);
+        if (m_hFilterCombo) MoveWindow(m_hFilterCombo, 10 + searchW + 6, btnY, filterW, 200, TRUE);
         MoveWindow(m_hLblMatchCount, 10 + searchW + 6 + filterW + 8, btnY + 3, matchW, 20, TRUE);
+    } else {
+        int spaceForSearchFilter = maxLeftW;
+        if (spaceForSearchFilter > 320) {
+            searchW = 180;
+            filterW = 130;
+        } else {
+            searchW = (std::max)(110, spaceForSearchFilter * 58 / 100);
+            filterW = (std::max)(95, spaceForSearchFilter - searchW - 6);
+        }
+        if (m_hSearchEdit) MoveWindow(m_hSearchEdit, 10, btnY, searchW, 26, TRUE);
+        if (m_hFilterCombo) MoveWindow(m_hFilterCombo, 10 + searchW + 6, btnY, filterW, 200, TRUE);
     }
 
     // 2. Status Bar and Embedded Progress Bar
@@ -479,6 +536,19 @@ void MainWindow::OnSize(int width, int height) {
         GetWindowRect(m_hStatusBar, &rcSb);
         sbHeight = rcSb.bottom - rcSb.top;
 
+        // Dynamic status bar parts:
+        // Part 0: Summary count (~210px)
+        // Part 1: Progress bar (~130px)
+        // Part 2: Category text (stretches to fill middle)
+        // Part 3: Administrator status (docked to right edge)
+        const int p0 = (std::min)(210, (std::max)(160, width / 4));
+        const int p1 = p0 + 130;
+        const int adminWidth = 175;
+        const int p2 = (std::max)(p1 + 100, width - adminWidth);
+        int parts[] = { p0, p1, p2, -1 };
+        SendMessage(m_hStatusBar, SB_SETPARTS, 4, reinterpret_cast<LPARAM>(parts));
+
+        // Position progress bar in Part 1
         RECT rcPart1{};
         SendMessage(m_hStatusBar, SB_GETRECT, 1, reinterpret_cast<LPARAM>(&rcPart1));
         if (m_hProgressBar) {
@@ -489,9 +559,9 @@ void MainWindow::OnSize(int width, int height) {
     // 3. Main Splitters and Panes
     const int topY = 48;
     const int contentHeight = height - topY - sbHeight - 6;
-    if (m_splitterY > contentHeight - 90) m_splitterY = contentHeight - 120;
+    if (m_splitterY > contentHeight - 100) m_splitterY = (std::max)(160, contentHeight - 120);
     if (m_splitterY < 160) m_splitterY = 160;
-    if (m_splitterX > width - 260) m_splitterX = width - 260;
+    if (m_splitterX > width - 260) m_splitterX = (std::max)(180, width - 280);
     if (m_splitterX < 180) m_splitterX = 180;
 
     const int listHeight = m_splitterY - topY - 2;
@@ -506,7 +576,7 @@ void MainWindow::OnSize(int width, int height) {
 
     // Auto-stretch column 0 to eliminate empty right gap
     const int fixedCols = 135 + 115 + 85 + 25; // Status + Safety + Scope + scrollbar reserve
-    const int col0Width = (std::max)(320, listWidth - fixedCols);
+    const int col0Width = (std::max)(220, listWidth - fixedCols);
     ListView_SetColumnWidth(m_hListView, 0, col0Width);
 
     // Details View (Bottom)
