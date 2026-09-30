@@ -200,6 +200,35 @@ cmake --build build --config Release
 
 ---
 
+## 🧪 Automated Testing
+
+PrivatizeWin includes a comprehensive automated test suite consisting of **24 Unit and Integration Tests** with zero external test dependencies:
+
+* **Unit Tests (`tests/unit/`):**
+  * `SimpleJson`: Verifies parsing of primitives, nested arrays/objects, string escaping, and round-trip serialization.
+  * `SmartHandle`: Verifies move semantics, RAII cleanup, and handle transfer for `UniqueHandle`, `UniqueHKey`, and `UniqueScHandle`.
+  * `CliParser`: Verifies CLI flags, scheduled task syntax, multi-user targeting (`--users`), and dry-run execution.
+  * `TemplateManager`: Verifies embedded presets (`recommended`, `strict`, `minimal`, `defaults`) and JSON file export/import.
+  * `TweakRegistry`: Verifies catalog integrity, category grouping, and JSON dynamic extensions.
+
+* **Integration Tests (`tests/integration/`):**
+  * `RegistryHelperLive`: Safely exercises live Windows Registry read/write/audit/delete routines within an isolated test key (`HKCU\Software\PrivatizeWin_Test_Sandbox`).
+  * `ServiceHelperLive`: Verifies service discovery and startup type queries against running Windows services (`RpcSs`).
+  * `UserHiveDiscovery`: Validates multi-user profile discovery and SID resolution on the active operating system.
+  * `CliEndToEnd`: Spawns child `PrivatizeWin.exe` processes via Win32 pipes to assert exit codes and parse live `--status --output json` output.
+
+### Running Tests
+
+```powershell
+# Run via CMake CTest
+ctest --test-dir build --output-on-failure
+
+# Or execute the test binary directly for detailed test reports:
+.\build\tests\PrivatizeWin_Tests.exe
+```
+
+---
+
 ## 📄 License
 
 PrivatizeWin is licensed under the [MIT License](LICENSE).

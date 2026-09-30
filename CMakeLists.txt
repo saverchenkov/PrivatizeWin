@@ -72,3 +72,10 @@ target_link_libraries(PrivatizeWin PRIVATE
     ole32
     oleaut32
 )
+
+# Automated Unit and Integration Test Suite
+option(BUILD_TESTING "Build the test suite" ON)
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
