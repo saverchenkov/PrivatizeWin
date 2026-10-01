@@ -25,6 +25,7 @@ public:
     [[nodiscard]] static HWND Create(HINSTANCE hInstance);
 
     static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK SplitterWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     explicit MainWindow(HWND hWnd);
     ~MainWindow();
@@ -53,6 +54,7 @@ private:
     void UpdateStatusBar();
     void UpdateSelectionCounts();
     void ToggleSelectedTweakFromDetails();
+    void UpdateSplitterLayout();
 
     void ApplyPreset(std::string_view templateName);
     void SelectPreset(std::string_view templateName);
@@ -90,6 +92,7 @@ private:
 
     // Standard Controls
     HWND m_hListView{ nullptr };
+    HWND m_hSplitterBar{ nullptr };
     HWND m_hDetailsEdit{ nullptr };
     HWND m_hBtnToggleTweak{ nullptr };
     HWND m_hBtnCopyTweak{ nullptr };

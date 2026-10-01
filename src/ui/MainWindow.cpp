@@ -56,7 +56,16 @@ bool MainWindow::RegisterClass(HINSTANCE hInstance) {
     wc.hIconSm = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_APPICON));
     wc.lpszMenuName = L"MAINMENU";
     wc.style = CS_HREDRAW | CS_VREDRAW;
-    return (RegisterClassExW(&wc) != 0);
+    if (!RegisterClassExW(&wc)) return false;
+
+    WNDCLASSEXW sc{ sizeof(sc) };
+    sc.lpfnWndProc = MainWindow::SplitterWndProc;
+    sc.hInstance = hInstance;
+    sc.lpszClassName = L"PrivatizeWin_Splitter";
+    sc.hbrBackground = nullptr;
+    sc.hCursor = LoadCursor(nullptr, IDC_SIZENS);
+    sc.style = CS_HREDRAW | CS_VREDRAW;
+    return (RegisterClassExW(&sc) != 0);
 }
 
 HWND MainWindow::Create(HINSTANCE hInstance) {
@@ -68,6 +77,42 @@ HWND MainWindow::Create(HINSTANCE hInstance) {
         CW_USEDEFAULT, CW_USEDEFAULT, 1080, 720,
         nullptr, nullptr, hInstance, nullptr
     );
+}
+
+LRESULT CALLBACK MainWindow::SplitterWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        RECT rc;
+        GetClientRect(hWnd, &rc);
+        FillRect(hdc, &rc, GetSysColorBrush(COLOR_BTNFACE));
+
+        // Draw a clean separator line in the center of the splitter bar
+        const int midY = (rc.bottom - rc.top) / 2;
+        RECT rcLine = { 0, midY, rc.right, midY + 1 };
+        FillRect(hdc, &rcLine, GetSysColorBrush(COLOR_3DSHADOW));
+
+        EndPaint(hWnd, &ps);
+        return 0;
+    }
+    case WM_ERASEBKGND:
+        return 1;
+    case WM_SETCURSOR:
+        SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+        return TRUE;
+    case WM_LBUTTONDOWN: {
+        HWND hParent = GetParent(hWnd);
+        if (hParent) {
+            POINT pt{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+            ClientToScreen(hWnd, &pt);
+            ScreenToClient(hParent, &pt);
+            SendMessage(hParent, WM_LBUTTONDOWN, wParam, MAKELPARAM(pt.x, pt.y));
+        }
+        return 0;
+    }
+    }
+    return DefWindowProcW(hWnd, uMsg, wParam, lParam);
 }
 
 LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -115,12 +160,16 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             pThis->OnMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
         case WM_SETCURSOR: {
+            if (pThis && pThis->m_isDraggingSplitter) {
+                SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+                return TRUE;
+            }
             HWND hTarget = reinterpret_cast<HWND>(wParam);
             if (hTarget == hWnd) {
                 POINT pt{};
                 GetCursorPos(&pt);
                 ScreenToClient(hWnd, &pt);
-                if (pt.y >= pThis->m_splitterY - 3 && pt.y <= pThis->m_splitterY + 5) {
+                if (pt.y >= pThis->m_splitterY - 4 && pt.y <= pThis->m_splitterY + 10) {
                     SetCursor(LoadCursor(nullptr, IDC_SIZENS));
                     return TRUE;
                 }
@@ -135,11 +184,6 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             RECT rc;
             GetClientRect(hWnd, &rc);
             FillRect(hdc, &rc, GetSysColorBrush(COLOR_BTNFACE));
-
-            // Draw a subtle separator line for the splitter bar (Item 13)
-            RECT rcSplitter = { 10, pThis->m_splitterY, rc.right - 10, pThis->m_splitterY + 1 };
-            FillRect(hdc, &rcSplitter, GetSysColorBrush(COLOR_3DSHADOW));
-
             EndPaint(hWnd, &ps);
             return 0;
         }
@@ -370,7 +414,20 @@ void MainWindow::InitializeControls() {
     col.iSubItem = 3;
     ListView_InsertColumn(m_hListView, 3, &col);
 
-    // 8. Inspector Details Pane (Native RichEdit 5.0)
+    // 8. Adjustable Splitter Bar (Item 13)
+    m_hSplitterBar = CreateWindowExW(
+        0,
+        L"PrivatizeWin_Splitter",
+        L"",
+        WS_CHILD | WS_VISIBLE,
+        10, m_splitterY, 1040, 6,
+        m_hWnd,
+        reinterpret_cast<HMENU>(IDC_SPLITTER_BAR),
+        hInst,
+        nullptr
+    );
+
+    // 9. Inspector Details Pane (Native RichEdit 5.0)
     m_hDetailsEdit = CreateWindowExW(
         WS_EX_CLIENTEDGE,
         MSFTEDIT_CLASS,
@@ -416,10 +473,6 @@ void MainWindow::OnSize(int width, int height) {
 
     SendMessage(m_hStatusBar, WM_SIZE, 0, 0);
 
-    RECT rcStatus{};
-    GetWindowRect(m_hStatusBar, &rcStatus);
-    const int statusH = rcStatus.bottom - rcStatus.top;
-
     // Adjust parts based on width
     int part0 = std::max(360, width - 420);
     int part1 = part0 + 160;
@@ -428,7 +481,6 @@ void MainWindow::OnSize(int width, int height) {
 
     // Toolbar layout
     const int topMargin = 10;
-    const int topH = 34;
     const int ctrlH = 26;
 
     // Position top row controls with unified layout
@@ -463,7 +515,33 @@ void MainWindow::OnSize(int width, int height) {
     SetWindowPos(m_hBtnRevert, nullptr, rightEdge - btnRevertW, topMargin, btnRevertW, ctrlH, SWP_NOZORDER);
     SetWindowPos(m_hBtnApply, nullptr, rightEdge - btnRevertW - 8 - btnApplyW, topMargin, btnApplyW, ctrlH, SWP_NOZORDER);
 
-    // Calculate vertical layout using adjustable splitter (Item 13)
+    UpdateSplitterLayout();
+
+    // Adjust list column 0 to fill available width
+    if (m_hListView) {
+        const int fixedCols = ListView_GetColumnWidth(m_hListView, 1) +
+                              ListView_GetColumnWidth(m_hListView, 2) +
+                              ListView_GetColumnWidth(m_hListView, 3);
+        const int col0Width = std::max(280, width - 20 - fixedCols - GetSystemMetrics(SM_CXVSCROLL) - 4);
+        ListView_SetColumnWidth(m_hListView, 0, col0Width);
+    }
+
+    InvalidateRect(m_hWnd, nullptr, FALSE);
+}
+
+void MainWindow::UpdateSplitterLayout() {
+    if (!m_hListView || !m_hDetailsEdit) return;
+
+    RECT rc;
+    GetClientRect(m_hWnd, &rc);
+    const int width = rc.right - rc.left;
+    const int height = rc.bottom - rc.top;
+
+    RECT rcStatus{};
+    GetWindowRect(m_hStatusBar, &rcStatus);
+    const int statusH = rcStatus.bottom - rcStatus.top;
+
+    const int topH = 34;
     const int minListH = 180;
     const int minDetailsH = 120;
 
@@ -475,31 +553,41 @@ void MainWindow::OnSize(int width, int height) {
 
     const int listTop = topH + 12;
     const int listH = std::max(minListH, m_splitterY - listTop);
-    SetWindowPos(m_hListView, nullptr, 10, listTop, width - 20, listH, SWP_NOZORDER);
 
-    // Adjust list column 0 to fill available width
-    if (m_hListView) {
-        const int fixedCols = ListView_GetColumnWidth(m_hListView, 1) +
-                              ListView_GetColumnWidth(m_hListView, 2) +
-                              ListView_GetColumnWidth(m_hListView, 3);
-        const int col0Width = std::max(280, width - 20 - fixedCols - GetSystemMetrics(SM_CXVSCROLL) - 4);
-        ListView_SetColumnWidth(m_hListView, 0, col0Width);
-    }
-
-    // Details pane and buttons below splitter
-    const int detailsBtnsTop = m_splitterY + 8;
-    SetWindowPos(m_hBtnToggleTweak, nullptr, 10, detailsBtnsTop, 130, 26, SWP_NOZORDER);
-    SetWindowPos(m_hBtnCopyTweak, nullptr, 148, detailsBtnsTop, 165, 26, SWP_NOZORDER);
-
+    const int splitterH = 6;
+    const int detailsBtnsTop = m_splitterY + splitterH + 4;
     const int editTop = detailsBtnsTop + 34;
     const int editH = std::max(minDetailsH, height - statusH - editTop - 6);
-    SetWindowPos(m_hDetailsEdit, nullptr, 10, editTop, width - 20, editH, SWP_NOZORDER);
 
-    InvalidateRect(m_hWnd, nullptr, FALSE);
+    HDWP hdwp = BeginDeferWindowPos(5);
+    if (hdwp) {
+        hdwp = DeferWindowPos(hdwp, m_hListView, nullptr, 10, listTop, width - 20, listH,
+            SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+        if (m_hSplitterBar) {
+            hdwp = DeferWindowPos(hdwp, m_hSplitterBar, nullptr, 10, m_splitterY, width - 20, splitterH,
+                SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+        }
+        hdwp = DeferWindowPos(hdwp, m_hBtnToggleTweak, nullptr, 10, detailsBtnsTop, 130, 26,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+        hdwp = DeferWindowPos(hdwp, m_hBtnCopyTweak, nullptr, 148, detailsBtnsTop, 165, 26,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+        hdwp = DeferWindowPos(hdwp, m_hDetailsEdit, nullptr, 10, editTop, width - 20, editH,
+            SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+        if (hdwp) {
+            EndDeferWindowPos(hdwp);
+        }
+    }
+
+    // Completely erase and repaint any exposed parent window band around the splitter
+    RECT rcBand = { 0, m_splitterY - 8, width, editTop + 2 };
+    RedrawWindow(m_hWnd, &rcBand, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW);
+    if (m_hSplitterBar) {
+        RedrawWindow(m_hSplitterBar, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW);
+    }
 }
 
 void MainWindow::OnLButtonDown(int /*x*/, int y) {
-    if (y >= m_splitterY - 3 && y <= m_splitterY + 5) {
+    if (y >= m_splitterY - 4 && y <= m_splitterY + 10) {
         m_isDraggingSplitter = true;
         SetCapture(m_hWnd);
     }
@@ -510,6 +598,10 @@ void MainWindow::OnLButtonUp() {
         m_isDraggingSplitter = false;
         ReleaseCapture();
         SavePreferences();
+
+        RECT rc;
+        GetClientRect(m_hWnd, &rc);
+        OnSize(rc.right - rc.left, rc.bottom - rc.top);
     }
 }
 
@@ -519,9 +611,9 @@ void MainWindow::OnMouseMove(int /*x*/, int y) {
         GetClientRect(m_hWnd, &rc);
         const int minTop = 220;
         const int maxBottom = rc.bottom - 180;
-        if (y >= minTop && y <= maxBottom) {
+        if (y >= minTop && y <= maxBottom && y != m_splitterY) {
             m_splitterY = y;
-            OnSize(rc.right - rc.left, rc.bottom - rc.top);
+            UpdateSplitterLayout();
         }
     }
 }
