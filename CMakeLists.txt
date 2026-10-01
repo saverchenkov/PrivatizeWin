@@ -4,7 +4,7 @@ project(PrivatizeWin LANGUAGES CXX RC)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_compile_definitions(UNICODE _UNICODE)
+add_compile_definitions(UNICODE _UNICODE WINVER=0x0A00 _WIN32_WINNT=0x0A00)
 
 # Force static CRT linking (/MT in Release, /MTd in Debug) for single standalone executable with 0 dependencies
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -51,8 +51,6 @@ set(SOURCES
     src/ui/DarkMode.cpp
     src/ui/ScheduleDialog.h
     src/ui/ScheduleDialog.cpp
-    src/ui/DetailsView.h
-    src/ui/DetailsView.cpp
     src/ui/MainWindow.h
     src/ui/MainWindow.cpp
     res/resource.h

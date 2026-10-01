@@ -2,26 +2,20 @@
 
 #include <windows.h>
 #include <commctrl.h>
+#include <richedit.h>
 #include <string>
 #include <string_view>
 #include <vector>
 #include <memory>
 #include "../core/Types.h"
-#include "DetailsView.h"
 
 namespace PrivatizeWin {
-
-enum class SplitterDragMode {
-    None,
-    Vertical,   // between TreeView and ListView
-    Horizontal  // between top panes and bottom Details pane
-};
 
 enum class FilterMode {
     All,
     UnprotectedOnly,
     ProtectedOnly,
-    SafeOnly,
+    RecommendedOnly,
     PendingChanges
 };
 
@@ -50,10 +44,8 @@ private:
     LRESULT OnCustomDraw(NMHDR* pnmhdr);
 
     void InitializeFonts();
-    void InitializeTreeIcons();
     void InitializeControls();
-    void PopulateCategories();
-    void PopulateListView(std::wstring_view category = L"All Settings", std::wstring_view filter = L"", FilterMode mode = FilterMode::All);
+    void PopulateListView(std::wstring_view filter = L"", FilterMode mode = FilterMode::All);
     void UpdateDetailsPane(int selectedIndex);
     void UpdateStatusBar();
     void UpdateSelectAllCheckboxState();
@@ -76,7 +68,6 @@ private:
     void SelectAllListItems();
 
     HWND m_hWnd{ nullptr };
-    HWND m_hToolbar{ nullptr };
     HWND m_hSearchEdit{ nullptr };
     HWND m_hFilterCombo{ nullptr };
     HWND m_hLblMatchCount{ nullptr };
@@ -86,9 +77,11 @@ private:
     HWND m_hBtnRevert{ nullptr };
     HWND m_hBtnRefresh{ nullptr };
 
-    HWND m_hTreeView{ nullptr };
+    // Standard Controls (Unified Grouped ListView & Native RichEdit Inspector)
     HWND m_hListView{ nullptr };
-    HWND m_hDetailsView{ nullptr };
+    HWND m_hDetailsEdit{ nullptr };
+    HWND m_hBtnToggleTweak{ nullptr };
+    HWND m_hBtnCopyTweak{ nullptr };
     HWND m_hStatusBar{ nullptr };
     HWND m_hProgressBar{ nullptr };
 
@@ -96,20 +89,14 @@ private:
     HFONT m_hFontBold{ nullptr };
     HFONT m_hFontTitle{ nullptr };
     HFONT m_hFontCode{ nullptr };
-    HFONT m_hFontBadge{ nullptr };
 
-    HIMAGELIST m_hTreeImageList{ nullptr };
     HIMAGELIST m_hRowImageList{ nullptr };
 
-    std::wstring m_currentCategory{ L"All Settings" };
     std::wstring m_currentFilter;
     FilterMode m_filterMode{ FilterMode::All };
     std::vector<Tweak> m_displayedTweaks;
     std::vector<bool> m_checkedStates;
-
-    int m_splitterX{ 285 };
-    int m_splitterY{ 410 };
-    SplitterDragMode m_dragMode{ SplitterDragMode::None };
+    HMODULE m_hRichEditLib{ nullptr };
 };
 
 } // namespace PrivatizeWin
