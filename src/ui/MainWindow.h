@@ -19,14 +19,13 @@ enum class FilterMode {
     RecommendedOnly
 };
 
-// Multi-state Checkbox (Item 10)
+// Multi-state Checkbox (All-or-Nothing)
 enum class CheckboxState : UINT {
     None = 0,
-    Unchecked = 1,      // [ ] Empty box - Windows default, not applied
+    Unchecked = 1,      // [ ] Empty box - Windows default / not applied
     AlreadyEnabled = 2, // [✔] Solid green box - Already applied in Windows
-    Partial = 3,        // [■] Solid amber box - Partially applied across keys/services
-    PendingEnable = 4,  // [☑] Solid blue box - Selected / pending to be applied
-    PendingRevert = 5   // [-] Solid red box - Selected / pending to be restored/reverted
+    PendingEnable = 3,  // [☑] Solid blue box - Selected / pending to be applied
+    PendingRevert = 4   // [-] Solid red box - Selected / pending to be restored/reverted
 };
 
 class MainWindow {

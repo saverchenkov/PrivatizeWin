@@ -492,7 +492,7 @@ void MainWindow::CreateStateImages() {
     }
 
     const int iconSize = 16;
-    m_hStateImageList = ImageList_Create(iconSize, iconSize, ILC_COLOR32 | ILC_MASK, 5, 1);
+    m_hStateImageList = ImageList_Create(iconSize, iconSize, ILC_COLOR32 | ILC_MASK, 4, 1);
     if (!m_hStateImageList) return;
 
     HDC hdcScreen = GetDC(nullptr);
@@ -558,29 +558,7 @@ void MainWindow::CreateStateImages() {
         DeleteObject(hBrush);
     });
 
-    // State 3: Partial [■] (Solid amber with white square)
-    addStateBitmap([](HDC hdc, bool /*dark*/) {
-        COLORREF clrAmber = RGB(225, 135, 0);
-        COLORREF clrBorder = RGB(185, 105, 0);
-        HPEN hPen = CreatePen(PS_SOLID, 1, clrBorder);
-        HBRUSH hBrush = CreateSolidBrush(clrAmber);
-        HPEN hOldPen = static_cast<HPEN>(SelectObject(hdc, hPen));
-        HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(hdc, hBrush));
-
-        RoundRect(hdc, 1, 1, 15, 15, 3, 3);
-
-        RECT rcSq{ 5, 5, 11, 11 };
-        HBRUSH hWhiteBrush = CreateSolidBrush(RGB(255, 255, 255));
-        FillRect(hdc, &rcSq, hWhiteBrush);
-        DeleteObject(hWhiteBrush);
-
-        SelectObject(hdc, hOldPen);
-        SelectObject(hdc, hOldBrush);
-        DeleteObject(hPen);
-        DeleteObject(hBrush);
-    });
-
-    // State 4: PendingEnable [☑] (Solid accent blue with white checkmark)
+    // State 3: PendingEnable [☑] (Solid accent blue with white checkmark)
     addStateBitmap([](HDC hdc, bool /*dark*/) {
         COLORREF clrBlue = RGB(0, 120, 215);
         COLORREF clrBorder = RGB(0, 95, 175);
@@ -604,7 +582,7 @@ void MainWindow::CreateStateImages() {
         DeleteObject(hBrush);
     });
 
-    // State 5: PendingRevert [-] (Solid red with white horizontal minus bar)
+    // State 4: PendingRevert [-] (Solid red with white horizontal minus bar)
     addStateBitmap([](HDC hdc, bool /*dark*/) {
         COLORREF clrRed = RGB(209, 52, 56);
         COLORREF clrBorder = RGB(165, 35, 40);
@@ -660,8 +638,7 @@ void MainWindow::ToggleRowCheckbox(int itemIndex) {
     } else if (cur == CheckboxState::PendingEnable) {
         m_pendingEnableIds.erase(t.id);
         m_pendingRevertIds.erase(t.id);
-        nextState = (auditSt == SettingStatus::Partial) ? CheckboxState::Partial :
-                    ((auditSt == SettingStatus::Applied) ? CheckboxState::AlreadyEnabled : CheckboxState::Unchecked);
+        nextState = (auditSt == SettingStatus::Applied) ? CheckboxState::AlreadyEnabled : CheckboxState::Unchecked;
     } else if (cur == CheckboxState::AlreadyEnabled) {
         m_pendingRevertIds.insert(t.id);
         m_pendingEnableIds.erase(t.id);
@@ -670,10 +647,6 @@ void MainWindow::ToggleRowCheckbox(int itemIndex) {
         m_pendingRevertIds.erase(t.id);
         m_pendingEnableIds.erase(t.id);
         nextState = CheckboxState::AlreadyEnabled;
-    } else if (cur == CheckboxState::Partial) {
-        m_pendingEnableIds.insert(t.id);
-        m_pendingRevertIds.erase(t.id);
-        nextState = CheckboxState::PendingEnable;
     } else {
         m_pendingEnableIds.insert(t.id);
         nextState = CheckboxState::PendingEnable;
@@ -889,14 +862,12 @@ void MainWindow::InitializeHeaderTooltips() {
         L"Status & Multi-State Checkbox:\r\n"
         L"Reflects machine audit status and pending staging actions.\r\n\r\n"
         L"System State (Status Column):\r\n"
-        L"  \u25CF Applied: Setting is active and enforced on your machine.\r\n"
-        L"  \u25D0 Partial: Partially applied across keys, services, or users.\r\n"
+        L"  \u25CF Applied: Setting is 100% active and enforced on your machine.\r\n"
         L"  \u25CB Not applied: Setting is in Windows standard default state.\r\n"
         L"  ? Unknown: Key inaccessible or detection failed.\r\n\r\n"
         L"Checkbox State:\r\n"
         L"  \u2022 [  ] Unchecked: Setting is default / not applied.\r\n"
         L"  \u2022 [\u2714] Green Check: Setting is already applied in Windows.\r\n"
-        L"  \u2022 [\u25A0] Amber Square: Setting is partially applied.\r\n"
         L"  \u2022 [\u2611] Blue Check: Staged to be applied on next action.\r\n"
         L"  \u2022 [ - ] Red Minus: Staged to be restored to Windows default."
     );
@@ -1031,14 +1002,14 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
 
         ListView_InsertItem(m_hListView, &lvi);
 
-        // Status text (Item 4: Applied, Not applied, Partial, Unknown, Not applicable)
+        // Status text (Item 4: Applied, Not applied, Unknown, Not applicable)
         std::wstring stStr;
         switch (st) {
         case SettingStatus::Applied:       stStr = L"\u25CF Applied"; break;
         case SettingStatus::NotApplied:    stStr = L"\u25CB Not applied"; break;
-        case SettingStatus::Partial:       stStr = L"\u25D0 Partial"; break;
         case SettingStatus::Unknown:       stStr = L"? Unknown"; break;
         case SettingStatus::NotApplicable: stStr = L"\u2014 Not applicable"; break;
+        default:                           stStr = L"\u25CB Not applied"; break;
         }
         ListView_SetItemText(m_hListView, itemIndex, 1, const_cast<LPWSTR>(stStr.c_str()));
 
@@ -1068,8 +1039,6 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
             cbState = CheckboxState::PendingRevert;
         } else if (st == SettingStatus::Applied) {
             cbState = CheckboxState::AlreadyEnabled;
-        } else if (st == SettingStatus::Partial) {
-            cbState = CheckboxState::Partial;
         }
         SetRowCheckboxState(itemIndex, cbState);
 
@@ -1169,9 +1138,9 @@ void MainWindow::UpdateDetailsPane(int selectedIndex) {
     switch (st) {
     case SettingStatus::Applied:       stStr = L"Applied"; break;
     case SettingStatus::NotApplied:    stStr = L"Not applied"; break;
-    case SettingStatus::Partial:       stStr = L"Partial"; break;
     case SettingStatus::Unknown:       stStr = L"Unknown"; break;
     case SettingStatus::NotApplicable: stStr = L"Not applicable"; break;
+    default:                           stStr = L"Not applied"; break;
     }
 
     std::wstring impactStr;
@@ -1263,9 +1232,9 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
         switch (newSt) {
         case SettingStatus::Applied:       stStr = L"\u25CF Applied"; break;
         case SettingStatus::NotApplied:    stStr = L"\u25CB Not applied"; break;
-        case SettingStatus::Partial:       stStr = L"\u25D0 Partial"; break;
         case SettingStatus::Unknown:       stStr = L"? Unknown"; break;
         case SettingStatus::NotApplicable: stStr = L"\u2014 Not applicable"; break;
+        default:                           stStr = L"\u25CB Not applied"; break;
         }
 
         ListView_SetItemText(m_hListView, sel, 1, const_cast<LPWSTR>(stStr.c_str()));
@@ -1276,8 +1245,6 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
         CheckboxState cbState = CheckboxState::Unchecked;
         if (newSt == SettingStatus::Applied) {
             cbState = CheckboxState::AlreadyEnabled;
-        } else if (newSt == SettingStatus::Partial) {
-            cbState = CheckboxState::Partial;
         }
         SetRowCheckboxState(sel, cbState);
 
@@ -1467,8 +1434,6 @@ void MainWindow::SelectPreset(std::string_view templateName) {
             cbState = CheckboxState::PendingEnable;
         } else if (st == SettingStatus::Applied) {
             cbState = CheckboxState::AlreadyEnabled;
-        } else if (st == SettingStatus::Partial) {
-            cbState = CheckboxState::Partial;
         }
         SetRowCheckboxState(i, cbState);
     }
@@ -1502,7 +1467,7 @@ void MainWindow::InvertShownSelection() {
         const CheckboxState cur = GetRowCheckboxState(i);
         if (cur == CheckboxState::PendingEnable) {
             m_pendingEnableIds.erase(t.id);
-            SetRowCheckboxState(i, (st == SettingStatus::Partial) ? CheckboxState::Partial : CheckboxState::Unchecked);
+            SetRowCheckboxState(i, (st == SettingStatus::Applied) ? CheckboxState::AlreadyEnabled : CheckboxState::Unchecked);
         } else if (cur == CheckboxState::PendingRevert) {
             m_pendingRevertIds.erase(t.id);
             SetRowCheckboxState(i, CheckboxState::AlreadyEnabled);
@@ -1528,8 +1493,6 @@ void MainWindow::ClearSelection() {
         CheckboxState cbState = CheckboxState::Unchecked;
         if (st == SettingStatus::Applied) {
             cbState = CheckboxState::AlreadyEnabled;
-        } else if (st == SettingStatus::Partial) {
-            cbState = CheckboxState::Partial;
         }
         SetRowCheckboxState(i, cbState);
     }
@@ -1827,9 +1790,9 @@ void MainWindow::RefreshAuditState() {
         switch (st) {
         case SettingStatus::Applied:       stStr = L"\u25CF Applied"; break;
         case SettingStatus::NotApplied:    stStr = L"\u25CB Not applied"; break;
-        case SettingStatus::Partial:       stStr = L"\u25D0 Partial"; break;
         case SettingStatus::Unknown:       stStr = L"? Unknown"; break;
         case SettingStatus::NotApplicable: stStr = L"\u2014 Not applicable"; break;
+        default:                           stStr = L"\u25CB Not applied"; break;
         }
 
         ListView_SetItemText(m_hListView, i, 1, const_cast<LPWSTR>(stStr.c_str()));
@@ -1841,8 +1804,6 @@ void MainWindow::RefreshAuditState() {
             cbState = CheckboxState::PendingRevert;
         } else if (st == SettingStatus::Applied) {
             cbState = CheckboxState::AlreadyEnabled;
-        } else if (st == SettingStatus::Partial) {
-            cbState = CheckboxState::Partial;
         }
         SetRowCheckboxState(i, cbState);
     }
@@ -2060,8 +2021,6 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
             const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
             if (st == SettingStatus::Applied) {
                 SetRowCheckboxState(i, CheckboxState::AlreadyEnabled);
-            } else if (st == SettingStatus::Partial) {
-                SetRowCheckboxState(i, CheckboxState::Partial);
             } else {
                 SetRowCheckboxState(i, CheckboxState::Unchecked);
             }

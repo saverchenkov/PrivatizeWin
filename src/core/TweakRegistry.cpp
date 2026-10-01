@@ -4273,7 +4273,6 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"Deactivating is not recommended! With this you deactivate the automatic installation of Windows Updates. Security leaks will not be tackled automatically.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\System", L"AllowClipboardHistory", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU", L"NoAutoUpdate", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -4286,7 +4285,6 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"Deactivating is not recommended! With this you deactivate the automatic installation of Windows Updates. Security leaks will not be tackled automatically.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Clipboard", L"EnableClipboardHistory", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\wuauserv", L"Start", RegType::Dword, 0, 0, L"", L"", false });
         t.serviceActions.push_back({ L"wuauserv", 4, 2, true });
         AddTweak(std::move(t));
@@ -4300,7 +4298,6 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::User;
-        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\System", L"AllowCrossDeviceClipboard", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Services\\7971f918-a847-4430-9279-4a52d1efe18d", L"RegisteredWithAU", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -4313,7 +4310,6 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"Windows 10 (from version 20H2 onward) allows optional updates, including preview updates, to be installed. These updates may include new features or fixes that have not yet been fully tested. Disable this setting to prevent optional updates from being installed automatically.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\userAccountInformation", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate", L"SetAllowOptionalContent", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate", L"AllowOptionalContent", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
@@ -4327,8 +4323,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"Windows 10 (from version 20H2 onward) allows optional updates, including preview updates, to be installed. These updates may include new features or fixes that have not yet been fully tested. Disable this setting to prevent optional updates from being installed automatically.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{C1D23ACC-752B-43E5-8448-8D0E519CD6D6}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\userAccountInformation", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate", L"SetAllowOptionalContent", RegType::Dword, 0, 0, L"", L"", false });
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate", L"AllowOptionalContent", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -4445,7 +4441,6 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
     size_t appliedCount = 0;
     size_t notAppliedCount = 0;
     size_t unknownCount = 0;
-    size_t partialCount = 0;
 
     // Check services
     for (const auto& sa : t->serviceActions) {
@@ -4453,7 +4448,6 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
         if (st == SettingStatus::Applied) appliedCount++;
         else if (st == SettingStatus::NotApplied) notAppliedCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
-        else if (st == SettingStatus::Partial) partialCount++;
         else notAppliedCount++;
     }
 
@@ -4469,13 +4463,11 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
         if (st == SettingStatus::Applied) appliedCount++;
         else if (st == SettingStatus::NotApplied) notAppliedCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
-        else if (st == SettingStatus::Partial) partialCount++;
         else notAppliedCount++;
     }
 
     if (unknownCount == totalChecks) return SettingStatus::Unknown;
     if (appliedCount == totalChecks) return SettingStatus::Applied;
-    if (appliedCount > 0 || partialCount > 0) return SettingStatus::Partial;
     return SettingStatus::NotApplied;
 }
 

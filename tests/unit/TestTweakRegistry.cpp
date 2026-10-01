@@ -79,10 +79,11 @@ TEST_CASE(Unit_TweakRegistry, SplitUserMachineAndNoPartialState) {
         // Assert scope is strictly User, Machine, or Service
         ASSERT_TRUE(t.scope == TargetScope::User || t.scope == TargetScope::Machine || t.scope == TargetScope::Service);
 
-        // Audit state is strictly defined
+        // Audit state is strictly all-or-nothing (never returns Partial)
         const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
         ASSERT_TRUE(st == SettingStatus::Applied || st == SettingStatus::NotApplied ||
-                    st == SettingStatus::Partial || st == SettingStatus::Unknown || st == SettingStatus::NotApplicable);
+                    st == SettingStatus::Unknown || st == SettingStatus::NotApplicable);
+        ASSERT_TRUE(st != SettingStatus::Partial);
 
         if (t.id.ends_with("_USER")) {
             ASSERT_TRUE(t.scope == TargetScope::User);
