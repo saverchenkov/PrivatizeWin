@@ -212,6 +212,9 @@ MainWindow::~MainWindow() {
     if (m_hFontTitle) DeleteObject(m_hFontTitle);
     if (m_hFontCode) DeleteObject(m_hFontCode);
     if (m_hRichEditLib) FreeLibrary(m_hRichEditLib);
+    if (m_hListView) {
+        RemoveWindowSubclass(m_hListView, ListViewSubclassProc, 1);
+    }
 }
 
 void MainWindow::InitializeFonts() {
@@ -385,6 +388,7 @@ void MainWindow::InitializeControls() {
         nullptr
     );
     SendMessage(m_hListView, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
+    SetWindowSubclass(m_hListView, ListViewSubclassProc, 1, reinterpret_cast<DWORD_PTR>(this));
 
     // Modern list view styles with checkboxes for selection (Item 1)
     ListView_SetExtendedListViewStyle(m_hListView,
@@ -702,7 +706,6 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
         switch (st) {
         case SettingStatus::Applied:       stStr = L"\u25CF Applied"; break;
         case SettingStatus::NotApplied:    stStr = L"\u25CB Not applied"; break;
-        case SettingStatus::Partial:       stStr = L"\u25D0 Partial"; break;
         case SettingStatus::Unknown:       stStr = L"? Unknown"; break;
         case SettingStatus::NotApplicable: stStr = L"\u2014 Not applicable"; break;
         }
@@ -717,15 +720,15 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
         }
         ListView_SetItemText(m_hListView, itemIndex, 2, const_cast<LPWSTR>(impactStr.c_str()));
 
-        // Scope text (Item 12: User, Machine, or Machine & user)
+        // Scope text (Item 12: User, Machine, or Service)
         std::wstring scopeStr;
         switch (t.scope) {
         case TargetScope::Machine: scopeStr = L"Machine"; break;
         case TargetScope::User:    scopeStr = L"User"; break;
-        case TargetScope::Both:    scopeStr = L"Machine & user"; break;
         case TargetScope::Service: scopeStr = L"Machine (Service)"; break;
         }
         ListView_SetItemText(m_hListView, itemIndex, 3, const_cast<LPWSTR>(scopeStr.c_str()));
+
 
         // Checkbox reflects applied state (Checked = Applied, Unchecked = Default)
         m_isProgrammaticCheckChange = true;
@@ -787,7 +790,6 @@ void MainWindow::UpdateDetailsPane(int selectedIndex) {
     switch (st) {
     case SettingStatus::Applied:       stStr = L"Applied"; break;
     case SettingStatus::NotApplied:    stStr = L"Not applied"; break;
-    case SettingStatus::Partial:       stStr = L"Partial"; break;
     case SettingStatus::Unknown:       stStr = L"Unknown"; break;
     case SettingStatus::NotApplicable: stStr = L"Not applicable"; break;
     }
@@ -803,9 +805,9 @@ void MainWindow::UpdateDetailsPane(int selectedIndex) {
     switch (t.scope) {
     case TargetScope::Machine: scopeStr = L"Machine"; break;
     case TargetScope::User:    scopeStr = L"User"; break;
-    case TargetScope::Both:    scopeStr = L"Machine & user"; break;
     case TargetScope::Service: scopeStr = L"Machine (Service)"; break;
     }
+
 
     ss << L"State: " << stStr
        << L"  |  Impact: " << impactStr
@@ -881,10 +883,10 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
         switch (newSt) {
         case SettingStatus::Applied:       stStr = L"\u25CF Applied"; break;
         case SettingStatus::NotApplied:    stStr = L"\u25CB Not applied"; break;
-        case SettingStatus::Partial:       stStr = L"\u25D0 Partial"; break;
         case SettingStatus::Unknown:       stStr = L"? Unknown"; break;
         case SettingStatus::NotApplicable: stStr = L"\u2014 Not applicable"; break;
         }
+
         ListView_SetItemText(m_hListView, sel, 1, const_cast<LPWSTR>(stStr.c_str()));
 
         // Keep the checkbox in sync with the applied state
@@ -1234,10 +1236,10 @@ void MainWindow::RefreshAuditState() {
         switch (st) {
         case SettingStatus::Applied:       stStr = L"\u25CF Applied"; break;
         case SettingStatus::NotApplied:    stStr = L"\u25CB Not applied"; break;
-        case SettingStatus::Partial:       stStr = L"\u25D0 Partial"; break;
         case SettingStatus::Unknown:       stStr = L"? Unknown"; break;
         case SettingStatus::NotApplicable: stStr = L"\u2014 Not applicable"; break;
         }
+
         ListView_SetItemText(m_hListView, i, 1, const_cast<LPWSTR>(stStr.c_str()));
         ListView_SetCheckState(m_hListView, i, (st == SettingStatus::Applied) ? TRUE : FALSE);
     }
@@ -1522,10 +1524,10 @@ void MainWindow::OnNotify(NMHDR* pnmhdr) {
                         switch (newSt) {
                         case SettingStatus::Applied:       stStr = L"\u25CF Applied"; break;
                         case SettingStatus::NotApplied:    stStr = L"\u25CB Not applied"; break;
-                        case SettingStatus::Partial:       stStr = L"\u25D0 Partial"; break;
                         case SettingStatus::Unknown:       stStr = L"? Unknown"; break;
                         case SettingStatus::NotApplicable: stStr = L"\u2014 Not applicable"; break;
                         }
+
                         ListView_SetItemText(m_hListView, pItem->iItem, 1, const_cast<LPWSTR>(stStr.c_str()));
 
                         // Keep checkbox in sync with actual result
@@ -1670,4 +1672,72 @@ void MainWindow::CreateSystemRestorePoint() {
     }
 }
 
+LRESULT CALLBACK MainWindow::ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
+    (void)uIdSubclass;
+    auto* pThis = reinterpret_cast<MainWindow*>(dwRefData);
+    if (!pThis) return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+
+
+    switch (uMsg) {
+    case WM_LBUTTONDOWN: {
+        LVHITTESTINFO hti{};
+        hti.pt.x = GET_X_LPARAM(lParam);
+        hti.pt.y = GET_Y_LPARAM(lParam);
+        SendMessageW(hWnd, LVM_HITTEST, static_cast<WPARAM>(-1), reinterpret_cast<LPARAM>(&hti));
+        if ((hti.flags & LVHT_EX_GROUP_HEADER) && !(hti.flags & LVHT_EX_GROUP_COLLAPSE)) {
+            pThis->m_mouseDownGroupId = (hti.iItem > 0) ? hti.iItem : hti.iGroup;
+        } else {
+            pThis->m_mouseDownGroupId = -1;
+        }
+        break;
+    }
+    case WM_LBUTTONUP: {
+        LVHITTESTINFO hti{};
+        hti.pt.x = GET_X_LPARAM(lParam);
+        hti.pt.y = GET_Y_LPARAM(lParam);
+        SendMessageW(hWnd, LVM_HITTEST, static_cast<WPARAM>(-1), reinterpret_cast<LPARAM>(&hti));
+        if ((hti.flags & LVHT_EX_GROUP_HEADER) && !(hti.flags & LVHT_EX_GROUP_COLLAPSE)) {
+            const int targetGroupId = (hti.iItem > 0) ? hti.iItem : hti.iGroup;
+            if (pThis->m_mouseDownGroupId == targetGroupId && targetGroupId > 0) {
+                const UINT curState = ListView_GetGroupState(hWnd, targetGroupId, LVGS_COLLAPSED);
+                const UINT newState = (curState & LVGS_COLLAPSED) ? 0 : LVGS_COLLAPSED;
+                LVGROUP grp{};
+                grp.cbSize = sizeof(grp);
+                grp.mask = LVGF_STATE;
+                grp.stateMask = LVGS_COLLAPSED;
+                grp.state = newState;
+                ListView_SetGroupInfo(hWnd, targetGroupId, &grp);
+                pThis->m_mouseDownGroupId = -1;
+                return 0;
+            }
+        }
+        pThis->m_mouseDownGroupId = -1;
+        break;
+    }
+    case WM_LBUTTONDBLCLK: {
+        LVHITTESTINFO hti{};
+        hti.pt.x = GET_X_LPARAM(lParam);
+        hti.pt.y = GET_Y_LPARAM(lParam);
+        SendMessageW(hWnd, LVM_HITTEST, static_cast<WPARAM>(-1), reinterpret_cast<LPARAM>(&hti));
+        if ((hti.flags & LVHT_EX_GROUP_HEADER) && !(hti.flags & LVHT_EX_GROUP_COLLAPSE)) {
+            const int targetGroupId = (hti.iItem > 0) ? hti.iItem : hti.iGroup;
+            if (targetGroupId > 0) {
+                const UINT curState = ListView_GetGroupState(hWnd, targetGroupId, LVGS_COLLAPSED);
+                const UINT newState = (curState & LVGS_COLLAPSED) ? 0 : LVGS_COLLAPSED;
+                LVGROUP grp{};
+                grp.cbSize = sizeof(grp);
+                grp.mask = LVGF_STATE;
+                grp.stateMask = LVGS_COLLAPSED;
+                grp.state = newState;
+                ListView_SetGroupInfo(hWnd, targetGroupId, &grp);
+                return 0;
+            }
+        }
+        break;
+    }
+    }
+    return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+}
+
 } // namespace PrivatizeWin
+

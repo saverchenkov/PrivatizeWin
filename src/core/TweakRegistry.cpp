@@ -141,15 +141,26 @@ void TweakRegistry::InitializeDefaultTweaks() {
     // ==========================================
     {
         Tweak t;
-        t.id = "AI_COPILOT";
+        t.id = "AI_COPILOT_USER";
+        t.title = L"Disable the Windows Copilot (User)";
+        t.scope = TargetScope::User;
         t.category = L"AI & Copilot";
-        t.title = L"Disable the Windows Copilot";
         t.description = L"The Windows Copilot is based on ChatGPT from OpenAI and is an extension to the AI in the Microsoft search engine Bing. In order for this AI to provide answers, further system information is transmitted in addition to the user queries. To prevent this, Copilot can be disabled.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot", L"TurnOffWindowsCopilot", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot", L"TurnOffWindowsCopilot", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "AI_COPILOT_MACHINE";
+        t.title = L"Disable the Windows Copilot (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"AI & Copilot";
+        t.description = L"The Windows Copilot is based on ChatGPT from OpenAI and is an extension to the AI in the Microsoft search engine Bing. In order for this AI to provide answers, further system information is transmitted in addition to the user queries. To prevent this, Copilot can be disabled.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot", L"TurnOffWindowsCopilot", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -202,15 +213,26 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "AI_RECALL_DATA";
+        t.id = "AI_RECALL_DATA_USER";
+        t.title = L"Disable Windows Copilot+ Recall (User)";
+        t.scope = TargetScope::User;
         t.category = L"AI & Copilot";
-        t.title = L"Disable Windows Copilot+ Recall";
         t.description = L"This setting deactivates the new Windows Copilot+ Recall feature. This is a component that constantly creates screenshots, evaluates their content and makes the data available via an application. Both to the user himself and to other applications that have the corresponding authorizations. Disabling the Recall feature is strongly recommended.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", L"DisableAIDataAnalysis", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", L"DisableAIDataAnalysis", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "AI_RECALL_DATA_MACHINE";
+        t.title = L"Disable Windows Copilot+ Recall (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"AI & Copilot";
+        t.description = L"This setting deactivates the new Windows Copilot+ Recall feature. This is a component that constantly creates screenshots, evaluates their content and makes the data available via an application. Both to the user himself and to other applications that have the corresponding authorizations. Disabling the Recall feature is strongly recommended.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", L"DisableAIDataAnalysis", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -331,60 +353,104 @@ void TweakRegistry::InitializeDefaultTweaks() {
     // ==========================================
     {
         Tweak t;
-        t.id = "P025";
+        t.id = "P025_USER";
+        t.title = L"Disable app access to device location (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to device location";
         t.description = L"When this feature is disabled, apps will no longer have access to the location of your computer. Some apps may be restricted in your function or may no longer work at all.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", L"Start_TrackProgs", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\location", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P025_MACHINE";
+        t.title = L"Disable app access to device location (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"When this feature is disabled, apps will no longer have access to the location of your computer. Some apps may be restricted in your function or may no longer work at all.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", L"Start_TrackProgs", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\location", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P023";
+        t.id = "P023_USER";
+        t.title = L"Disable app access to diagnostics information (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to diagnostics information";
         t.description = L"Disabling this function means apps will no longer have access to diagnostic information from your system. These are needed for finding sources of error from the respective manufacturers. You can disable this feature if you don’t wish to permit this.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{2297E4E2-5DBE-466D-A12B-0F8286F0D9CA}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\appDiagnostics", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P023_MACHINE";
+        t.title = L"Disable app access to diagnostics information (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"Disabling this function means apps will no longer have access to diagnostic information from your system. These are needed for finding sources of error from the respective manufacturers. You can disable this feature if you don’t wish to permit this.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{2297E4E2-5DBE-466D-A12B-0F8286F0D9CA}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\appDiagnostics", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P082";
+        t.id = "P082_USER";
+        t.title = L"Deny app access to generative AI (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Deny app access to generative AI";
         t.description = L"This setting denies apps access to Windows text and image generation capabilities. It writes both known capability names used by recent Windows builds.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\AppPrivacy", L"LetAppsAccessGenerativeAI", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\AppPrivacy", L"LetAppsAccessSystemAIModels", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\generativeAI", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\systemAIModels", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P082_MACHINE";
+        t.title = L"Deny app access to generative AI (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"This setting denies apps access to Windows text and image generation capabilities. It writes both known capability names used by recent Windows builds.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\generativeAI", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\systemAIModels", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P084";
+        t.id = "P084_USER";
+        t.title = L"Deny app access to presence sensing (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Deny app access to presence sensing";
         t.description = L"This setting denies apps access to human presence sensors used for features such as wake on approach and lock on leave.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\AppPrivacy", L"LetAppsAccessHumanPresence", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\humanPresence", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P084_MACHINE";
+        t.title = L"Deny app access to presence sensing (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"This setting denies apps access to human presence sensors used for features such as wake on approach and lock on leave.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\humanPresence", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -402,29 +468,51 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "P012";
+        t.id = "P012_USER";
+        t.title = L"Disable app access to camera (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to camera";
         t.description = L"By default, apps, e.g. the browser Edge, Facebook or Twitter can access the camera on your machine, if one exists. Activating camera access can be useful when you want, for example, to make video chats or conferences. Deactivating may result in not being able to transmit video images.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{E5323777-F976-4f5b-9B55-B94699C46E44}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P012_MACHINE";
+        t.title = L"Disable app access to camera (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"By default, apps, e.g. the browser Edge, Facebook or Twitter can access the camera on your machine, if one exists. Activating camera access can be useful when you want, for example, to make video chats or conferences. Deactivating may result in not being able to transmit video images.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{E5323777-F976-4f5b-9B55-B94699C46E44}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P013";
+        t.id = "P013_USER";
+        t.title = L"Disable app access to microphone (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to microphone";
         t.description = L"If you want to use online chat apps or the voice recorder, this function should remain active. If you don't use voice recording or transfer, then deactivate the microphone access to prevent manipulated apps from activating the microphone and recording a conversation without your permission.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{2EEF81BE-33FA-4800-9670-1CD474972C3F}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P013_MACHINE";
+        t.title = L"Disable app access to microphone (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If you want to use online chat apps or the voice recorder, this function should remain active. If you don't use voice recording or transfer, then deactivate the microphone access to prevent manipulated apps from activating the microphone and recording a conversation without your permission.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{2EEF81BE-33FA-4800-9670-1CD474972C3F}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -466,137 +554,247 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "P019";
+        t.id = "P019_USER";
+        t.title = L"Disable app access to notifications (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to notifications";
         t.description = L"Disabling this function means apps will no longer have access to your messages such as SMS or MMS. As a result, some apps may be limited in their functionality or no longer function at all (e.g. messaging apps).";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{52079E78-A92B-413F-B213-E8FE35712E72}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\userNotificationListener", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P019_MACHINE";
+        t.title = L"Disable app access to notifications (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"Disabling this function means apps will no longer have access to your messages such as SMS or MMS. As a result, some apps may be limited in their functionality or no longer function at all (e.g. messaging apps).";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{52079E78-A92B-413F-B213-E8FE35712E72}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\userNotificationListener", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P048";
+        t.id = "P048_USER";
+        t.title = L"Disable app access to movements (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to movements";
         t.description = L"When this feature is disabled, apps will no longer have access to your movements, which are recorded by so-called motion trackers. This can limit some apps in their function or stop working at all (e.g. fitness apps).";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\activity", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P048_MACHINE";
+        t.title = L"Disable app access to movements (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"When this feature is disabled, apps will no longer have access to your movements, which are recorded by so-called motion trackers. This can limit some apps in their function or stop working at all (e.g. fitness apps).";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\activity", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P020";
+        t.id = "P020_USER";
+        t.title = L"Disable app access to contacts (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to contacts";
         t.description = L"Disabling this function means apps will no longer have access to your contacts. As a result, some apps may be limited in their functionality or no longer function at all (e.g. messaging apps).";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{7D7E8402-7C54-4821-A34E-AEEFD62DED93}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\contacts", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P020_MACHINE";
+        t.title = L"Disable app access to contacts (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"Disabling this function means apps will no longer have access to your contacts. As a result, some apps may be limited in their functionality or no longer function at all (e.g. messaging apps).";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{7D7E8402-7C54-4821-A34E-AEEFD62DED93}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\contacts", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P011";
+        t.id = "P011_USER";
+        t.title = L"Disable app access to calendar (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to calendar";
         t.description = L"By deactivating this function, apps will have no access to calendar entries. Some apps may be limited in their functionality or not work at all (e.g. calendar apps).";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{D89823BA-7180-4B81-B50C-7E471E6121A3}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\appointments", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P011_MACHINE";
+        t.title = L"Disable app access to calendar (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"By deactivating this function, apps will have no access to calendar entries. Some apps may be limited in their functionality or not work at all (e.g. calendar apps).";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{D89823BA-7180-4B81-B50C-7E471E6121A3}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\appointments", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P050";
+        t.id = "P050_USER";
+        t.title = L"Disable app access to phone calls (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to phone calls";
         t.description = L"When this feature is disabled, apps will no longer have access to phones connected to this device and will not be able to make calls. This may limit some apps in their function or stop working at all.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\phoneCall", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P050_MACHINE";
+        t.title = L"Disable app access to phone calls (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"When this feature is disabled, apps will no longer have access to phones connected to this device and will not be able to make calls. This may limit some apps in their function or stop working at all.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\phoneCall", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P018";
+        t.id = "P018_USER";
+        t.title = L"Disable app access to call history (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to call history";
         t.description = L"Disabling this function means apps will no longer have access to your calling history. As a result, some apps may be limited in their functionality or no longer function at all (e.g. messaging apps).";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{8BC668CF-7728-45BD-93F8-CF2B3B41D7AB}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\phoneCallHistory", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P018_MACHINE";
+        t.title = L"Disable app access to call history (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"Disabling this function means apps will no longer have access to your calling history. As a result, some apps may be limited in their functionality or no longer function at all (e.g. messaging apps).";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{8BC668CF-7728-45BD-93F8-CF2B3B41D7AB}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\phoneCallHistory", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P021";
+        t.id = "P021_USER";
+        t.title = L"Disable app access to email (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to email";
         t.description = L"Disabling this function means apps will no longer have access to your mails. As a result, some apps may be limited in their functionality or no longer function at all (e.g. mail apps).";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{9231CB4C-BF57-4AF3-8C55-FDA7BFCC04C5}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\email", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P021_MACHINE";
+        t.title = L"Disable app access to email (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"Disabling this function means apps will no longer have access to your mails. As a result, some apps may be limited in their functionality or no longer function at all (e.g. mail apps).";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{9231CB4C-BF57-4AF3-8C55-FDA7BFCC04C5}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\email", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "112";
+        t.id = "112_USER";
+        t.title = L"Disable app access to tasks (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to tasks";
         t.description = L"Disabling this function means apps will no longer have access to your task lists. As a result, some apps may be limited in their functionality or no longer function at all (e.g. messaging or calendar apps).";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{E390DF20-07DF-446D-B962-F5C953062741}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "112_MACHINE";
+        t.title = L"Disable app access to tasks (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"Disabling this function means apps will no longer have access to your task lists. As a result, some apps may be limited in their functionality or no longer function at all (e.g. messaging or calendar apps).";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\userDataTasks", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P014";
+        t.id = "P014_USER";
+        t.title = L"Disable app access to messages (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to messages";
         t.description = L"Apps are denied access to your notification / mails if these functions are deactivated (Emails, SMS, Messenger). This may lead to Messenger apps or email apps not working correctly anymore.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{992AFA70-6F47-4148-B3E9-3003349C1548}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\chat", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P014_MACHINE";
+        t.title = L"Disable app access to messages (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"Apps are denied access to your notification / mails if these functions are deactivated (Emails, SMS, Messenger). This may lead to Messenger apps or email apps not working correctly anymore.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{992AFA70-6F47-4148-B3E9-3003349C1548}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\chat", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P052";
+        t.id = "P052_USER";
+        t.title = L"Disable app access to wireless connections (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to wireless connections";
         t.description = L"When this feature is disabled, apps will no longer have access to wireless connections and will not be able to enable or disable them on their own. This may limit some apps in their function or stop working at all.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\radios", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P052_MACHINE";
+        t.title = L"Disable app access to wireless connections (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"When this feature is disabled, apps will no longer have access to wireless connections and will not be able to enable or disable them on their own. This may limit some apps in their function or stop working at all.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\radios", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -614,92 +812,169 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "P029";
+        t.id = "P029_USER";
+        t.title = L"Disable app access to documents (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to documents";
         t.description = L"When this feature is disabled, apps will no longer have access to your documents. Some apps may be restricted in your function or may no longer work at all.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\documentsLibrary", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P029_MACHINE";
+        t.title = L"Disable app access to documents (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"When this feature is disabled, apps will no longer have access to your documents. Some apps may be restricted in your function or may no longer work at all.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\documentsLibrary", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P030";
+        t.id = "P030_USER";
+        t.title = L"Disable app access to images (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to images";
         t.description = L"When this feature is disabled, apps will no longer have access to your pictures and photos. Some apps may be restricted in your function or may no longer work at all.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\picturesLibrary", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P030_MACHINE";
+        t.title = L"Disable app access to images (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"When this feature is disabled, apps will no longer have access to your pictures and photos. Some apps may be restricted in your function or may no longer work at all.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\picturesLibrary", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P031";
+        t.id = "P031_USER";
+        t.title = L"Disable app access to videos (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to videos";
         t.description = L"When this feature is disabled, apps will no longer have access to your videos. Some apps may be restricted in your function or may no longer work at all.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\videosLibrary", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P031_MACHINE";
+        t.title = L"Disable app access to videos (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"When this feature is disabled, apps will no longer have access to your videos. Some apps may be restricted in your function or may no longer work at all.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\videosLibrary", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P032";
+        t.id = "P032_USER";
+        t.title = L"Disable app access to the file system (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to the file system";
         t.description = L"When this feature is disabled, apps will no longer have access to your file system and therefore your files. Some apps may be restricted in your function or may no longer work at all.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\broadFileSystemAccess", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P032_MACHINE";
+        t.title = L"Disable app access to the file system (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"When this feature is disabled, apps will no longer have access to your file system and therefore your files. Some apps may be restricted in your function or may no longer work at all.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\broadFileSystemAccess", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P058";
+        t.id = "P058_USER";
+        t.title = L"Disable app access to wireless technology (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to wireless technology";
         t.description = L"When this feature is disabled, apps are no longer allowed to use the PC's wireless technology. This can limit some apps in their function or stop working if they need a data connection.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\cellularData", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P058_MACHINE";
+        t.title = L"Disable app access to wireless technology (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"When this feature is disabled, apps are no longer allowed to use the PC's wireless technology. This can limit some apps in their function or stop working if they need a data connection.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\cellularData", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P060";
+        t.id = "P060_USER";
+        t.title = L"Disable app access to eye tracking (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to eye tracking";
         t.description = L"When this feature is disabled, apps will no longer be able to track the user's eyes and gaze in front of the device. This may limit some apps in their function or stop working at all. This may affect applications for users with neuromuscular diseases such as ALS, who can control the PC using this functionality.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\gazeInput", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P060_MACHINE";
+        t.title = L"Disable app access to eye tracking (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"When this feature is disabled, apps will no longer be able to track the user's eyes and gaze in front of the device. This may limit some apps in their function or stop working at all. This may affect applications for users with neuromuscular diseases such as ALS, who can control the PC using this functionality.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\gazeInput", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P071";
+        t.id = "P071_USER";
+        t.title = L"Disable the ability for apps to take screenshots (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable the ability for apps to take screenshots";
         t.description = L"Apps can take screenshots of your Windows desktop or other applications. This may mean that there is private content on these screenshots, which is then further processed by the app. With this setting you can prevent this.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\graphicsCaptureProgrammatic", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P071_MACHINE";
+        t.title = L"Disable the ability for apps to take screenshots (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"Apps can take screenshots of your Windows desktop or other applications. This may mean that there is private content on these screenshots, which is then further processed by the app. With this setting you can prevent this.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\graphicsCaptureProgrammatic", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -717,14 +992,25 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "P074";
+        t.id = "P074_USER";
+        t.title = L"Disable the ability for apps to take screenshots without borders (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable the ability for apps to take screenshots without borders";
         t.description = L"Apps can take screenshots of your Windows desktop or other applications. This may mean that there is private content on these screenshots, which is then further processed by the app. With this setting, you can prevent an app from disabling the edges of screenshots and thus taking more than desired.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\graphicsCaptureWithoutBorder", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P074_MACHINE";
+        t.title = L"Disable the ability for apps to take screenshots without borders (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"Apps can take screenshots of your Windows desktop or other applications. This may mean that there is private content on these screenshots, which is then further processed by the app. With this setting, you can prevent an app from disabling the edges of screenshots and thus taking more than desired.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\graphicsCaptureWithoutBorder", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -742,27 +1028,49 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "P077";
+        t.id = "P077_USER";
+        t.title = L"Disable app access to music libraries (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to music libraries";
         t.description = L"If this feature is turned off, apps will no longer be allowed to access music libraries. Some apps may be restricted in their function or stop working at all if they need access to music files.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\musicLibrary", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P077_MACHINE";
+        t.title = L"Disable app access to music libraries (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If this feature is turned off, apps will no longer be allowed to access music libraries. Some apps may be restricted in their function or stop working at all if they need access to music files.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\musicLibrary", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P079";
+        t.id = "P079_USER";
+        t.title = L"Disable app access to downloads folder (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to downloads folder";
         t.description = L"If this feature is disabled, apps will no longer be allowed to access the downloads folder. Some apps may be restricted in their function or may stop working at all if they need access to this directory.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\downloadsFolder", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P079_MACHINE";
+        t.title = L"Disable app access to downloads folder (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If this feature is disabled, apps will no longer be allowed to access the downloads folder. Some apps may be restricted in their function or may stop working at all if they need access to this directory.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\downloadsFolder", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -780,118 +1088,217 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "P086";
+        t.id = "P086_USER";
+        t.title = L"Disable app access to passkeys (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to passkeys";
         t.description = L"If this feature is disabled, apps and websites will no longer be allowed to access the passkeys stored on this device. Signing in with a passkey will then no longer be possible and you will have to use your password or another sign-in method instead.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Advanced;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\passkeys", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P086_MACHINE";
+        t.title = L"Disable app access to passkeys (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If this feature is disabled, apps and websites will no longer be allowed to access the passkeys stored on this device. Signing in with a passkey will then no longer be possible and you will have to use your password or another sign-in method instead.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Advanced;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\passkeys", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P089";
+        t.id = "P089_USER";
+        t.title = L"Disable app access to the list of stored passkeys (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to the list of stored passkeys";
         t.description = L"If this feature is disabled, apps and websites will no longer be allowed to determine which passkeys are stored on this device. Websites may then no longer offer you a passkey sign-in even though a passkey exists.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Advanced;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\passkeysEnumeration", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P089_MACHINE";
+        t.title = L"Disable app access to the list of stored passkeys (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If this feature is disabled, apps and websites will no longer be allowed to determine which passkeys are stored on this device. Websites may then no longer offer you a passkey sign-in even though a passkey exists.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Advanced;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\passkeysEnumeration", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P087";
+        t.id = "P087_USER";
+        t.title = L"Disable app access to Bluetooth devices (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to Bluetooth devices";
         t.description = L"If this feature is disabled, apps will no longer be allowed to communicate with Bluetooth devices. Apps that rely on Bluetooth accessories such as headphones, controllers or fitness trackers may stop working.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Advanced;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\bluetooth", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P087_MACHINE";
+        t.title = L"Disable app access to Bluetooth devices (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If this feature is disabled, apps will no longer be allowed to communicate with Bluetooth devices. Apps that rely on Bluetooth accessories such as headphones, controllers or fitness trackers may stop working.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Advanced;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\bluetooth", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P088";
+        t.id = "P088_USER";
+        t.title = L"Disable app access to human interface devices (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to human interface devices";
         t.description = L"If this feature is disabled, apps will no longer be allowed to access human interface devices (HID). Apps that use game controllers or other special input hardware may stop working. Your keyboard and mouse are not affected: Windows reserves these devices for the system, so they remain available in any case.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Advanced;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\humanInterfaceDevice", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P088_MACHINE";
+        t.title = L"Disable app access to human interface devices (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If this feature is disabled, apps will no longer be allowed to access human interface devices (HID). Apps that use game controllers or other special input hardware may stop working. Your keyboard and mouse are not affected: Windows reserves these devices for the system, so they remain available in any case.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Advanced;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\humanInterfaceDevice", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P090";
+        t.id = "P090_USER";
+        t.title = L"Disable app access to custom sensors (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to custom sensors";
         t.description = L"If this feature is disabled, apps will no longer be allowed to read custom sensors built into your device. Apps that evaluate sensor data may be restricted in their function.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Advanced;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\sensors.custom", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P090_MACHINE";
+        t.title = L"Disable app access to custom sensors (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If this feature is disabled, apps will no longer be allowed to read custom sensors built into your device. Apps that evaluate sensor data may be restricted in their function.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Advanced;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\sensors.custom", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P091";
+        t.id = "P091_USER";
+        t.title = L"Disable app access to serial ports (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to serial ports";
         t.description = L"If this feature is disabled, apps will no longer be allowed to use serial ports. Apps that communicate with measuring instruments, microcontrollers or other serial hardware may stop working.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Advanced;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\serialCommunication", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P091_MACHINE";
+        t.title = L"Disable app access to serial ports (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If this feature is disabled, apps will no longer be allowed to use serial ports. Apps that communicate with measuring instruments, microcontrollers or other serial hardware may stop working.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Advanced;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\serialCommunication", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P092";
+        t.id = "P092_USER";
+        t.title = L"Disable app access to USB devices (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to USB devices";
         t.description = L"If this feature is disabled, apps will no longer be allowed to communicate directly with USB devices. Apps that use USB hardware such as printers, scanners or programming adapters may stop working.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Advanced;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\usb", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P092_MACHINE";
+        t.title = L"Disable app access to USB devices (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If this feature is disabled, apps will no longer be allowed to communicate directly with USB devices. Apps that use USB hardware such as printers, scanners or programming adapters may stop working.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Advanced;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\usb", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P093";
+        t.id = "P093_USER";
+        t.title = L"Disable app access to Wi-Fi information (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to Wi-Fi information";
         t.description = L"If this feature is disabled, apps will no longer be allowed to read information about nearby Wi-Fi networks. This data can be used to determine your location, but some apps may be restricted in their function.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Advanced;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\wifiData", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P093_MACHINE";
+        t.title = L"Disable app access to Wi-Fi information (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If this feature is disabled, apps will no longer be allowed to read information about nearby Wi-Fi networks. This data can be used to determine your location, but some apps may be restricted in their function.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Advanced;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\wifiData", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "P094";
+        t.id = "P094_USER";
+        t.title = L"Disable app access to Wi-Fi Direct (User)";
+        t.scope = TargetScope::User;
         t.category = L"App Permissions & Hardware Access";
-        t.title = L"Disable app access to Wi-Fi Direct";
         t.description = L"If this feature is disabled, apps will no longer be allowed to establish direct Wi-Fi connections to other devices. Features such as wireless displays or direct file transfer may stop working.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Advanced;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\wiFiDirect", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "P094_MACHINE";
+        t.title = L"Disable app access to Wi-Fi Direct (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"App Permissions & Hardware Access";
+        t.description = L"If this feature is disabled, apps will no longer be allowed to establish direct Wi-Fi connections to other devices. Features such as wireless displays or direct file transfer may stop working.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Advanced;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\wiFiDirect", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -901,14 +1308,25 @@ void TweakRegistry::InitializeDefaultTweaks() {
     // ==========================================
     {
         Tweak t;
-        t.id = "C001";
+        t.id = "C001_USER";
+        t.title = L"Disable and reset Cortana (User)";
+        t.scope = TargetScope::User;
         t.category = L"Cortana & Search";
-        t.title = L"Disable and reset Cortana";
         t.description = L"If you don't want the personal assistant Cortana, then deactivate this function. This prevents Microsoft receiving information like contacts, current calendar events, language patterns, handwriting samples and your entry history.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search", L"AllowCortana", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "C001_MACHINE";
+        t.title = L"Disable and reset Cortana (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Cortana & Search";
+        t.description = L"If you don't want the personal assistant Cortana, then deactivate this function. This prevents Microsoft receiving information like contacts, current calendar events, language patterns, handwriting samples and your entry history.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Windows Search", L"CortanaConsent", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -1037,16 +1455,27 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "M003";
+        t.id = "M003_USER";
+        t.title = L"Disable extension of Windows search with Bing (User)";
+        t.scope = TargetScope::User;
         t.category = L"Cortana & Search";
-        t.title = L"Disable extension of Windows search with Bing";
         t.description = L"If you want to look for a local App or a setting in the Windows search, but don't type in the exact name, Windows will look for an answer by default using Bing, instead of using your local hard disk for adequate results. This will deactivate that function.  <u>Note:</u> Windows Search and Explorer may sporadically reset this setting during search indexer restarts, feature updates, or Group Policy refresh cycles.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
+        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer", L"DisableSearchBoxSuggestions", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "M003_MACHINE";
+        t.title = L"Disable extension of Windows search with Bing (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Cortana & Search";
+        t.description = L"If you want to look for a local App or a setting in the Windows search, but don't type in the exact name, Windows will look for an answer by default using Bing, instead of using your local hard disk for adequate results. This will deactivate that function.  <u>Note:</u> Windows Search and Explorer may sporadically reset this setting during search indexer restarts, feature updates, or Group Policy refresh cycles.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Search", L"BingSearchEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer", L"DisableSearchBoxSuggestions", RegType::Dword, 0, 0, L"", L"", false });
-        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer", L"DisableSearchBoxSuggestions", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -1144,15 +1573,26 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "L005";
+        t.id = "L005_USER";
+        t.title = L"Disable Windows Geolocation Service (User)";
+        t.scope = TargetScope::User;
         t.category = L"Location & Sensors";
-        t.title = L"Disable Windows Geolocation Service";
         t.description = L"The geolocation service in Windows manages the current location of the system and defines geographical boundaries (so-called “geofencing“). Deactivating it means applications can no longer access the geographical location through this service.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\lfsvc", L"Start", RegType::Dword, 0, 1, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Sensor\\Overrides\\{BFA794E4-F964-4FDB-90F6-51056BFE4B44}", L"SensorPermissionState", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "L005_MACHINE";
+        t.title = L"Disable Windows Geolocation Service (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Location & Sensors";
+        t.description = L"The geolocation service in Windows manages the current location of the system and defines geographical boundaries (so-called “geofencing“). Deactivating it means applications can no longer access the geographical location through this service.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\lfsvc", L"Start", RegType::Dword, 0, 1, L"", L"", false });
         t.serviceActions.push_back({ L"lfsvc", 4, 2, true });
         AddTweak(std::move(t));
     }
@@ -1228,16 +1668,27 @@ void TweakRegistry::InitializeDefaultTweaks() {
     // ==========================================
     {
         Tweak t;
-        t.id = "E001";
+        t.id = "E001_USER";
+        t.title = L"Disable tracking in the web (User)";
+        t.scope = TargetScope::User;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable tracking in the web";
         t.description = L"Disabling tracking (\"Do Not Track\" or also DNT) means that Edge will send a message to the website indicating that no tracking of the user should take place. This means that the IP and cookies will not be saved. Websites are not obliged to honor this request but this is generally the case. This is why it makes sense to enable this setting.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
+        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ConfigureDoNotTrack", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E001_MACHINE";
+        t.title = L"Disable tracking in the web (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Microsoft Edge";
+        t.description = L"Disabling tracking (\"Do Not Track\" or also DNT) means that Edge will send a message to the website indicating that no tracking of the user should take place. This means that the IP and cookies will not be saved. Websites are not obliged to honor this request but this is generally the case. This is why it makes sense to enable this setting.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppContainer\\Storage\\microsoft.microsoftedge_8wekyb3d8bbwe\\MicrosoftEdge\\Main", L"DoNotTrack", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ConfigureDoNotTrack", RegType::Dword, 0, 0, L"", L"", false });
-        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ConfigureDoNotTrack", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -1254,16 +1705,27 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "E003";
+        t.id = "E003_USER";
+        t.title = L"Disable search and website suggestions (User)";
+        t.scope = TargetScope::User;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable search and website suggestions";
         t.description = L"While entering searches or URIs in Edge, matching suggestions will appear automatically. This is done by transmitting the input to Microsoft where it must be evaluated in order to create these suggestions. Such a transfer of data enables conclusions to be made regarding surfing behavior.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
+        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SearchSuggestEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E003_MACHINE";
+        t.title = L"Disable search and website suggestions (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Microsoft Edge";
+        t.description = L"While entering searches or URIs in Edge, matching suggestions will appear automatically. This is done by transmitting the input to Microsoft where it must be evaluated in order to create these suggestions. Such a transfer of data enables conclusions to be made regarding surfing behavior.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppContainer\\Storage\\microsoft.microsoftedge_8wekyb3d8bbwe\\MicrosoftEdge\\Main", L"ShowSearchSuggestionsGlobal", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SearchSuggestEnabled", RegType::Dword, 0, 0, L"", L"", false });
-        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SearchSuggestEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -1280,16 +1742,27 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "E007";
+        t.id = "E007_USER";
+        t.title = L"Disable automatic completion of web addresses in address bar (User)";
+        t.scope = TargetScope::User;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable automatic completion of web addresses in address bar";
         t.description = L"Automatic completion in the address lines of Edge can possibly transmit data concerning user behavior. As a result, information regarding your surfing activity might also be available to others who use this computer under your user account. By disabling this feature, no suggestions will be made for completing any addresses while entering a web address.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\PolicyManager\\current\\device\\Browser", L"AllowAddressBarDropdown", RegType::Dword, 0, 0, L"", L"", false });
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"AddressBarMicrosoftSearchInBingProviderEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"AddressBarMicrosoftSearchInBingProviderEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E007_MACHINE";
+        t.title = L"Disable automatic completion of web addresses in address bar (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Microsoft Edge";
+        t.description = L"Automatic completion in the address lines of Edge can possibly transmit data concerning user behavior. As a result, information regarding your surfing activity might also be available to others who use this computer under your user account. By disabling this feature, no suggestions will be made for completing any addresses while entering a web address.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"AddressBarMicrosoftSearchInBingProviderEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -1306,42 +1779,75 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "E011";
+        t.id = "E011_USER";
+        t.title = L"Disable user feedback in toolbar (User)";
+        t.scope = TargetScope::User;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable user feedback in toolbar";
         t.description = L"Edge (Chromium) displays a smiley on the toolbar for sending feedback to Microsoft. This setting allows you to hide the smiley. After changing the setting, the browser must be restarted for it to take effect.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"UserFeedbackAllowed", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E011_MACHINE";
+        t.title = L"Disable user feedback in toolbar (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Microsoft Edge";
+        t.description = L"Edge (Chromium) displays a smiley on the toolbar for sending feedback to Microsoft. This setting allows you to hide the smiley. After changing the setting, the browser must be restarted for it to take effect.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"UserFeedbackAllowed", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E012";
+        t.id = "E012_USER";
+        t.title = L"Disable storing and autocompleting of credit card data on websites (User)";
+        t.scope = TargetScope::User;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable storing and autocompleting of credit card data on websites";
         t.description = L"Microsoft Edge can automatically store credit card information and fill it out on later purchases. To do this, the data must be stored reversibly on the local machine, so this poses a potential security risk.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"AutofillCreditCardEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E012_MACHINE";
+        t.title = L"Disable storing and autocompleting of credit card data on websites (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Microsoft Edge";
+        t.description = L"Microsoft Edge can automatically store credit card information and fill it out on later purchases. To do this, the data must be stored reversibly on the local machine, so this poses a potential security risk.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"AutofillCreditCardEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E009";
+        t.id = "E009_USER";
+        t.title = L"Disable form suggestions (User)";
+        t.scope = TargetScope::User;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable form suggestions";
         t.description = L"Microsoft Edge can suggest previous entries for easier completion when filling out forms. This is usually helpful but such information can also be displayed to other users, especially when sharing a PC.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
+        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"AutofillAddressEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E009_MACHINE";
+        t.title = L"Disable form suggestions (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Microsoft Edge";
+        t.description = L"Microsoft Edge can suggest previous entries for easier completion when filling out forms. This is usually helpful but such information can also be displayed to other users, especially when sharing a PC.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppContainer\\Storage\\microsoft.microsoftedge_8wekyb3d8bbwe\\MicrosoftEdge\\Main", L"Use FormSuggest", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"AutofillAddressEnabled", RegType::Dword, 0, 0, L"", L"", false });
-        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"AutofillAddressEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -1394,146 +1900,267 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "E006";
+        t.id = "E006_USER";
+        t.title = L"Disable SmartScreen Filter (User)";
+        t.scope = TargetScope::User;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable SmartScreen Filter";
         t.description = L"The SmartScreen Filter protects you from accessing malicious websites and downloads whenever you're surfing with Edge. In order to do this, information (e.g., the URL) will be sent to Microsoft that allows it to identify such dangerous content. Disabling this function provides more privacy but it also gives you less protection while surfing. That's why we recommend your leaving this function enabled.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Advanced;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppContainer\\Storage\\microsoft.microsoftedge_8wekyb3d8bbwe\\MicrosoftEdge\\PhishingFilter", L"EnabledV9", RegType::Dword, 0, 0, L"", L"", false });
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SmartScreenEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SmartScreenEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E115";
+        t.id = "E006_MACHINE";
+        t.title = L"Disable SmartScreen Filter (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable check for saved payment methods by sites";
+        t.description = L"The SmartScreen Filter protects you from accessing malicious websites and downloads whenever you're surfing with Edge. In order to do this, information (e.g., the URL) will be sent to Microsoft that allows it to identify such dangerous content. Disabling this function provides more privacy but it also gives you less protection while surfing. That's why we recommend your leaving this function enabled.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Advanced;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppContainer\\Storage\\microsoft.microsoftedge_8wekyb3d8bbwe\\MicrosoftEdge\\PhishingFilter", L"EnabledV9", RegType::Dword, 0, 0, L"", L"", false });
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SmartScreenEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E115_USER";
+        t.title = L"Disable check for saved payment methods by sites (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"Websites can check whether the current user has stored payment methods in the browser. By setting this policy, you can prevent verification so that no information about it is transmitted from the browser to the Web site.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"PaymentMethodQueryEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"PaymentMethodQueryEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E116";
+        t.id = "E115_MACHINE";
+        t.title = L"Disable check for saved payment methods by sites (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable sending info about websites visited";
+        t.description = L"Websites can check whether the current user has stored payment methods in the browser. By setting this policy, you can prevent verification so that no information about it is transmitted from the browser to the Web site.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"PaymentMethodQueryEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E116_USER";
+        t.title = L"Disable sending info about websites visited (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"Microsoft Edge sends information about the websites you visit to Microsoft to improve search and products. By setting this policy, you can prevent sending so that no information is transmitted by the browser.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SendSiteInfoToImproveServices", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SendSiteInfoToImproveServices", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "EDGE_METRICS";
+        t.id = "E116_MACHINE";
+        t.title = L"Disable sending info about websites visited (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable sending data about browser usage";
+        t.description = L"Microsoft Edge sends information about the websites you visit to Microsoft to improve search and products. By setting this policy, you can prevent sending so that no information is transmitted by the browser.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SendSiteInfoToImproveServices", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "EDGE_METRICS_USER";
+        t.title = L"Disable sending data about browser usage (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"Microsoft Edge sends information about usage behavior and crashes to Microsoft to improve the product. By setting this policy, you can prevent sending so that no information is transmitted by the browser.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"MetricsReportingEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"MetricsReportingEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E118";
+        t.id = "EDGE_METRICS_MACHINE";
+        t.title = L"Disable sending data about browser usage (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable personalizing advertising, search, news and other services";
+        t.description = L"Microsoft Edge sends information about usage behavior and crashes to Microsoft to improve the product. By setting this policy, you can prevent sending so that no information is transmitted by the browser.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"MetricsReportingEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E118_USER";
+        t.title = L"Disable personalizing advertising, search, news and other services (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"Microsoft Edge sends information about usage behavior to Microsoft to improve advertising, search, news, and other Microsoft services. Enable this policy to prevent the browser from sending this information.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"PersonalizationReportingEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"PersonalizationReportingEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E121";
+        t.id = "E118_MACHINE";
+        t.title = L"Disable personalizing advertising, search, news and other services (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable suggestions from local providers";
+        t.description = L"Microsoft Edge sends information about usage behavior to Microsoft to improve advertising, search, news, and other Microsoft services. Enable this policy to prevent the browser from sending this information.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"PersonalizationReportingEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E121_USER";
+        t.title = L"Disable suggestions from local providers (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"Microsoft Edge can display suggestions from so-called suggestion providers in the address bar, favorites, and browsing history. By setting this policy, you can prevent this display.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"LocalProvidersEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"LocalProvidersEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E123";
+        t.id = "E121_MACHINE";
+        t.title = L"Disable suggestions from local providers (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable shopping assistant in Microsoft Edge";
+        t.description = L"Microsoft Edge can display suggestions from so-called suggestion providers in the address bar, favorites, and browsing history. By setting this policy, you can prevent this display.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"LocalProvidersEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E123_USER";
+        t.title = L"Disable shopping assistant in Microsoft Edge (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"When visiting websites, Microsoft Edge can automatically search for coupons or discounts, or compare prices. For this purpose, data must be transmitted in the background to appropriate servers in order to provide this function. This can lead to the transmission of private information, which is not desired.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeShoppingAssistantEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeShoppingAssistantEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E124";
+        t.id = "E123_MACHINE";
+        t.title = L"Disable shopping assistant in Microsoft Edge (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable Edge bar";
+        t.description = L"When visiting websites, Microsoft Edge can automatically search for coupons or discounts, or compare prices. For this purpose, data must be transmitted in the background to appropriate servers in order to provide this function. This can lead to the transmission of private information, which is not desired.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeShoppingAssistantEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E124_USER";
+        t.title = L"Disable Edge bar (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"The input bar from Microsoft Edge allows web pages to be accessed directly from the search box that appears on the desktop. If you want to disable this bar, you can do so with this option.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"WebWidgetAllowed", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"WebWidgetAllowed", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E128";
+        t.id = "E124_MACHINE";
+        t.title = L"Disable Edge bar (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable Sidebar in Microsoft Edge";
+        t.description = L"The input bar from Microsoft Edge allows web pages to be accessed directly from the search box that appears on the desktop. If you want to disable this bar, you can do so with this option.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"WebWidgetAllowed", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E128_USER";
+        t.title = L"Disable Sidebar in Microsoft Edge (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"The sidebar on the right side of Microsoft Edge is enabled by default and is used for quick access to applications, but also to search with Bing. That is why it is represented by the Bing icon when it is closed. To remove this edge bar, enable this setting. The next time you launch Microsoft Edge, the setting will be applied.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"HubsSidebarEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"HubsSidebarEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E130";
+        t.id = "E128_MACHINE";
+        t.title = L"Disable Sidebar in Microsoft Edge (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable Enhanced Spell Checking";
+        t.description = L"The sidebar on the right side of Microsoft Edge is enabled by default and is used for quick access to applications, but also to search with Bing. That is why it is represented by the Bing icon when it is closed. To remove this edge bar, enable this setting. The next time you launch Microsoft Edge, the setting will be applied.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"HubsSidebarEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E130_USER";
+        t.title = L"Disable Enhanced Spell Checking (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables the enhanced spelling and grammar check provided by Microsoft Editor. Instead, the basic, local spell check is used, which does not rely on the cloud.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"MicrosoftEditorProofingEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"MicrosoftEditorProofingEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E132";
+        t.id = "E130_MACHINE";
+        t.title = L"Disable Enhanced Spell Checking (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Hide first run experience and splash screen";
+        t.description = L"This setting disables the enhanced spelling and grammar check provided by Microsoft Editor. Instead, the basic, local spell check is used, which does not rely on the cloud.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"MicrosoftEditorProofingEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E132_USER";
+        t.title = L"Hide first run experience and splash screen (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting hides the first-run experience and splash screen when Microsoft Edge is launched for the first time, preventing promotional content from being displayed.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"HideFirstRunExperience", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"HideFirstRunExperience", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E132_MACHINE";
+        t.title = L"Hide first run experience and splash screen (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Microsoft Edge";
+        t.description = L"This setting hides the first-run experience and splash screen when Microsoft Edge is launched for the first time, preventing promotional content from being displayed.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"HideFirstRunExperience", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -1550,41 +2177,74 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "E134";
+        t.id = "E134_USER";
+        t.title = L"Disable automatic sign-in from web to browser (User)";
+        t.scope = TargetScope::User;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable automatic sign-in from web to browser";
         t.description = L"This setting prevents automatic sign-in to the browser when signing into Microsoft websites, improving privacy by separating web and browser accounts.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"WebToBrowserSignInEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"WebToBrowserSignInEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E135";
+        t.id = "E134_MACHINE";
+        t.title = L"Disable automatic sign-in from web to browser (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable Bing Chat on new tab page";
+        t.description = L"This setting prevents automatic sign-in to the browser when signing into Microsoft websites, improving privacy by separating web and browser accounts.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"WebToBrowserSignInEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E135_USER";
+        t.title = L"Disable Bing Chat on new tab page (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables Bing Chat on the new tab page, reducing AI features and potential data sharing.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NewTabPageBingChatEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NewTabPageBingChatEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E136";
+        t.id = "E135_MACHINE";
+        t.title = L"Disable Bing Chat on new tab page (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable content on new tab page";
+        t.description = L"This setting disables Bing Chat on the new tab page, reducing AI features and potential data sharing.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NewTabPageBingChatEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E136_USER";
+        t.title = L"Disable content on new tab page (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables content on the new tab page such as news feed and promotional information, showing a clean, minimal new tab page.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NewTabPageContentEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NewTabPageContentEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E136_MACHINE";
+        t.title = L"Disable content on new tab page (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Microsoft Edge";
+        t.description = L"This setting disables content on the new tab page such as news feed and promotional information, showing a clean, minimal new tab page.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NewTabPageContentEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -1601,275 +2261,506 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "E138";
+        t.id = "E138_USER";
+        t.title = L"Disable built-in AI APIs for websites (User)";
+        t.scope = TargetScope::User;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable built-in AI APIs for websites";
         t.description = L"This setting disables built-in AI APIs that websites can access, preventing websites from using Edge's AI features.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"BuiltInAIAPIsEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"BuiltInAIAPIsEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E139";
+        t.id = "E138_MACHINE";
+        t.title = L"Disable built-in AI APIs for websites (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable inline Compose feature";
+        t.description = L"This setting disables built-in AI APIs that websites can access, preventing websites from using Edge's AI features.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"BuiltInAIAPIsEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E139_USER";
+        t.title = L"Disable inline Compose feature (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables the inline Compose feature (AI writing assistant), reducing AI-based data processing.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ComposeInlineEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ComposeInlineEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E140";
+        t.id = "E139_MACHINE";
+        t.title = L"Disable inline Compose feature (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable Copilot access to page context";
+        t.description = L"This setting disables the inline Compose feature (AI writing assistant), reducing AI-based data processing.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ComposeInlineEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E140_USER";
+        t.title = L"Disable Copilot access to page context (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables Copilot access to page context, preventing sending page content to Copilot AI.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"CopilotPageContext", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"CopilotPageContext", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E141";
+        t.id = "E140_MACHINE";
+        t.title = L"Disable Copilot access to page context (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable prompts to make Edge the default browser";
+        t.description = L"This setting disables Copilot access to page context, preventing sending page content to Copilot AI.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"CopilotPageContext", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E141_USER";
+        t.title = L"Disable prompts to make Edge the default browser (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables prompts to make Edge the default browser, reducing unwanted notifications.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"DefaultBrowserSettingEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"DefaultBrowserSettingEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E142";
+        t.id = "E141_MACHINE";
+        t.title = L"Disable prompts to make Edge the default browser (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable default browser campaigns";
+        t.description = L"This setting disables prompts to make Edge the default browser, reducing unwanted notifications.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"DefaultBrowserSettingEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E142_USER";
+        t.title = L"Disable default browser campaigns (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables campaigns to set Edge as the default browser, preventing promotional interruptions.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"DefaultBrowserSettingsCampaignEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"DefaultBrowserSettingsCampaignEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E143";
+        t.id = "E142_MACHINE";
+        t.title = L"Disable default browser campaigns (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable diagnostic data collection";
+        t.description = L"This setting disables campaigns to set Edge as the default browser, preventing promotional interruptions.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"DefaultBrowserSettingsCampaignEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E143_USER";
+        t.title = L"Disable diagnostic data collection (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables diagnostic data collection, minimizing data sent to Microsoft. Options are: 0=Off, 1=Required, 2=Optional.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"DiagnosticData", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"DiagnosticData", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "EDGE_SHOPPING";
+        t.id = "E143_MACHINE";
+        t.title = L"Disable diagnostic data collection (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable shopping assistant";
+        t.description = L"This setting disables diagnostic data collection, minimizing data sent to Microsoft. Options are: 0=Off, 1=Required, 2=Optional.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"DiagnosticData", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "EDGE_SHOPPING_USER";
+        t.title = L"Disable shopping assistant (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables the shopping assistant feature, preventing automatic price comparison and coupon suggestions.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeShoppingAssistantEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeShoppingAssistantEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E145";
+        t.id = "EDGE_SHOPPING_MACHINE";
+        t.title = L"Disable shopping assistant (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Hide Microsoft 365 Copilot chat icon";
+        t.description = L"This setting disables the shopping assistant feature, preventing automatic price comparison and coupon suggestions.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeShoppingAssistantEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E145_USER";
+        t.title = L"Hide Microsoft 365 Copilot chat icon (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting hides the Microsoft 365 Copilot chat icon from the browser interface.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"Microsoft365CopilotChatIconEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"Microsoft365CopilotChatIconEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E146";
+        t.id = "E145_MACHINE";
+        t.title = L"Hide Microsoft 365 Copilot chat icon (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Hide Microsoft Rewards";
+        t.description = L"This setting hides the Microsoft 365 Copilot chat icon from the browser interface.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"Microsoft365CopilotChatIconEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E146_USER";
+        t.title = L"Hide Microsoft Rewards (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting hides Microsoft Rewards notifications and features, reducing promotional content.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ShowMicrosoftRewards", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ShowMicrosoftRewards", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E147";
+        t.id = "E146_MACHINE";
+        t.title = L"Hide Microsoft Rewards (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable recommendations in settings";
+        t.description = L"This setting hides Microsoft Rewards notifications and features, reducing promotional content.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ShowMicrosoftRewards", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E147_USER";
+        t.title = L"Disable recommendations in settings (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables recommendations in settings and other areas, reducing promotional content.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ShowRecommendationsEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ShowRecommendationsEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E148";
+        t.id = "E147_MACHINE";
+        t.title = L"Disable recommendations in settings (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable cloud-based tab services";
+        t.description = L"This setting disables recommendations in settings and other areas, reducing promotional content.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ShowRecommendationsEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E148_USER";
+        t.title = L"Disable cloud-based tab services (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables cloud-based tab services, preventing syncing tab data to the Microsoft cloud.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"TabServicesEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"TabServicesEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E149";
+        t.id = "E148_MACHINE";
+        t.title = L"Disable cloud-based tab services (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable text prediction in forms";
+        t.description = L"This setting disables cloud-based tab services, preventing syncing tab data to the Microsoft cloud.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"TabServicesEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E149_USER";
+        t.title = L"Disable text prediction in forms (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables text prediction features in forms, reducing AI-based text analysis.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"TextPredictionEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"TextPredictionEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E150";
+        t.id = "E149_MACHINE";
+        t.title = L"Disable text prediction in forms (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable visual search";
+        t.description = L"This setting disables text prediction features in forms, reducing AI-based text analysis.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"TextPredictionEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E150_USER";
+        t.title = L"Disable visual search (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables the visual search feature, preventing sending images to Bing for search.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"VisualSearchEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"VisualSearchEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E151";
+        t.id = "E150_MACHINE";
+        t.title = L"Disable visual search (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable AI-powered history search";
+        t.description = L"This setting disables the visual search feature, preventing sending images to Bing for search.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"VisualSearchEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E151_USER";
+        t.title = L"Disable AI-powered history search (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables AI-powered search in browsing history, preventing AI processing of browsing history.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeHistoryAISearchEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeHistoryAISearchEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E156";
+        t.id = "E151_MACHINE";
+        t.title = L"Disable AI-powered history search (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable Edge Secure Network (built-in VPN)";
+        t.description = L"This setting disables AI-powered search in browsing history, preventing AI processing of browsing history.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeHistoryAISearchEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E156_USER";
+        t.title = L"Disable Edge Secure Network (built-in VPN) (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting disables the Microsoft Edge Secure Network (built-in VPN) feature, which routes network traffic through Microsoft's servers. Disabling it prevents any data from being transmitted via this service.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeSecureNetworkEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeSecureNetworkEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E152";
+        t.id = "E156_MACHINE";
+        t.title = L"Disable Edge Secure Network (built-in VPN) (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Allow user control of local AI features";
+        t.description = L"This setting disables the Microsoft Edge Secure Network (built-in VPN) feature, which routes network traffic through Microsoft's servers. Disabling it prevents any data from being transmitted via this service.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"EdgeSecureNetworkEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E152_USER";
+        t.title = L"Allow user control of local AI features (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting allows users to control local AI foundational model features in Microsoft Edge.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"GenAILocalFoundationalModelSettings", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"GenAILocalFoundationalModelSettings", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E119";
+        t.id = "E152_MACHINE";
+        t.title = L"Allow user control of local AI features (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable use of web service to resolve navigation errors";
+        t.description = L"This setting allows users to control local AI foundational model features in Microsoft Edge.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"GenAILocalFoundationalModelSettings", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E119_USER";
+        t.title = L"Disable use of web service to resolve navigation errors (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"If there is an error navigating the Microsoft Edge (e.g. due to an incorrectly entered web address), a connection is established to a web service to correct this error (e.g. suggestion of the correct web address). By setting this policy, you can prevent sending so that no information is transmitted by the browser.  This setting is recommended because entering a Web address incorrectly may result in a fake Web page that has malicious potential.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ResolveNavigationErrorsUseWebService", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ResolveNavigationErrorsUseWebService", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E120";
+        t.id = "E119_MACHINE";
+        t.title = L"Disable use of web service to resolve navigation errors (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable suggestion of similar sites when website cannot be found";
+        t.description = L"If there is an error navigating the Microsoft Edge (e.g. due to an incorrectly entered web address), a connection is established to a web service to correct this error (e.g. suggestion of the correct web address). By setting this policy, you can prevent sending so that no information is transmitted by the browser.  This setting is recommended because entering a Web address incorrectly may result in a fake Web page that has malicious potential.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ResolveNavigationErrorsUseWebService", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E120_USER";
+        t.title = L"Disable suggestion of similar sites when website cannot be found (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"If there is an error navigating the Microsoft Edge (e.g. due to an incorrectly entered web address), then a similar Web page is suggested for the original input. By setting this policy, you can prevent sending so that no information is transmitted by the browser.  This setting is recommended because entering a Web address incorrectly may result in a fake Web page that has malicious potential.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"AlternateErrorPagesEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"AlternateErrorPagesEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E122";
+        t.id = "E120_MACHINE";
+        t.title = L"Disable suggestion of similar sites when website cannot be found (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable preload of pages for faster browsing and searching";
+        t.description = L"If there is an error navigating the Microsoft Edge (e.g. due to an incorrectly entered web address), then a similar Web page is suggested for the original input. By setting this policy, you can prevent sending so that no information is transmitted by the browser.  This setting is recommended because entering a Web address incorrectly may result in a fake Web page that has malicious potential.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"AlternateErrorPagesEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E122_USER";
+        t.title = L"Disable preload of pages for faster browsing and searching (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"Microsoft Edge can predict which page to load by entering the web address in the address field. This is to do this, certain services are preconfigured in the background to speed up loading. By setting this policy, you can prevent this preloading.  This setting is not recommended because it slows down the speed of searching and displaying a Web page.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NetworkPredictionOptions", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NetworkPredictionOptions", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E125";
+        t.id = "E122_MACHINE";
+        t.title = L"Disable preload of pages for faster browsing and searching (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable saving passwords for websites";
+        t.description = L"Microsoft Edge can predict which page to load by entering the web address in the address field. This is to do this, certain services are preconfigured in the background to speed up loading. By setting this policy, you can prevent this preloading.  This setting is not recommended because it slows down the speed of searching and displaying a Web page.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NetworkPredictionOptions", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E125_USER";
+        t.title = L"Disable saving passwords for websites (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"Microsoft Edge stores passwords in its own password manager. These are automatically filled in when you visit a website for which a password is stored. If this setting is deactivated, no new passwords will be saved in the future, but existing ones will continue to be used.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"PasswordManagerEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"PasswordManagerEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E126";
+        t.id = "E125_MACHINE";
+        t.title = L"Disable saving passwords for websites (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable site safety services for more information about a visited website";
+        t.description = L"Microsoft Edge stores passwords in its own password manager. These are automatically filled in when you visit a website for which a password is stored. If this setting is deactivated, no new passwords will be saved in the future, but existing ones will continue to be used.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"PasswordManagerEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E126_USER";
+        t.title = L"Disable site safety services for more information about a visited website (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"By clicking on the lock in the address bar of Microsoft Edge, you can get more safety information about a website. For this purpose, information is transmitted to Microsoft Bing, which could disclose information. Because this information can be useful for evaluating a website, this setting is only conditionally recommended.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SiteSafetyServicesEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SiteSafetyServicesEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E126_MACHINE";
+        t.title = L"Disable site safety services for more information about a visited website (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Microsoft Edge";
+        t.description = L"By clicking on the lock in the address bar of Microsoft Edge, you can get more safety information about a website. For this purpose, information is transmitted to Microsoft Bing, which could disclose information. Because this information can be useful for evaluating a website, this setting is only conditionally recommended.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"SiteSafetyServicesEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -1886,67 +2777,122 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "E153";
+        t.id = "E153_USER";
+        t.title = L"Disable startup boost (User)";
+        t.scope = TargetScope::User;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable startup boost";
         t.description = L"This setting disables the startup boost feature that keeps Edge processes running in the background, saving system resources but increasing initial launch time.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"StartupBoostEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"StartupBoostEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E154";
+        t.id = "E153_MACHINE";
+        t.title = L"Disable startup boost (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Hide default top sites on new tab page";
+        t.description = L"This setting disables the startup boost feature that keeps Edge processes running in the background, saving system resources but increasing initial launch time.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"StartupBoostEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E154_USER";
+        t.title = L"Hide default top sites on new tab page (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting hides the default top sites from the new tab page, providing a cleaner new tab experience.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NewTabPageHideDefaultTopSites", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NewTabPageHideDefaultTopSites", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E155";
+        t.id = "E154_MACHINE";
+        t.title = L"Hide default top sites on new tab page (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Hide Adobe Acrobat subscription button";
+        t.description = L"This setting hides the default top sites from the new tab page, providing a cleaner new tab experience.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"NewTabPageHideDefaultTopSites", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E155_USER";
+        t.title = L"Hide Adobe Acrobat subscription button (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting hides the Adobe Acrobat subscription button in the PDF viewer, reducing third-party promotions.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ShowAcrobatSubscriptionButton", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ShowAcrobatSubscriptionButton", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E129";
+        t.id = "E155_MACHINE";
+        t.title = L"Hide Adobe Acrobat subscription button (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable the Microsoft Account Sign-In Button";
+        t.description = L"This setting hides the Adobe Acrobat subscription button in the PDF viewer, reducing third-party promotions.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"ShowAcrobatSubscriptionButton", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E129_USER";
+        t.title = L"Disable the Microsoft Account Sign-In Button (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"This setting removes the sign-in button in Microsoft Edge. You won’t be able to sign in with a Microsoft account, and data synchronization like favorites, passwords, and settings will be disabled.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"BrowserSignin", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"BrowserSignin", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "E127";
+        t.id = "E129_MACHINE";
+        t.title = L"Disable the Microsoft Account Sign-In Button (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Microsoft Edge";
-        t.title = L"Disable typosquatting checker for site addresses";
+        t.description = L"This setting removes the sign-in button in Microsoft Edge. You won’t be able to sign in with a Microsoft account, and data synchronization like favorites, passwords, and settings will be disabled.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"BrowserSignin", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E127_USER";
+        t.title = L"Disable typosquatting checker for site addresses (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Microsoft Edge";
         t.description = L"When entering site addresses in the Edge, they are checked for typos and corrected, so that you do not accidentally end up on a wrong (possibly malicious) website. This involves using Microsoft services to which the input must be sent. Because the risk of a fake website is high, enabling this setting is not recommended.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Advanced;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"TyposquattingCheckerEnabled", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"TyposquattingCheckerEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "E127_MACHINE";
+        t.title = L"Disable typosquatting checker for site addresses (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Microsoft Edge";
+        t.description = L"When entering site addresses in the Edge, they are checked for typos and corrected, so that you do not accidentally end up on a wrong (possibly malicious) website. This involves using Microsoft services to which the input must be sent. Because the risk of a fake website is high, enabling this setting is not recommended.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Advanced;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Edge", L"TyposquattingCheckerEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
 
@@ -1955,14 +2901,25 @@ void TweakRegistry::InitializeDefaultTweaks() {
     // ==========================================
     {
         Tweak t;
-        t.id = "M022";
+        t.id = "M022_USER";
+        t.title = L"Disable feedback reminders (User)";
+        t.scope = TargetScope::User;
         t.category = L"Miscellaneous";
-        t.title = L"Disable feedback reminders";
         t.description = L"Microsoft often asks for feedback and transfers \"Diagnostics and user data\". If you want to prevent this, then deactivate this function.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection", L"DoNotShowFeedbackNotifications", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "M022_MACHINE";
+        t.title = L"Disable feedback reminders (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Miscellaneous";
+        t.description = L"Microsoft often asks for feedback and transfers \"Diagnostics and user data\". If you want to prevent this, then deactivate this function.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Siuf\\Rules", L"NumberOfSIUFInPeriod", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -2509,14 +3466,25 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "PRIV_AD_ID";
+        t.id = "PRIV_AD_ID_USER";
+        t.title = L"Disable and reset Advertising ID and info (User)";
+        t.scope = TargetScope::User;
         t.category = L"Privacy & Tracking";
-        t.title = L"Disable and reset Advertising ID and info";
         t.description = L"Windows creates a commercial ID to show you advertisements based on your installed and used apps, and your browsing history. These advertisements can also be displayed in non-Microsoft apps.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo", L"Enabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "PRIV_AD_ID_MACHINE";
+        t.title = L"Disable and reset Advertising ID and info (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Privacy & Tracking";
+        t.description = L"Windows creates a commercial ID to show you advertisements based on your installed and used apps, and your browsing history. These advertisements can also be displayed in non-Microsoft apps.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo", L"Enabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -3070,15 +4038,26 @@ void TweakRegistry::InitializeDefaultTweaks() {
     // ==========================================
     {
         Tweak t;
-        t.id = "M019";
+        t.id = "M019_USER";
+        t.title = L"Disable news and interests in the task bar (User)";
+        t.scope = TargetScope::User;
         t.category = L"Taskbar & Start Menu";
-        t.title = L"Disable news and interests in the task bar";
         t.description = L"This setting allows you to disable the display of news and interesting topics in the taskbar if you do not want them to be displayed. In the active state, data from Microsoft Bing services is retrieved at regular intervals and thus Internet connections are established.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Feeds", L"EnableFeeds", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Dsh", L"AllowNewsAndInterests", RegType::Dword, 1, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "M019_MACHINE";
+        t.title = L"Disable news and interests in the task bar (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Taskbar & Start Menu";
+        t.description = L"This setting allows you to disable the display of news and interesting topics in the taskbar if you do not want them to be displayed. In the active state, data from Microsoft Bing services is retrieved at regular intervals and thus Internet connections are established.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Feeds", L"ShellFeedsTaskbarViewMode", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -3108,14 +4087,25 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "M017";
+        t.id = "M017_USER";
+        t.title = L"UNKNOWN (User)";
+        t.scope = TargetScope::User;
         t.category = L"Taskbar & Start Menu";
-        t.title = L"Disable \"Meet now\" in the task bar";
         t.description = L"The \"Meet now\" feature is part of Microsoft Skype and is used to quickly create an online meeting. If you do not want this feature, then activate this setting.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", L"HideSCAMeetNow", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "M017_MACHINE";
+        t.title = L"UNKNOWN (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Taskbar & Start Menu";
+        t.description = L"The \"Meet now\" feature is part of Microsoft Skype and is used to quickly create an online meeting. If you do not want this feature, then activate this setting.";
+        t.impact = L"Disabling may impact convenience or specific hardware features.";
+        t.safety = SafetyLevel::Normal;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", L"HideSCAMeetNow", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -3151,14 +4141,25 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "PRIV_TAILORED";
+        t.id = "PRIV_TAILORED_USER";
+        t.title = L"Disable diagnostic data from customizing user experiences (User)";
+        t.scope = TargetScope::User;
         t.category = L"Telemetry & Diagnostics";
-        t.title = L"Disable diagnostic data from customizing user experiences";
         t.description = L"Microsoft can record diagnostic data from your computer and evaluate it in order to improve your use of Windows. While doing so, a large amount of such data will be compiled and transmitted. Disable this feature if you want to stop this from happening.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Privacy", L"TailoredExperiencesWithDiagnosticDataEnabled", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "PRIV_TAILORED_MACHINE";
+        t.title = L"Disable diagnostic data from customizing user experiences (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Telemetry & Diagnostics";
+        t.description = L"Microsoft can record diagnostic data from your computer and evaluate it in order to improve your use of Windows. While doing so, a large amount of such data will be compiled and transmitted. Disable this feature if you want to stop this from happening.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Privacy", L"TailoredExperiencesWithDiagnosticDataEnabled", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -3265,16 +4266,27 @@ void TweakRegistry::InitializeDefaultTweaks() {
     // ==========================================
     {
         Tweak t;
-        t.id = "A004";
+        t.id = "A004_USER";
+        t.title = L"Disable automatic Windows Updates (User)";
+        t.scope = TargetScope::User;
         t.category = L"Windows Update";
-        t.title = L"Disable automatic Windows Updates";
         t.description = L"Deactivating is not recommended! With this you deactivate the automatic installation of Windows Updates. Security leaks will not be tackled automatically.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\System", L"AllowClipboardHistory", RegType::Dword, 0, 0, L"", L"", false });
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Clipboard", L"EnableClipboardHistory", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU", L"NoAutoUpdate", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "A004_MACHINE";
+        t.title = L"Disable automatic Windows Updates (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Windows Update";
+        t.description = L"Deactivating is not recommended! With this you deactivate the automatic installation of Windows Updates. Security leaks will not be tackled automatically.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Clipboard", L"EnableClipboardHistory", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\wuauserv", L"Start", RegType::Dword, 0, 0, L"", L"", false });
         t.serviceActions.push_back({ L"wuauserv", 4, 2, true });
         AddTweak(std::move(t));
@@ -3294,31 +4306,53 @@ void TweakRegistry::InitializeDefaultTweaks() {
     }
     {
         Tweak t;
-        t.id = "P007";
+        t.id = "P007_USER";
+        t.title = L"Disable optional updates (including preview updates) (User)";
+        t.scope = TargetScope::User;
         t.category = L"Windows Update";
-        t.title = L"Disable optional updates (including preview updates)";
         t.description = L"Windows 10 (from version 20H2 onward) allows optional updates, including preview updates, to be installed. These updates may include new features or fixes that have not yet been fully tested. Disable this setting to prevent optional updates from being installed automatically.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{C1D23ACC-752B-43E5-8448-8D0E519CD6D6}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\userAccountInformation", L"Value", RegType::Dword, 0, 0, L"", L"", false });
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\userAccountInformation", L"Value", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate", L"SetAllowOptionalContent", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate", L"AllowOptionalContent", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
-        t.id = "WU_DELIVERY_OPT";
+        t.id = "P007_MACHINE";
+        t.title = L"Disable optional updates (including preview updates) (Machine)";
+        t.scope = TargetScope::Machine;
         t.category = L"Windows Update";
-        t.title = L"Disable Windows Update via peer-to-peer";
+        t.description = L"Windows 10 (from version 20H2 onward) allows optional updates, including preview updates, to be installed. These updates may include new features or fixes that have not yet been fully tested. Disable this setting to prevent optional updates from being installed automatically.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeviceAccess\\Global\\{C1D23ACC-752B-43E5-8448-8D0E519CD6D6}", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\userAccountInformation", L"Value", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "WU_DELIVERY_OPT_USER";
+        t.title = L"Disable Windows Update via peer-to-peer (User)";
+        t.scope = TargetScope::User;
+        t.category = L"Windows Update";
         t.description = L"Windows Updates do not have to be downloaded only from Microsoft servers, but can also be downloaded from PCs in your network or the Internet. This often speeds up the process. It is a disadvantage that update data is sent from your computer too so that upload speeds can be reduced. If you don't want this, then deactivate this function.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Both;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeliveryOptimization\\Config", L"DODownloadMode", RegType::Dword, 0, 0, L"", L"", false });
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\DeliveryOptimization", L"DODownloadMode", RegType::Dword, 0, 0, L"", L"", false });
+        AddTweak(std::move(t));
+    }
+    {
+        Tweak t;
+        t.id = "WU_DELIVERY_OPT_MACHINE";
+        t.title = L"Disable Windows Update via peer-to-peer (Machine)";
+        t.scope = TargetScope::Machine;
+        t.category = L"Windows Update";
+        t.description = L"Windows Updates do not have to be downloaded only from Microsoft servers, but can also be downloaded from PCs in your network or the Internet. This often speeds up the process. It is a disadvantage that update data is sent from your computer too so that upload speeds can be reduced. If you don't want this, then deactivate this function.";
+        t.impact = L"Disabling improves privacy with zero functional side effects.";
+        t.safety = SafetyLevel::Safe;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\DeliveryOptimization", L"DODownloadMode", RegType::Dword, 0, 0, L"", L"", false });
         AddTweak(std::move(t));
     }
@@ -3426,32 +4460,18 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
         SettingStatus st = SettingStatus::NotApplied;
         if (ra.scope == TargetScope::Machine) {
             st = RegistryHelper::AuditAction(HKEY_LOCAL_MACHINE, ra);
-        } else if (ra.scope == TargetScope::User) {
+        } else {
             st = UserHiveManager::AuditUserAction(ra, mode, users);
-        } else if (ra.scope == TargetScope::Both) {
-            const auto stMach = RegistryHelper::AuditAction(HKEY_LOCAL_MACHINE, ra);
-            const auto stUsr = UserHiveManager::AuditUserAction(ra, mode, users);
-            if (stMach == SettingStatus::Applied && stUsr == SettingStatus::Applied) st = SettingStatus::Applied;
-            else if (stMach == SettingStatus::NotApplied && stUsr == SettingStatus::NotApplied) st = SettingStatus::NotApplied;
-            else if (stMach == SettingStatus::Unknown || stUsr == SettingStatus::Unknown) st = SettingStatus::Unknown;
-            else st = SettingStatus::Partial;
         }
 
         if (st == SettingStatus::Applied) appliedCount++;
         else if (st == SettingStatus::NotApplied) notAppliedCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
-        else if (st == SettingStatus::Partial) {
-            appliedCount++;
-            notAppliedCount++;
-        }
+        else notAppliedCount++;
     }
 
     if (unknownCount == totalChecks) return SettingStatus::Unknown;
-    if (appliedCount == totalChecks && notAppliedCount == 0) return SettingStatus::Applied;
-    if (notAppliedCount == totalChecks && appliedCount == 0) return SettingStatus::NotApplied;
-    if (appliedCount > 0 && notAppliedCount > 0) return SettingStatus::Partial;
-    if (appliedCount > 0) return SettingStatus::Applied;
-    if (unknownCount > 0) return SettingStatus::Unknown;
+    if (appliedCount == totalChecks) return SettingStatus::Applied;
     return SettingStatus::NotApplied;
 }
 

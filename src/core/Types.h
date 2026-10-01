@@ -23,13 +23,11 @@ using SafetyLevel = ImpactLevel;
 enum class SettingStatus {
     Applied,        // Setting active / applied on the machine
     NotApplied,     // Setting not applied (Windows default)
-    Partial,        // Partially applied across different keys or services
     Unknown,        // Inaccessible or detection failed
     NotApplicable,  // Not applicable to this Windows version
     // Aliases for backwards compatibility
     Protected = Applied,
     Default = NotApplied,
-    Mixed = Partial,
     NotSupported = NotApplicable
 };
 
@@ -37,9 +35,9 @@ enum class SettingStatus {
 enum class TargetScope {
     Machine,     // HKEY_LOCAL_MACHINE
     User,        // HKEY_CURRENT_USER / All Users
-    Both,        // Both HKLM and HKCU
     Service      // Windows Service controller
 };
+
 
 // Value type for registry
 enum class RegType {

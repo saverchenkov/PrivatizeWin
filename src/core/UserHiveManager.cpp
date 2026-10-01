@@ -217,13 +217,11 @@ SettingStatus UserHiveManager::AuditUserAction(
         return RegistryHelper::AuditAction(HKEY_CURRENT_USER, action);
     }
     if (protectedUsers == totalUsers) {
-        return SettingStatus::Protected;
+        return SettingStatus::Applied;
     }
-    if (protectedUsers == 0) {
-        return SettingStatus::Default;
-    }
-    return SettingStatus::Mixed;
+    return SettingStatus::NotApplied;
 }
+
 
 bool UserHiveManager::ApplyUserAction(
     const RegistryAction& action,

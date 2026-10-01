@@ -68,3 +68,31 @@ TEST_CASE(Unit_TweakRegistry, LoadCustomTweaksFromJson) {
     ASSERT_EQ(custom->id, "CUSTOM_TWEAK_01");
     ASSERT_EQ(custom->category, L"Testing");
 }
+
+TEST_CASE(Unit_TweakRegistry, SplitUserMachineAndNoPartialState) {
+    TweakRegistry::Instance().InitializeDefaultTweaks();
+    const auto& tweaks = TweakRegistry::Instance().GetAllTweaks();
+
+    ASSERT_TRUE(tweaks.size() >= 300);
+
+    for (const auto& t : tweaks) {
+        // Assert scope is strictly User, Machine, or Service
+        ASSERT_TRUE(t.scope == TargetScope::User || t.scope == TargetScope::Machine || t.scope == TargetScope::Service);
+
+        // Audit state is binary: never Partial
+        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        ASSERT_TRUE(st == SettingStatus::Applied || st == SettingStatus::NotApplied ||
+                    st == SettingStatus::Unknown || st == SettingStatus::NotApplicable);
+
+        if (t.id.ends_with("_USER")) {
+            ASSERT_TRUE(t.scope == TargetScope::User);
+            ASSERT_TRUE(t.title.find(L"(User)") != std::wstring::npos);
+            const std::string machId = t.id.substr(0, t.id.length() - 5) + "_MACHINE";
+            const auto* machTweak = TweakRegistry::Instance().GetTweakById(machId);
+            ASSERT_TRUE(machTweak != nullptr);
+            ASSERT_TRUE(machTweak->scope == TargetScope::Machine);
+            ASSERT_TRUE(machTweak->title.find(L"(Machine)") != std::wstring::npos);
+        }
+    }
+}
+

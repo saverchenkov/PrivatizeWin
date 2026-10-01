@@ -117,6 +117,10 @@ private:
     // Adjustable splitter (Item 13)
     int m_splitterY{ 430 };
     bool m_isDraggingSplitter{ false };
+
+    // Group header collapse interaction
+    int m_mouseDownGroupId{ -1 };
+    static LRESULT CALLBACK ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 };
 
 } // namespace PrivatizeWin
