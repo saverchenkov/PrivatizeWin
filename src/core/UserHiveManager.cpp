@@ -219,6 +219,9 @@ SettingStatus UserHiveManager::AuditUserAction(
     if (protectedUsers == totalUsers) {
         return SettingStatus::Applied;
     }
+    if (protectedUsers > 0) {
+        return SettingStatus::Partial;
+    }
     return SettingStatus::NotApplied;
 }
 

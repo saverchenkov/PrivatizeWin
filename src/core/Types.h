@@ -21,15 +21,18 @@ using SafetyLevel = ImpactLevel;
 
 // Current audit state on the machine (Item 4)
 enum class SettingStatus {
-    Applied,        // Setting active / applied on the machine
+    Applied,        // Setting active / applied on the machine (Already Enabled)
     NotApplied,     // Setting not applied (Windows default)
+    Partial,        // Partially applied across different keys or services (Partially Enabled)
     Unknown,        // Inaccessible or detection failed
     NotApplicable,  // Not applicable to this Windows version
     // Aliases for backwards compatibility
     Protected = Applied,
     Default = NotApplied,
+    Mixed = Partial,
     NotSupported = NotApplicable
 };
+
 
 // Target registry or service scope
 enum class TargetScope {

@@ -4445,6 +4445,7 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
     size_t appliedCount = 0;
     size_t notAppliedCount = 0;
     size_t unknownCount = 0;
+    size_t partialCount = 0;
 
     // Check services
     for (const auto& sa : t->serviceActions) {
@@ -4452,6 +4453,7 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
         if (st == SettingStatus::Applied) appliedCount++;
         else if (st == SettingStatus::NotApplied) notAppliedCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
+        else if (st == SettingStatus::Partial) partialCount++;
         else notAppliedCount++;
     }
 
@@ -4467,11 +4469,13 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
         if (st == SettingStatus::Applied) appliedCount++;
         else if (st == SettingStatus::NotApplied) notAppliedCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
+        else if (st == SettingStatus::Partial) partialCount++;
         else notAppliedCount++;
     }
 
     if (unknownCount == totalChecks) return SettingStatus::Unknown;
     if (appliedCount == totalChecks) return SettingStatus::Applied;
+    if (appliedCount > 0 || partialCount > 0) return SettingStatus::Partial;
     return SettingStatus::NotApplied;
 }
 

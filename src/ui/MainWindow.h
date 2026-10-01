@@ -19,6 +19,16 @@ enum class FilterMode {
     RecommendedOnly
 };
 
+// Multi-state Checkbox (Item 10)
+enum class CheckboxState : UINT {
+    None = 0,
+    Unchecked = 1,      // [ ] Empty box - Windows default, not applied
+    AlreadyEnabled = 2, // [✔] Solid green box - Already applied in Windows
+    Partial = 3,        // [■] Solid amber box - Partially applied across keys/services
+    PendingEnable = 4,  // [☑] Solid blue box - Selected / pending to be applied
+    PendingRevert = 5   // [-] Solid red box - Selected / pending to be restored/reverted
+};
+
 class MainWindow {
 public:
     static bool RegisterClass(HINSTANCE hInstance);
@@ -49,6 +59,10 @@ private:
 
     void InitializeFonts();
     void InitializeControls();
+    void CreateStateImages();
+    void SetRowCheckboxState(int itemIndex, CheckboxState state);
+    [[nodiscard]] CheckboxState GetRowCheckboxState(int itemIndex) const;
+    void ToggleRowCheckbox(int itemIndex);
     void PopulateListView(std::wstring_view filter = L"", FilterMode mode = FilterMode::All);
     void UpdateDetailsPane(int selectedIndex);
     void UpdateStatusBar();
@@ -108,11 +122,14 @@ private:
     HFONT m_hFontCode{ nullptr };
 
     HIMAGELIST m_hRowImageList{ nullptr };
+    HIMAGELIST m_hStateImageList{ nullptr }; // Multi-state checkbox image list (Item 10)
 
     std::wstring m_currentFilter;
     FilterMode m_filterMode{ FilterMode::All };
     std::vector<Tweak> m_displayedTweaks;
-    std::unordered_set<std::string> m_selectedTweakIds; // Stable selection by tweak ID (Items 1, 3, 15)
+    std::unordered_set<std::string> m_selectedTweakIds; // Legacy alias
+    std::unordered_set<std::string> m_pendingEnableIds; // Staged to apply (Item 10)
+    std::unordered_set<std::string> m_pendingRevertIds; // Staged to restore (Item 10)
     int m_appliedCount{ 0 };
     bool m_isProgrammaticCheckChange{ false };
     HMODULE m_hRichEditLib{ nullptr };
@@ -121,8 +138,9 @@ private:
     int m_splitterY{ 430 };
     bool m_isDraggingSplitter{ false };
 
-    // Group header collapse interaction
+    // Group header collapse & checkbox click tracking
     int m_mouseDownGroupId{ -1 };
+    int m_mouseDownCheckboxItem{ -1 };
     static LRESULT CALLBACK ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 };
 

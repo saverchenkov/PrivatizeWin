@@ -210,6 +210,7 @@ int CliRunner::Execute(const CliOptions& opts) {
                 switch (st) {
                 case SettingStatus::Applied: obj["status"] = "applied"; break;
                 case SettingStatus::NotApplied: obj["status"] = "not_applied"; break;
+                case SettingStatus::Partial: obj["status"] = "partial"; break;
                 case SettingStatus::Unknown: obj["status"] = "unknown"; break;
                 case SettingStatus::NotApplicable: obj["status"] = "not_applicable"; break;
                 }
@@ -226,6 +227,7 @@ int CliRunner::Execute(const CliOptions& opts) {
                 switch (st) {
                 case SettingStatus::Applied: std::cout << std::setw(16) << "[APPLIED]"; break;
                 case SettingStatus::NotApplied: std::cout << std::setw(16) << "[NOT APPLIED]"; break;
+                case SettingStatus::Partial: std::cout << std::setw(16) << "[PARTIAL]"; break;
                 case SettingStatus::Unknown: std::cout << std::setw(16) << "[UNKNOWN]"; break;
                 case SettingStatus::NotApplicable: std::cout << std::setw(16) << "[NOT APPLICABLE]"; break;
                 }
