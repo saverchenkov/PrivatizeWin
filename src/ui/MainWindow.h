@@ -55,6 +55,8 @@ private:
     void UpdateSelectionCounts();
     void ToggleSelectedTweakFromDetails();
     void UpdateSplitterLayout();
+    void InitializeHeaderTooltips();
+    void UpdateHeaderTooltips();
 
     void ApplyPreset(std::string_view templateName);
     void SelectPreset(std::string_view templateName);
@@ -92,6 +94,7 @@ private:
 
     // Standard Controls
     HWND m_hListView{ nullptr };
+    HWND m_hHeaderTooltip{ nullptr };
     HWND m_hSplitterBar{ nullptr };
     HWND m_hDetailsEdit{ nullptr };
     HWND m_hBtnToggleTweak{ nullptr };

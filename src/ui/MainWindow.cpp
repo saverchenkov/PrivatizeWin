@@ -261,10 +261,12 @@ void MainWindow::LoadPreferences() {
                     }
                 }
             }
+            UpdateHeaderTooltips();
         }
         RegCloseKey(hKey);
     }
 }
+
 
 void MainWindow::SavePreferences() {
     HKEY hKey = nullptr;
@@ -418,7 +420,10 @@ void MainWindow::InitializeControls() {
     col.iSubItem = 3;
     ListView_InsertColumn(m_hListView, 3, &col);
 
+    InitializeHeaderTooltips();
+
     // 8. Adjustable Splitter Bar (Item 13)
+
     m_hSplitterBar = CreateWindowExW(
         0,
         L"PrivatizeWin_Splitter",
@@ -528,9 +533,11 @@ void MainWindow::OnSize(int width, int height) {
                               ListView_GetColumnWidth(m_hListView, 3);
         const int col0Width = std::max(280, width - 20 - fixedCols - GetSystemMetrics(SM_CXVSCROLL) - 4);
         ListView_SetColumnWidth(m_hListView, 0, col0Width);
+        UpdateHeaderTooltips();
     }
 
     InvalidateRect(m_hWnd, nullptr, FALSE);
+
 }
 
 void MainWindow::UpdateSplitterLayout() {
@@ -622,7 +629,115 @@ void MainWindow::OnMouseMove(int /*x*/, int y) {
     }
 }
 
+void MainWindow::InitializeHeaderTooltips() {
+    if (!m_hListView) return;
+    HWND hHeader = ListView_GetHeader(m_hListView);
+    if (!hHeader) return;
+
+    if (!m_hHeaderTooltip) {
+        m_hHeaderTooltip = CreateWindowExW(
+            WS_EX_TOPMOST,
+            TOOLTIPS_CLASSW,
+            nullptr,
+            WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
+            CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+            m_hWnd,
+            nullptr,
+            reinterpret_cast<HINSTANCE>(GetWindowLongPtrW(m_hWnd, GWLP_HINSTANCE)),
+            nullptr
+        );
+        if (!m_hHeaderTooltip) return;
+
+        SendMessageW(m_hHeaderTooltip, TTM_SETMAXTIPWIDTH, 0, 380);
+        SendMessageW(m_hHeaderTooltip, TTM_SETDELAYTIME, TTDT_INITIAL, 250);
+        SendMessageW(m_hHeaderTooltip, TTM_SETDELAYTIME, TTDT_AUTOPOP, 15000);
+        SendMessageW(m_hHeaderTooltip, TTM_SETDELAYTIME, TTDT_RESHOW, 100);
+
+        if (DarkMode::IsDarkModeActive()) {
+            DarkMode::ApplyToControl(m_hHeaderTooltip);
+        }
+    }
+
+    // Column 0: Setting
+    TOOLINFOW ti0{};
+    ti0.cbSize = sizeof(ti0);
+    ti0.uFlags = TTF_SUBCLASS;
+    ti0.hwnd = hHeader;
+    ti0.uId = 0;
+    Header_GetItemRect(hHeader, 0, &ti0.rect);
+    ti0.lpszText = const_cast<LPWSTR>(
+        L"Setting:\r\n"
+        L"Name and summary of the Windows privacy, telemetry, or security feature."
+    );
+    SendMessageW(m_hHeaderTooltip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&ti0));
+
+    // Column 1: Status
+    TOOLINFOW ti1{};
+    ti1.cbSize = sizeof(ti1);
+    ti1.uFlags = TTF_SUBCLASS;
+    ti1.hwnd = hHeader;
+    ti1.uId = 1;
+    Header_GetItemRect(hHeader, 1, &ti1.rect);
+    ti1.lpszText = const_cast<LPWSTR>(
+        L"Status:\r\n"
+        L"Shows whether this privacy setting is currently active on the machine.\r\n\r\n"
+        L"\u25CF Applied: Setting is active and enforced on your machine.\r\n"
+        L"\u25CB Not applied: Setting is in Windows standard default state.\r\n"
+        L"? Unknown: Key inaccessible or detection failed."
+    );
+    SendMessageW(m_hHeaderTooltip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&ti1));
+
+    // Column 2: Impact
+    TOOLINFOW ti2{};
+    ti2.cbSize = sizeof(ti2);
+    ti2.uFlags = TTF_SUBCLASS;
+    ti2.hwnd = hHeader;
+    ti2.uId = 2;
+    Header_GetItemRect(hHeader, 2, &ti2.rect);
+    ti2.lpszText = const_cast<LPWSTR>(
+        L"Impact:\r\n"
+        L"Functional consequence of applying this tweak:\r\n\r\n"
+        L"\u2022 Low: Safe optimization with minimal or no functional side effects.\r\n"
+        L"\u2022 Moderate: Mild tradeoff (e.g. disables Bing search in Start, web suggestions, or feedback prompts).\r\n"
+        L"\u2022 High: Functional restriction on hardware or convenience (e.g. restricts camera, microphone, or biometric login)."
+    );
+    SendMessageW(m_hHeaderTooltip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&ti2));
+
+    // Column 3: Scope
+    TOOLINFOW ti3{};
+    ti3.cbSize = sizeof(ti3);
+    ti3.uFlags = TTF_SUBCLASS;
+    ti3.hwnd = hHeader;
+    ti3.uId = 3;
+    Header_GetItemRect(hHeader, 3, &ti3.rect);
+    ti3.lpszText = const_cast<LPWSTR>(
+        L"Scope:\r\n"
+        L"Execution boundary and permissions required for this tweak:\r\n\r\n"
+        L"\u2022 User: Applies to current user profile (HKCU). Standard user, no admin elevation required.\r\n"
+        L"\u2022 Machine: Applies system-wide to all users (HKLM / policies). Requires administrator privileges.\r\n"
+        L"\u2022 Machine (Service): Governs Windows system services. Requires administrator privileges."
+    );
+    SendMessageW(m_hHeaderTooltip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&ti3));
+}
+
+void MainWindow::UpdateHeaderTooltips() {
+    if (!m_hListView || !m_hHeaderTooltip) return;
+    HWND hHeader = ListView_GetHeader(m_hListView);
+    if (!hHeader) return;
+
+    for (int col = 0; col < 4; ++col) {
+        TOOLINFOW ti{};
+        ti.cbSize = sizeof(ti);
+        ti.hwnd = hHeader;
+        ti.uId = static_cast<UINT_PTR>(col);
+        if (Header_GetItemRect(hHeader, col, &ti.rect)) {
+            SendMessageW(m_hHeaderTooltip, TTM_NEWTOOLRECTW, 0, reinterpret_cast<LPARAM>(&ti));
+        }
+    }
+}
+
 void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode filterMode) {
+
     SendMessage(m_hListView, WM_SETREDRAW, FALSE, 0);
     ListView_DeleteAllItems(m_hListView);
     ListView_RemoveAllGroups(m_hListView);
@@ -1482,7 +1597,15 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
 }
 
 void MainWindow::OnNotify(NMHDR* pnmhdr) {
+    if (m_hListView && pnmhdr->hwndFrom == ListView_GetHeader(m_hListView)) {
+        if (pnmhdr->code == HDN_ITEMCHANGEDW || pnmhdr->code == HDN_ITEMCHANGEDA ||
+            pnmhdr->code == HDN_ENDTRACKW || pnmhdr->code == HDN_ENDTRACKA) {
+            UpdateHeaderTooltips();
+        }
+    }
+
     if (pnmhdr->idFrom == IDC_LIST_TWEAKS) {
+
         if (pnmhdr->code == LVN_ITEMCHANGED) {
             auto* pItem = reinterpret_cast<NMLISTVIEW*>(pnmhdr);
             if (pItem->iItem >= 0 && pItem->iItem < static_cast<int>(m_displayedTweaks.size())) {
