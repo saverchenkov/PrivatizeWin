@@ -184,13 +184,13 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             RECT rcClient{};
             GetClientRect(hWnd, &rcClient);
 
-            if (x >= s_pMainWnd->m_splitterX - 4 && x <= s_pMainWnd->m_splitterX + 6 &&
+            if (x >= s_pMainWnd->m_splitterX - 4 && x <= s_pMainWnd->m_splitterX + 4 &&
                 y >= 48 && y < s_pMainWnd->m_splitterY) {
                 s_pMainWnd->m_dragMode = SplitterDragMode::Vertical;
                 SetCapture(hWnd);
                 return 0;
             }
-            if (y >= s_pMainWnd->m_splitterY - 4 && y <= s_pMainWnd->m_splitterY + 6 &&
+            if (y >= s_pMainWnd->m_splitterY - 4 && y <= s_pMainWnd->m_splitterY + 4 &&
                 y >= 48 && x >= 10 && x <= rcClient.right - 10) {
                 s_pMainWnd->m_dragMode = SplitterDragMode::Horizontal;
                 SetCapture(hWnd);
@@ -226,6 +226,19 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             }
             break;
         }
+        case WM_CAPTURECHANGED: {
+            if (s_pMainWnd) {
+                s_pMainWnd->m_dragMode = SplitterDragMode::None;
+            }
+            return 0;
+        }
+        case WM_CANCELMODE: {
+            if (s_pMainWnd && s_pMainWnd->m_dragMode != SplitterDragMode::None) {
+                s_pMainWnd->m_dragMode = SplitterDragMode::None;
+                ReleaseCapture();
+            }
+            return 0;
+        }
         case WM_DESTROY:
             s_pMainWnd.reset();
             PostQuitMessage(0);
@@ -236,9 +249,91 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
     return DefWindowProcW(hWnd, uMsg, wParam, lParam);
 }
 
+static LRESULT CALLBACK ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR /*uIdSubclass*/, DWORD_PTR /*dwRefData*/) {
+    static bool s_isDraggingSelection = false;
+    static int s_anchorItem = -1;
+
+    switch (uMsg) {
+    case WM_LBUTTONDOWN: {
+        const int x = GET_X_LPARAM(lParam);
+        const int y = GET_Y_LPARAM(lParam);
+        LVHITTESTINFO hti{};
+        hti.pt.x = x;
+        hti.pt.y = y;
+        ListView_SubItemHitTest(hWnd, &hti);
+
+        // If clicking on a checkbox state icon, let default handle check toggle
+        if (hti.flags & LVHT_ONITEMSTATEICON) {
+            s_isDraggingSelection = false;
+            s_anchorItem = -1;
+            break;
+        }
+
+        if (hti.iItem != -1) {
+            s_isDraggingSelection = true;
+            s_anchorItem = hti.iItem;
+        }
+        break;
+    }
+    case WM_MOUSEMOVE: {
+        if (s_isDraggingSelection && (wParam & MK_LBUTTON)) {
+            const int x = GET_X_LPARAM(lParam);
+            const int y = GET_Y_LPARAM(lParam);
+            LVHITTESTINFO hti{};
+            hti.pt.x = x;
+            hti.pt.y = y;
+            ListView_SubItemHitTest(hWnd, &hti);
+
+            if (hti.iItem != -1 && s_anchorItem != -1) {
+                const int start = (std::min)(s_anchorItem, hti.iItem);
+                const int end = (std::max)(s_anchorItem, hti.iItem);
+                const int count = ListView_GetItemCount(hWnd);
+
+                SendMessage(hWnd, WM_SETREDRAW, FALSE, 0);
+                for (int i = 0; i < count; ++i) {
+                    const UINT state = (i >= start && i <= end) ? LVIS_SELECTED : 0;
+                    ListView_SetItemState(hWnd, i, state, LVIS_SELECTED);
+                }
+                ListView_SetItemState(hWnd, hti.iItem, LVIS_FOCUSED, LVIS_FOCUSED);
+                SendMessage(hWnd, WM_SETREDRAW, TRUE, 0);
+                InvalidateRect(hWnd, nullptr, FALSE);
+
+                RECT rcClient{};
+                GetClientRect(hWnd, &rcClient);
+                if (y < 20) {
+                    SendMessage(hWnd, WM_VSCROLL, SB_LINEUP, 0);
+                } else if (y > rcClient.bottom - 20) {
+                    SendMessage(hWnd, WM_VSCROLL, SB_LINEDOWN, 0);
+                }
+
+                // Prevent SysListView32 default drag tracking that can snap cursor to (0, 0)
+                return 0;
+            }
+        }
+        break;
+    }
+    case WM_LBUTTONUP: {
+        s_isDraggingSelection = false;
+        s_anchorItem = -1;
+        break;
+    }
+    case WM_CAPTURECHANGED:
+    case WM_CANCELMODE: {
+        s_isDraggingSelection = false;
+        s_anchorItem = -1;
+        break;
+    }
+    }
+
+    return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+}
+
 MainWindow::MainWindow(HWND hWnd) : m_hWnd(hWnd) {}
 
 MainWindow::~MainWindow() {
+    if (m_hListView) {
+        RemoveWindowSubclass(m_hListView, ListViewSubclassProc, 1001);
+    }
     if (m_hFontRegular) DeleteObject(m_hFontRegular);
     if (m_hFontBold) DeleteObject(m_hFontBold);
     if (m_hFontTitle) DeleteObject(m_hFontTitle);
@@ -401,6 +496,7 @@ void MainWindow::InitializeControls() {
         m_splitterX + 5, 48, 1140 - m_splitterX - 15, m_splitterY - 50, m_hWnd, reinterpret_cast<HMENU>(IDC_LIST_TWEAKS), hInst, nullptr);
     SendMessage(m_hListView, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
     ListView_SetExtendedListViewStyle(m_hListView, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER);
+    SetWindowSubclass(m_hListView, ListViewSubclassProc, 1001, 0);
 
     // Set 26px row height via image list
     m_hRowImageList = ImageList_Create(1, 26, ILC_COLOR32, 1, 1);
@@ -574,10 +670,11 @@ void MainWindow::OnSize(int width, int height) {
     const int listWidth = width - listX - 10;
     MoveWindow(m_hListView, listX, topY, listWidth, listHeight, TRUE);
 
-    // Auto-stretch column 0 to eliminate empty right gap
+    // Auto-stretch column 0 to eliminate empty right gap and prevent horizontal scrollbar
     const int fixedCols = 135 + 115 + 85 + 25; // Status + Safety + Scope + scrollbar reserve
-    const int col0Width = (std::max)(220, listWidth - fixedCols);
+    const int col0Width = (std::max)(140, listWidth - fixedCols);
     ListView_SetColumnWidth(m_hListView, 0, col0Width);
+    ShowScrollBar(m_hListView, SB_HORZ, FALSE);
 
     // Details View (Bottom)
     const int detailsTop = m_splitterY + 4;
@@ -1161,6 +1258,10 @@ void MainWindow::OnNotify(NMHDR* pnmhdr) {
             UpdateStatusBar();
         }
     } else if (pnmhdr->idFrom == IDC_LIST_TWEAKS) {
+        if (pnmhdr->code == LVN_BEGINDRAG || pnmhdr->code == LVN_BEGINRDRAG) {
+            ReleaseCapture();
+            return;
+        }
         if (pnmhdr->code == LVN_ITEMCHANGED) {
             auto* pnmv = reinterpret_cast<LPNMLISTVIEW>(pnmhdr);
             if (pnmv->uNewState & LVIS_SELECTED) {

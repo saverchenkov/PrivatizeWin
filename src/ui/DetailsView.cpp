@@ -133,6 +133,7 @@ void DetailsView::SetDarkMode(bool isDark) {
 }
 
 void DetailsView::SetTweak(const Tweak* pTweak, bool isChecked) {
+    const bool hadTweak = m_currentTweak.has_value();
     if (pTweak) {
         m_currentTweak = *pTweak;
     } else {
@@ -141,19 +142,19 @@ void DetailsView::SetTweak(const Tweak* pTweak, bool isChecked) {
     m_isChecked = isChecked;
     m_scrollY = 0;
 
-    if (m_currentTweak.has_value()) {
-        ShowWindow(m_hBtnToggle, SW_SHOW);
-        ShowWindow(m_hBtnCopy, SW_SHOW);
+    const bool hasTweak = m_currentTweak.has_value();
+    if (hasTweak != hadTweak) {
+        ShowWindow(m_hBtnToggle, hasTweak ? SW_SHOW : SW_HIDE);
+        ShowWindow(m_hBtnCopy, hasTweak ? SW_SHOW : SW_HIDE);
+    }
+    if (hasTweak) {
         SetCheckedState(isChecked);
-    } else {
-        ShowWindow(m_hBtnToggle, SW_HIDE);
-        ShowWindow(m_hBtnCopy, SW_HIDE);
     }
 
     RECT rc{};
     GetClientRect(m_hWnd, &rc);
     OnSize(rc.right - rc.left, rc.bottom - rc.top);
-    InvalidateRect(m_hWnd, nullptr, TRUE);
+    InvalidateRect(m_hWnd, nullptr, FALSE);
 }
 
 void DetailsView::SetCheckedState(bool isChecked) {
