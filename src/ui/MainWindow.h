@@ -54,6 +54,7 @@ private:
     void UpdateSelectionCounts();
     void ToggleSelectedTweakFromDetails();
 
+    void ApplyPreset(std::string_view templateName);
     void SelectPreset(std::string_view templateName);
     void SelectRecommended();
     void SelectAllShown();
@@ -107,6 +108,7 @@ private:
     std::vector<Tweak> m_displayedTweaks;
     std::unordered_set<std::string> m_selectedTweakIds; // Stable selection by tweak ID (Items 1, 3, 15)
     int m_appliedCount{ 0 };
+    bool m_isProgrammaticCheckChange{ false };
     HMODULE m_hRichEditLib{ nullptr };
 
     // Adjustable splitter (Item 13)
