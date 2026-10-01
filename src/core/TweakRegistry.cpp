@@ -13,6 +13,8 @@ TweakRegistry& TweakRegistry::Instance() {
 }
 
 void TweakRegistry::AddTweak(Tweak tweak) {
+    tweak.impactLevel = tweak.safety;
+    tweak.isRecommended = (tweak.impactLevel == ImpactLevel::Low);
     m_idIndexMap[tweak.id] = m_tweaks.size();
     m_tweaks.push_back(std::move(tweak));
 }
@@ -3401,29 +3403,56 @@ void TweakRegistry::InitializeDefaultTweaks() {
 
 SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode mode, const std::vector<std::wstring>& users) const {
     const Tweak* t = GetTweakById(id);
-    if (!t) return SettingStatus::Default;
+    if (!t) return SettingStatus::NotApplicable;
+
+    const size_t totalChecks = t->serviceActions.size() + t->regActions.size();
+    if (totalChecks == 0) return SettingStatus::NotApplicable;
+
+    size_t appliedCount = 0;
+    size_t notAppliedCount = 0;
+    size_t unknownCount = 0;
 
     // Check services
     for (const auto& sa : t->serviceActions) {
-        if (ServiceHelper::AuditAction(sa) != SettingStatus::Protected) {
-            return SettingStatus::Default;
-        }
+        const SettingStatus st = ServiceHelper::AuditAction(sa);
+        if (st == SettingStatus::Applied) appliedCount++;
+        else if (st == SettingStatus::NotApplied) notAppliedCount++;
+        else if (st == SettingStatus::Unknown) unknownCount++;
+        else notAppliedCount++;
     }
 
     // Check registry actions
     for (const auto& ra : t->regActions) {
+        SettingStatus st = SettingStatus::NotApplied;
         if (ra.scope == TargetScope::Machine) {
-            if (RegistryHelper::AuditAction(HKEY_LOCAL_MACHINE, ra) != SettingStatus::Protected) {
-                return SettingStatus::Default;
-            }
+            st = RegistryHelper::AuditAction(HKEY_LOCAL_MACHINE, ra);
         } else if (ra.scope == TargetScope::User) {
-            if (UserHiveManager::AuditUserAction(ra, mode, users) != SettingStatus::Protected) {
-                return SettingStatus::Default;
-            }
+            st = UserHiveManager::AuditUserAction(ra, mode, users);
+        } else if (ra.scope == TargetScope::Both) {
+            const auto stMach = RegistryHelper::AuditAction(HKEY_LOCAL_MACHINE, ra);
+            const auto stUsr = UserHiveManager::AuditUserAction(ra, mode, users);
+            if (stMach == SettingStatus::Applied && stUsr == SettingStatus::Applied) st = SettingStatus::Applied;
+            else if (stMach == SettingStatus::NotApplied && stUsr == SettingStatus::NotApplied) st = SettingStatus::NotApplied;
+            else if (stMach == SettingStatus::Unknown || stUsr == SettingStatus::Unknown) st = SettingStatus::Unknown;
+            else st = SettingStatus::Partial;
+        }
+
+        if (st == SettingStatus::Applied) appliedCount++;
+        else if (st == SettingStatus::NotApplied) notAppliedCount++;
+        else if (st == SettingStatus::Unknown) unknownCount++;
+        else if (st == SettingStatus::Partial) {
+            appliedCount++;
+            notAppliedCount++;
         }
     }
 
-    return SettingStatus::Protected;
+    if (unknownCount == totalChecks) return SettingStatus::Unknown;
+    if (appliedCount == totalChecks && notAppliedCount == 0) return SettingStatus::Applied;
+    if (notAppliedCount == totalChecks && appliedCount == 0) return SettingStatus::NotApplied;
+    if (appliedCount > 0 && notAppliedCount > 0) return SettingStatus::Partial;
+    if (appliedCount > 0) return SettingStatus::Applied;
+    if (unknownCount > 0) return SettingStatus::Unknown;
+    return SettingStatus::NotApplied;
 }
 
 bool TweakRegistry::ApplyTweak(std::string_view id, bool enableProtection, UserSelectionMode mode, const std::vector<std::wstring>& users) {

@@ -16,20 +16,24 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "E&xit\tAlt+F4",                            IDM_FILE_EXIT
     END
-    POPUP "&Templates"
+    POPUP "&Presets"
     BEGIN
-        MENUITEM "&Recommended (Safe for Everyone)",        IDM_TPL_RECOMMENDED
-        MENUITEM "&Strict Privacy (Maximum Hardening)",      IDM_TPL_STRICT
-        MENUITEM "&Minimal (Core Telemetry Only)",           IDM_TPL_MINIMAL
-        MENUITEM SEPARATOR
-        MENUITEM "Revert to Windows &Defaults",              IDM_TPL_DEFAULTS
+        MENUITEM "Select &Recommended Preset",              IDM_TPL_RECOMMENDED
+        MENUITEM "Select &Strict Privacy Preset",           IDM_TPL_STRICT
+        MENUITEM "Select &Minimal Preset",                  IDM_TPL_MINIMAL
     END
     POPUP "&Actions"
     BEGIN
-        MENUITEM "&Apply Current Selection\tCtrl+S",        IDM_ACT_APPLY
-        MENUITEM "&Invert Selection",                       IDM_ACT_INVERT
-        MENUITEM "&Refresh System Audit\tF5",               IDM_ACT_REFRESH
+        MENUITEM "&Apply Selected Settings\tCtrl+S",        IDM_ACT_APPLY
+        MENUITEM "Restore Selected to Windows &Defaults...", IDM_ACT_RESTORE_SELECTED
+        MENUITEM "Restore &All to Windows Defaults...",      IDM_ACT_RESTORE_ALL
         MENUITEM SEPARATOR
+        MENUITEM "Select &Recommended",                     IDM_SEL_RECOMMENDED
+        MENUITEM "Select All &Shown",                       IDM_SEL_ALL_SHOWN
+        MENUITEM "&Invert Shown Selection",                 IDM_SEL_INVERT_SHOWN
+        MENUITEM "&Clear Selection",                        IDM_SEL_CLEAR
+        MENUITEM SEPARATOR
+        MENUITEM "&Refresh System Audit\tF5",               IDM_ACT_REFRESH
         MENUITEM "Create &System Restore Point...",          IDM_ACT_RESTORE_PT
     END
     POPUP "&Tools"

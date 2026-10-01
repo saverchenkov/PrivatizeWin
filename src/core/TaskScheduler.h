@@ -21,6 +21,7 @@ struct ScheduledTaskConfig {
 class TaskScheduler {
 public:
     [[nodiscard]] static bool IsTaskInstalled(std::wstring_view taskName = L"PrivatizeWin Auto-Protect");
+    [[nodiscard]] static bool GetTaskConfig(ScheduledTaskConfig& outConfig, std::wstring_view taskName = L"PrivatizeWin Auto-Protect");
     static bool InstallTask(const ScheduledTaskConfig& config);
     static bool UninstallTask(std::wstring_view taskName = L"PrivatizeWin Auto-Protect");
     [[nodiscard]] static std::wstring GetExecutablePath();

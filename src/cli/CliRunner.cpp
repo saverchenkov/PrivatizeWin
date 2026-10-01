@@ -207,21 +207,29 @@ int CliRunner::Execute(const CliOptions& opts) {
                 const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, opts.userMode, opts.specificUsernames);
                 JsonValue obj(JsonType::Object);
                 obj["id"] = t.id;
-                obj["status"] = (st == SettingStatus::Protected) ? "protected" : "default";
+                switch (st) {
+                case SettingStatus::Applied: obj["status"] = "applied"; break;
+                case SettingStatus::NotApplied: obj["status"] = "not_applied"; break;
+                case SettingStatus::Partial: obj["status"] = "partial"; break;
+                case SettingStatus::Unknown: obj["status"] = "unknown"; break;
+                case SettingStatus::NotApplicable: obj["status"] = "not_applicable"; break;
+                }
                 items.arrayValue.push_back(std::move(obj));
             }
             root["tweaks"] = std::move(items);
             std::cout << root.toString(2) << "\n" << std::flush;
         } else {
-            std::cout << "\n" << std::left << std::setw(25) << "TWEAK ID" << std::setw(15) << "STATUS" << "TITLE\n";
+            std::cout << "\n" << std::left << std::setw(25) << "SETTING ID" << std::setw(16) << "STATUS" << "TITLE\n";
             std::cout << std::string(75, '-') << "\n";
             for (const auto& t : tweaks) {
                 const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, opts.userMode, opts.specificUsernames);
                 std::cout << std::left << std::setw(25) << t.id;
-                if (st == SettingStatus::Protected) {
-                    std::cout << std::setw(15) << "[PROTECTED]";
-                } else {
-                    std::cout << std::setw(15) << "[DEFAULT]";
+                switch (st) {
+                case SettingStatus::Applied: std::cout << std::setw(16) << "[APPLIED]"; break;
+                case SettingStatus::NotApplied: std::cout << std::setw(16) << "[NOT APPLIED]"; break;
+                case SettingStatus::Partial: std::cout << std::setw(16) << "[PARTIAL]"; break;
+                case SettingStatus::Unknown: std::cout << std::setw(16) << "[UNKNOWN]"; break;
+                case SettingStatus::NotApplicable: std::cout << std::setw(16) << "[NOT APPLICABLE]"; break;
                 }
                 std::cout << WStringToUtf8(t.title) << "\n";
             }

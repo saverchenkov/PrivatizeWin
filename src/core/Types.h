@@ -7,19 +7,30 @@
 
 namespace PrivatizeWin {
 
-// Recommendation level for user safety
-enum class SafetyLevel {
-    Safe,        // Recommended for everyone, no functional side effects (green)
-    Normal,      // Mild impact (e.g. disables location or Bing in Start) (yellow)
-    Advanced     // Potential functional loss (e.g. disabling biometric, camera access) (red)
+// Functional impact level of the tweak (Item 5)
+enum class ImpactLevel {
+    Low = 0,        // Minimal or no side effects on user experience
+    Moderate = 1,   // Mild impact (e.g. disables location or Bing in Start)
+    High = 2,       // Potential functional loss (e.g. biometric, camera access)
+    // Aliases for backwards compatibility
+    Safe = Low,
+    Normal = Moderate,
+    Advanced = High
 };
+using SafetyLevel = ImpactLevel;
 
-// Current audit state on the machine
+// Current audit state on the machine (Item 4)
 enum class SettingStatus {
-    Protected,   // Telemetry disabled / Privacy active
-    Default,     // Default Windows behavior (telemetry enabled)
-    Mixed,       // Partially applied across different keys or users
-    NotSupported // Not applicable to this Windows version
+    Applied,        // Setting active / applied on the machine
+    NotApplied,     // Setting not applied (Windows default)
+    Partial,        // Partially applied across different keys or services
+    Unknown,        // Inaccessible or detection failed
+    NotApplicable,  // Not applicable to this Windows version
+    // Aliases for backwards compatibility
+    Protected = Applied,
+    Default = NotApplied,
+    Mixed = Partial,
+    NotSupported = NotApplicable
 };
 
 // Target registry or service scope
@@ -60,18 +71,26 @@ struct Tweak {
     std::wstring category;
     std::wstring title;
     std::wstring description;
-    std::wstring impact;
-    SafetyLevel safety{ SafetyLevel::Safe };
+    std::wstring impact;           // Specific consequences and tradeoff
+    ImpactLevel impactLevel{ ImpactLevel::Low };
+    bool isRecommended{ true };    // Recommendation membership separate from impact
+    bool requiresReboot{ false };
+    bool requiresSignOut{ false };
+    std::wstring affectsFeatures;
     TargetScope scope{ TargetScope::Machine };
     std::vector<RegistryAction> regActions;
     std::vector<ServiceAction> serviceActions;
     std::string minWindowsBuild; // e.g. "22000" for Win11
+
+    // Compatibility alias field
+    ImpactLevel safety{ ImpactLevel::Low };
 };
 
 struct CategoryInfo {
     std::wstring name;
     int totalCount{ 0 };
-    int protectedCount{ 0 };
+    int appliedCount{ 0 };
+    int protectedCount{ 0 }; // compatibility
 };
 
 struct TemplateProfile {

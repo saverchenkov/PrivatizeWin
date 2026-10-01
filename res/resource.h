@@ -16,12 +16,22 @@
 #define IDM_ACT_INVERT          40021
 #define IDM_ACT_REFRESH         40022
 #define IDM_ACT_RESTORE_PT      40023
+#define IDM_ACT_RESTORE_SELECTED 40024
+#define IDM_ACT_RESTORE_ALL     40025
+
+#define IDM_SEL_RECOMMENDED     40060
+#define IDM_SEL_ALL_SHOWN       40061
+#define IDM_SEL_INVERT_SHOWN    40062
+#define IDM_SEL_CLEAR           40063
 
 #define IDM_TOOLS_SCHEDULE      40030
 #define IDM_TOOLS_TASKSCHD      40031
 
 #define IDM_HELP_ABOUT          40040
 #define IDM_HELP_GITHUB         40041
+
+#define IDC_BTN_SELECT_MENU     1020
+#define IDC_BTN_SELECT_PRESET   1021
 
 #define IDC_SEARCH_EDIT         1001
 #define IDC_TPL_COMBO           1002

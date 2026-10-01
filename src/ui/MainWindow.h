@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <unordered_set>
 #include <memory>
 #include "../core/Types.h"
 
@@ -13,10 +14,9 @@ namespace PrivatizeWin {
 
 enum class FilterMode {
     All,
-    UnprotectedOnly,
-    ProtectedOnly,
-    RecommendedOnly,
-    PendingChanges
+    NotAppliedOnly,
+    AppliedOnly,
+    RecommendedOnly
 };
 
 class MainWindow {
@@ -41,6 +41,9 @@ private:
     void OnNotify(NMHDR* pnmhdr);
     void OnContextMenu(HWND hWnd, int x, int y);
     void OnKeyDown(WPARAM vk);
+    void OnLButtonDown(int x, int y);
+    void OnLButtonUp();
+    void OnMouseMove(int x, int y);
     LRESULT OnCustomDraw(NMHDR* pnmhdr);
 
     void InitializeFonts();
@@ -48,36 +51,43 @@ private:
     void PopulateListView(std::wstring_view filter = L"", FilterMode mode = FilterMode::All);
     void UpdateDetailsPane(int selectedIndex);
     void UpdateStatusBar();
-    void UpdateSelectAllCheckboxState();
-    void ToggleCurrentTweakFromDetails();
+    void UpdateSelectionCounts();
+    void ToggleSelectedTweakFromDetails();
 
-    void ApplyTemplate(std::string_view templateName);
-    void ApplyCurrentSelection();
-    void ApplySelectedItemsOnly();
-    void RevertAllToDefaults();
+    void SelectPreset(std::string_view templateName);
+    void SelectRecommended();
+    void SelectAllShown();
+    void InvertShownSelection();
+    void ClearSelection();
+    void ShowSelectMenu();
+
+    void ApplySelectedTweaks();
+    void RestoreSelectedDefaults();
+    void RestoreAllDefaults();
     void RefreshAuditState();
 
     void ExportConfiguration();
     void ImportConfiguration();
     void CreateSystemRestorePoint();
 
-    void SetSelectedItemsChecked(bool checked);
-    void InvertSelectedItemsChecked();
     void CopySelectedTweakIds();
     void CopySelectedTweakDetails();
-    void SelectAllListItems();
+
+    void LoadPreferences();
+    void SavePreferences();
 
     HWND m_hWnd{ nullptr };
     HWND m_hSearchEdit{ nullptr };
     HWND m_hFilterCombo{ nullptr };
     HWND m_hLblMatchCount{ nullptr };
     HWND m_hTemplateCombo{ nullptr };
-    HWND m_hChkSelectAll{ nullptr };
+    HWND m_hBtnSelectPreset{ nullptr };
+    HWND m_hBtnSelectMenu{ nullptr };
     HWND m_hBtnApply{ nullptr };
     HWND m_hBtnRevert{ nullptr };
     HWND m_hBtnRefresh{ nullptr };
 
-    // Standard Controls (Unified Grouped ListView & Native RichEdit Inspector)
+    // Standard Controls
     HWND m_hListView{ nullptr };
     HWND m_hDetailsEdit{ nullptr };
     HWND m_hBtnToggleTweak{ nullptr };
@@ -95,8 +105,12 @@ private:
     std::wstring m_currentFilter;
     FilterMode m_filterMode{ FilterMode::All };
     std::vector<Tweak> m_displayedTweaks;
-    std::vector<bool> m_checkedStates;
+    std::unordered_set<std::string> m_selectedTweakIds; // Stable selection by tweak ID (Items 1, 3, 15)
     HMODULE m_hRichEditLib{ nullptr };
+
+    // Adjustable splitter (Item 13)
+    int m_splitterY{ 430 };
+    bool m_isDraggingSplitter{ false };
 };
 
 } // namespace PrivatizeWin
