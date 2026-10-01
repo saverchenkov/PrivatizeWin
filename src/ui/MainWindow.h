@@ -106,6 +106,7 @@ private:
     FilterMode m_filterMode{ FilterMode::All };
     std::vector<Tweak> m_displayedTweaks;
     std::unordered_set<std::string> m_selectedTweakIds; // Stable selection by tweak ID (Items 1, 3, 15)
+    int m_appliedCount{ 0 };
     HMODULE m_hRichEditLib{ nullptr };
 
     // Adjustable splitter (Item 13)

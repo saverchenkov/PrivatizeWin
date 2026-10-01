@@ -111,22 +111,40 @@ void UserHiveManager::ForEachTargetUser(
 
         if (p.isLoaded) {
             UniqueHKey hUserRoot;
-            if (RegOpenKeyExW(HKEY_USERS, p.sid.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS) {
+            if (RegOpenKeyExW(HKEY_USERS, p.sid.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS ||
+                RegOpenKeyExW(HKEY_USERS, p.sid.c_str(), 0, KEY_READ, hUserRoot.put()) == ERROR_SUCCESS) {
                 callback(hUserRoot.get(), p);
             }
         } else {
             const std::wstring ntuserPath = p.profilePath + L"\\NTUSER.DAT";
             const std::wstring mountName = L"PrivatizeWin_" + p.sid;
 
-            const LSTATUS loadStatus = RegLoadKeyW(HKEY_USERS, mountName.c_str(), ntuserPath.c_str());
+            LSTATUS loadStatus = RegLoadKeyW(HKEY_USERS, mountName.c_str(), ntuserPath.c_str());
+            bool wasAlreadyMounted = false;
+            if (loadStatus != ERROR_SUCCESS) {
+                UniqueHKey testKey;
+                if (RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ, testKey.put()) == ERROR_SUCCESS) {
+                    wasAlreadyMounted = true;
+                    loadStatus = ERROR_SUCCESS;
+                }
+            }
+
             if (loadStatus == ERROR_SUCCESS) {
                 {
                     UniqueHKey hUserRoot;
-                    if (RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS) {
+                    if (RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS ||
+                        RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ, hUserRoot.put()) == ERROR_SUCCESS) {
                         callback(hUserRoot.get(), p);
                     }
                 }
-                RegUnLoadKeyW(HKEY_USERS, mountName.c_str());
+                if (!wasAlreadyMounted) {
+                    for (int retry = 0; retry < 3; ++retry) {
+                        if (RegUnLoadKeyW(HKEY_USERS, mountName.c_str()) == ERROR_SUCCESS) {
+                            break;
+                        }
+                        Sleep(10);
+                    }
+                }
             }
         }
     }
@@ -137,10 +155,21 @@ void UserHiveManager::ForEachTargetUser(
         const std::wstring defaultNtuser = std::wstring(sysDrive) + L"\\Users\\Default\\NTUSER.DAT";
         const std::wstring defaultMount = L"PrivatizeWin_DefaultUser";
 
-        if (RegLoadKeyW(HKEY_USERS, defaultMount.c_str(), defaultNtuser.c_str()) == ERROR_SUCCESS) {
+        LSTATUS loadStatus = RegLoadKeyW(HKEY_USERS, defaultMount.c_str(), defaultNtuser.c_str());
+        bool wasAlreadyMounted = false;
+        if (loadStatus != ERROR_SUCCESS) {
+            UniqueHKey testKey;
+            if (RegOpenKeyExW(HKEY_USERS, defaultMount.c_str(), 0, KEY_READ, testKey.put()) == ERROR_SUCCESS) {
+                wasAlreadyMounted = true;
+                loadStatus = ERROR_SUCCESS;
+            }
+        }
+
+        if (loadStatus == ERROR_SUCCESS) {
             {
                 UniqueHKey hUserRoot;
-                if (RegOpenKeyExW(HKEY_USERS, defaultMount.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS) {
+                if (RegOpenKeyExW(HKEY_USERS, defaultMount.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS ||
+                    RegOpenKeyExW(HKEY_USERS, defaultMount.c_str(), 0, KEY_READ, hUserRoot.put()) == ERROR_SUCCESS) {
                     UserProfile defaultProfile;
                     defaultProfile.username = L"Default User Template";
                     defaultProfile.sid = L"DEFAULT_TEMPLATE";
@@ -148,7 +177,14 @@ void UserHiveManager::ForEachTargetUser(
                     callback(hUserRoot.get(), defaultProfile);
                 }
             }
-            RegUnLoadKeyW(HKEY_USERS, defaultMount.c_str());
+            if (!wasAlreadyMounted) {
+                for (int retry = 0; retry < 3; ++retry) {
+                    if (RegUnLoadKeyW(HKEY_USERS, defaultMount.c_str()) == ERROR_SUCCESS) {
+                        break;
+                    }
+                    Sleep(10);
+                }
+            }
         }
     }
 }

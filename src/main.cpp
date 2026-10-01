@@ -74,7 +74,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*l
         return 1;
     }
 
-    ShowWindow(hWnd, nCmdShow);
+    const int showCmd = (nCmdShow == 0 || nCmdShow == SW_HIDE) ? SW_SHOWNORMAL : nCmdShow;
+    ShowWindow(hWnd, showCmd);
     UpdateWindow(hWnd);
 
     const HACCEL hAccel = LoadAcceleratorsW(hInstance, L"MAINMENU");

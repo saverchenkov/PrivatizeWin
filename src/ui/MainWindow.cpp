@@ -536,12 +536,19 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
 
     // 2. Populate Tweaks into their Groups
     m_displayedTweaks.clear();
+    m_appliedCount = 0;
 
     std::wstring lowerSearch(searchFilter);
     std::transform(lowerSearch.begin(), lowerSearch.end(), lowerSearch.begin(), ::towlower);
 
     int itemIndex = 0;
     for (const auto& t : catalog) {
+        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        const bool isApplied = (st == SettingStatus::Applied);
+        if (isApplied) {
+            m_appliedCount++;
+        }
+
         // Filter logic
         if (!lowerSearch.empty()) {
             std::wstring lowerTitle = t.title;
@@ -556,9 +563,6 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
                 continue;
             }
         }
-
-        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::AllUsers, {});
-        const bool isApplied = (st == SettingStatus::Applied);
 
         if (filterMode == FilterMode::RecommendedOnly && !t.isRecommended) continue;
         if (filterMode == FilterMode::NotAppliedOnly && isApplied) continue;
@@ -675,7 +679,7 @@ void MainWindow::UpdateDetailsPane(int selectedIndex) {
     EnableWindow(m_hBtnCopyTweak, TRUE);
 
     const auto& t = m_displayedTweaks[selectedIndex];
-    const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::AllUsers, {});
+    const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
 
     // Item 11: Consistent per-setting action labels
     if (st == SettingStatus::Applied) {
@@ -776,13 +780,13 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
     }
 
     const auto& t = m_displayedTweaks[sel];
-    const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::AllUsers, {});
+    const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
     const bool shouldApply = (st != SettingStatus::Applied);
 
-    const bool ok = TweakRegistry::Instance().ApplyTweak(t.id, shouldApply, UserSelectionMode::AllUsers, {});
+    const bool ok = TweakRegistry::Instance().ApplyTweak(t.id, shouldApply, UserSelectionMode::CurrentUser, {});
     if (ok) {
         // Re-audit setting and update UI
-        const SettingStatus newSt = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::AllUsers, {});
+        const SettingStatus newSt = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
         std::wstring stStr;
         switch (newSt) {
         case SettingStatus::Applied:       stStr = L"\u25CF Applied"; break;
@@ -792,6 +796,11 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
         case SettingStatus::NotApplicable: stStr = L"\u2014 Not applicable"; break;
         }
         ListView_SetItemText(m_hListView, sel, 1, const_cast<LPWSTR>(stStr.c_str()));
+        if (st != SettingStatus::Applied && newSt == SettingStatus::Applied) {
+            m_appliedCount++;
+        } else if (st == SettingStatus::Applied && newSt != SettingStatus::Applied) {
+            m_appliedCount = std::max(0, m_appliedCount - 1);
+        }
         UpdateDetailsPane(sel);
         UpdateStatusBar();
     } else {
@@ -800,14 +809,6 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
 }
 
 void MainWindow::UpdateStatusBar() {
-    const auto& all = TweakRegistry::Instance().GetAllTweaks();
-    int appliedCount = 0;
-    for (const auto& t : all) {
-        if (TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::AllUsers, {}) == SettingStatus::Applied) {
-            appliedCount++;
-        }
-    }
-
     // Item 14: Factual counts in status bar ("40 applied · 12 selected · 260 shown")
     const size_t totalSelected = m_selectedTweakIds.size();
     size_t visibleSelected = 0;
@@ -816,7 +817,7 @@ void MainWindow::UpdateStatusBar() {
     }
     const size_t hiddenSelected = totalSelected - visibleSelected;
 
-    std::wstring part0 = std::to_wstring(appliedCount) + L" applied \u00B7 " +
+    std::wstring part0 = std::to_wstring(m_appliedCount) + L" applied \u00B7 " +
                          std::to_wstring(totalSelected) + L" selected";
     if (hiddenSelected > 0) {
         part0 += L" (" + std::to_wstring(hiddenSelected) + L" hidden)";
@@ -989,12 +990,12 @@ void MainWindow::ApplySelectedTweaks() {
 
     int progress = 0;
     for (const auto& id : m_selectedTweakIds) {
-        const SettingStatus before = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::AllUsers, {});
+        const SettingStatus before = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
         if (before == SettingStatus::Applied) {
             alreadyCount++;
         } else {
-            const bool ok = TweakRegistry::Instance().ApplyTweak(id, true, UserSelectionMode::AllUsers, {});
-            const SettingStatus after = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::AllUsers, {});
+            const bool ok = TweakRegistry::Instance().ApplyTweak(id, true, UserSelectionMode::CurrentUser, {});
+            const SettingStatus after = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
             if (ok && after == SettingStatus::Applied) {
                 changedCount++;
             } else {
@@ -1061,12 +1062,12 @@ void MainWindow::RestoreSelectedDefaults() {
 
     int progress = 0;
     for (const auto& id : m_selectedTweakIds) {
-        const SettingStatus before = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::AllUsers, {});
+        const SettingStatus before = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
         if (before == SettingStatus::NotApplied) {
             alreadyCount++;
         } else {
-            const bool ok = TweakRegistry::Instance().ApplyTweak(id, false, UserSelectionMode::AllUsers, {});
-            const SettingStatus after = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::AllUsers, {});
+            const bool ok = TweakRegistry::Instance().ApplyTweak(id, false, UserSelectionMode::CurrentUser, {});
+            const SettingStatus after = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
             if (ok && after == SettingStatus::NotApplied) {
                 changedCount++;
             } else {
@@ -1120,8 +1121,8 @@ void MainWindow::RestoreAllDefaults() {
     int changed = 0;
     int progress = 0;
     for (const auto& t : catalog) {
-        if (TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::AllUsers, {}) == SettingStatus::Applied) {
-            if (TweakRegistry::Instance().ApplyTweak(t.id, false, UserSelectionMode::AllUsers, {})) {
+        if (TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {}) == SettingStatus::Applied) {
+            if (TweakRegistry::Instance().ApplyTweak(t.id, false, UserSelectionMode::CurrentUser, {})) {
                 changed++;
             }
         }
@@ -1136,9 +1137,17 @@ void MainWindow::RestoreAllDefaults() {
 }
 
 void MainWindow::RefreshAuditState() {
+    m_appliedCount = 0;
+    const auto& catalog = TweakRegistry::Instance().GetAllTweaks();
+    for (const auto& t : catalog) {
+        if (TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {}) == SettingStatus::Applied) {
+            m_appliedCount++;
+        }
+    }
+
     for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
         const auto& t = m_displayedTweaks[i];
-        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::AllUsers, {});
+        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
 
         std::wstring stStr;
         switch (st) {
