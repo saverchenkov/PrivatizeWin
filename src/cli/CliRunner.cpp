@@ -4,6 +4,7 @@
 #include "../core/RestorePoint.h"
 #include "../core/TaskScheduler.h"
 #include "../core/SimpleJson.h"
+#include "../core/ProcessHelper.h"
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -41,8 +42,6 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
         opts.isCli = false;
         return opts;
     }
-
-    opts.isCli = true;
 
     for (int i = 1; i < argc; ++i) {
         const std::wstring arg = argv[i];
@@ -105,6 +104,14 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
         }
     }
 
+    opts.isCli = false;
+    for (int j = 1; j < argc; ++j) {
+        if (wcscmp(argv[j], L"--no-elevate") != 0) {
+            opts.isCli = true;
+            break;
+        }
+    }
+
     return opts;
 }
 
@@ -139,6 +146,14 @@ int CliRunner::Execute(const CliOptions& opts) {
 
     // 2. Install Scheduled Task
     if (opts.installTask) {
+        if (!IsRunningAsAdmin()) {
+            if (!opts.quiet) {
+                std::cerr << "[ERROR] Administrator privileges are required to configure scheduled tasks.\n"
+                          << "        Please run Command Prompt or PowerShell as Administrator.\n" << std::flush;
+            }
+            return 5;
+        }
+
         ScheduledTaskConfig taskConfig;
         taskConfig.frequency = std::wstring(opts.taskFrequency.begin(), opts.taskFrequency.end());
         taskConfig.templateName = std::wstring(opts.taskTemplate.begin(), opts.taskTemplate.end());
@@ -163,6 +178,14 @@ int CliRunner::Execute(const CliOptions& opts) {
 
     // 3. Uninstall Scheduled Task
     if (opts.uninstallTask) {
+        if (!IsRunningAsAdmin()) {
+            if (!opts.quiet) {
+                std::cerr << "[ERROR] Administrator privileges are required to remove scheduled tasks.\n"
+                          << "        Please run Command Prompt or PowerShell as Administrator.\n" << std::flush;
+            }
+            return 5;
+        }
+
         const bool ok = TaskScheduler::UninstallTask();
         if (!opts.quiet) {
             if (ok) {
@@ -214,6 +237,14 @@ int CliRunner::Execute(const CliOptions& opts) {
     }
 
     if (!templateToApply.empty()) {
+        if (!opts.dryRun && !IsRunningAsAdmin()) {
+            if (!opts.quiet) {
+                std::cerr << "[ERROR] Administrator privileges are required to modify system privacy settings.\n"
+                          << "        Please run Command Prompt or PowerShell as Administrator.\n" << std::flush;
+            }
+            return 5;
+        }
+
         TemplateProfile profile;
         const auto builtin = TemplateManager::Instance().GetTemplate(templateToApply);
         if (builtin.has_value()) {

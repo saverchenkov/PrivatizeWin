@@ -11,6 +11,7 @@
 #include "../core/TweakRegistry.h"
 #include "../core/TemplateManager.h"
 #include "../core/RestorePoint.h"
+#include "../core/ProcessHelper.h"
 #include <windowsx.h>
 #include <commctrl.h>
 #include <commdlg.h>
@@ -206,6 +207,14 @@ void MainWindow::OnCreate() {
 
     PopulateListView(L"", FilterMode::All);
     UpdateStatusBar();
+
+    std::wstring title = L"PrivatizeWin";
+    if (IsRunningAsAdmin()) {
+        title += L" [Administrator]";
+    } else {
+        title += L" [Standard User - Read Only]";
+    }
+    SetWindowTextW(m_hWnd, title.c_str());
 }
 
 void MainWindow::InitializeControls() {
@@ -722,7 +731,9 @@ void MainWindow::UpdateStatusBar() {
     std::wstring part2 = L"Total Tweaks: " + std::to_wstring(m_displayedTweaks.size()) + L" displayed across categories";
     SendMessage(m_hStatusBar, SB_SETTEXTW, 2, reinterpret_cast<LPARAM>(part2.c_str()));
 
-    SendMessage(m_hStatusBar, SB_SETTEXTW, 3, reinterpret_cast<LPARAM>(L"Administrator (Elevated)"));
+    const bool isAdmin = IsRunningAsAdmin();
+    std::wstring part3 = isAdmin ? L"Administrator (Elevated)" : L"Standard User (Limited - Read Only)";
+    SendMessage(m_hStatusBar, SB_SETTEXTW, 3, reinterpret_cast<LPARAM>(part3.c_str()));
 }
 
 void MainWindow::OnContextMenu(HWND hWnd, int x, int y) {
@@ -856,6 +867,20 @@ void MainWindow::CopySelectedTweakDetails() {
 }
 
 void MainWindow::ApplySelectedItemsOnly() {
+    if (!IsRunningAsAdmin()) {
+        const int res = MessageBoxW(m_hWnd,
+            L"Administrator privileges are required to apply registry and service modifications to this computer.\n\n"
+            L"Would you like to restart PrivatizeWin as Administrator now?",
+            L"PrivatizeWin - Elevation Required",
+            MB_YESNO | MB_ICONWARNING);
+        if (res == IDYES) {
+            if (RelaunchElevated(m_hWnd)) {
+                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
+            }
+        }
+        return;
+    }
+
     const int count = ListView_GetSelectedCount(m_hListView);
     if (count == 0) return;
 
@@ -878,6 +903,15 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
         break;
     case IDM_FILE_IMPORT:
         ImportConfiguration();
+        break;
+    case IDM_FILE_RESTART_ADMIN:
+        if (IsRunningAsAdmin()) {
+            MessageBoxW(m_hWnd, L"PrivatizeWin is already running with Administrator privileges.", L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
+        } else {
+            if (RelaunchElevated(m_hWnd)) {
+                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
+            }
+        }
         break;
     case IDM_FILE_EXIT:
         DestroyWindow(m_hWnd);
@@ -1054,6 +1088,20 @@ void MainWindow::ApplyTemplate(std::string_view templateName) {
 }
 
 void MainWindow::ApplyCurrentSelection() {
+    if (!IsRunningAsAdmin()) {
+        const int res = MessageBoxW(m_hWnd,
+            L"Administrator privileges are required to apply registry and service modifications to this computer.\n\n"
+            L"Would you like to restart PrivatizeWin as Administrator now?",
+            L"PrivatizeWin - Elevation Required",
+            MB_YESNO | MB_ICONWARNING);
+        if (res == IDYES) {
+            if (RelaunchElevated(m_hWnd)) {
+                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
+            }
+        }
+        return;
+    }
+
     std::unordered_map<std::string, bool> desired;
     for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
         const bool checked = (ListView_GetCheckState(m_hListView, i) != 0);
@@ -1083,6 +1131,20 @@ void MainWindow::ApplyCurrentSelection() {
 }
 
 void MainWindow::RevertAllToDefaults() {
+    if (!IsRunningAsAdmin()) {
+        const int res = MessageBoxW(m_hWnd,
+            L"Administrator privileges are required to revert settings to Windows defaults.\n\n"
+            L"Would you like to restart PrivatizeWin as Administrator now?",
+            L"PrivatizeWin - Elevation Required",
+            MB_YESNO | MB_ICONWARNING);
+        if (res == IDYES) {
+            if (RelaunchElevated(m_hWnd)) {
+                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
+            }
+        }
+        return;
+    }
+
     const int choice = MessageBoxW(m_hWnd,
         L"Are you sure you want to revert all privacy settings to default Windows behavior?",
         L"Confirm Revert Defaults",
@@ -1184,6 +1246,20 @@ void MainWindow::ImportConfiguration() {
 }
 
 void MainWindow::CreateSystemRestorePoint() {
+    if (!IsRunningAsAdmin()) {
+        const int res = MessageBoxW(m_hWnd,
+            L"Administrator privileges are required to create a Windows System Restore Point.\n\n"
+            L"Would you like to restart PrivatizeWin as Administrator now?",
+            L"PrivatizeWin - Elevation Required",
+            MB_YESNO | MB_ICONWARNING);
+        if (res == IDYES) {
+            if (RelaunchElevated(m_hWnd)) {
+                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
+            }
+        }
+        return;
+    }
+
     const int choice = MessageBoxW(m_hWnd,
         L"Do you want to create a Windows System Restore Point before applying tweaks?",
         L"System Restore Point",

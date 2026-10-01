@@ -12,6 +12,8 @@ BEGIN
         MENUITEM "&Export Configuration (JSON)...\tCtrl+E", IDM_FILE_EXPORT
         MENUITEM "&Import Configuration (JSON)...\tCtrl+O", IDM_FILE_IMPORT
         MENUITEM SEPARATOR
+        MENUITEM "Restart as &Administrator...",             IDM_FILE_RESTART_ADMIN
+        MENUITEM SEPARATOR
         MENUITEM "E&xit\tAlt+F4",                            IDM_FILE_EXIT
     END
     POPUP "&Templates"

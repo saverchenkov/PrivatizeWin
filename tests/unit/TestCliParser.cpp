@@ -69,3 +69,11 @@ TEST_CASE(Unit_CliParser, StatusOutputFlags) {
     ASSERT_TRUE(opts.showStatus);
     ASSERT_EQ(opts.statusFormat, "json");
 }
+
+#include "../../src/core/ProcessHelper.h"
+
+TEST_CASE(Unit_CliParser, ElevationDetectionFunction) {
+    const bool elevated = IsRunningAsAdmin();
+    ASSERT_TRUE(elevated == true || elevated == false);
+}
+

@@ -4,6 +4,7 @@
 
 #define IDM_FILE_EXPORT         40001
 #define IDM_FILE_IMPORT         40002
+#define IDM_FILE_RESTART_ADMIN  40004
 #define IDM_FILE_EXIT           40003
 
 #define IDM_TPL_RECOMMENDED     40010
