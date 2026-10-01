@@ -89,7 +89,7 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             return 0;
         case WM_GETMINMAXINFO: {
             auto* pMMI = reinterpret_cast<MINMAXINFO*>(lParam);
-            pMMI->ptMinTrackSize.x = 860;
+            pMMI->ptMinTrackSize.x = 1050;
             pMMI->ptMinTrackSize.y = 560;
             return 0;
         }
@@ -272,7 +272,7 @@ void MainWindow::InitializeControls() {
     // 1. Search Box (Item 15: Filter tweaks Ctrl+F)
     m_hSearchEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | WS_TABSTOP,
-        10, 10, 160, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_SEARCH_EDIT), hInst, nullptr);
+        10, 10, 145, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_SEARCH_EDIT), hInst, nullptr);
     SendMessage(m_hSearchEdit, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
     SendMessage(m_hSearchEdit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Filter tweaks (Ctrl+F)..."));
     SetWindowSubclass(m_hSearchEdit, SearchSubclassProc, 1, reinterpret_cast<DWORD_PTR>(this));
@@ -280,8 +280,9 @@ void MainWindow::InitializeControls() {
     // 2. Filter Dropdown (Item 15: Labeled by what it filters)
     m_hFilterCombo = CreateWindowW(WC_COMBOBOXW, L"",
         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
-        176, 10, 130, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_FILTER_COMBO), hInst, nullptr);
+        161, 10, 140, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_FILTER_COMBO), hInst, nullptr);
     SendMessage(m_hFilterCombo, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
+    SendMessage(m_hFilterCombo, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1), 20);
     SendMessage(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"All settings"));
     SendMessage(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Not applied only"));
     SendMessage(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Applied only"));
@@ -291,20 +292,21 @@ void MainWindow::InitializeControls() {
     // 3. Match / Hidden Count Label (Item 3)
     m_hLblMatchCount = CreateWindowW(WC_STATICW, L"260 shown",
         WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,
-        312, 13, 140, 20, m_hWnd, reinterpret_cast<HMENU>(IDC_LBL_MATCH_COUNT), hInst, nullptr);
+        307, 13, 95, 20, m_hWnd, reinterpret_cast<HMENU>(IDC_LBL_MATCH_COUNT), hInst, nullptr);
     SendMessage(m_hLblMatchCount, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
     // 4. Actions Menu Button
     m_hBtnSelectMenu = CreateWindowW(WC_BUTTONW, L"Actions \u25BC",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        458, 10, 85, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_SELECT_MENU), hInst, nullptr);
+        412, 10, 85, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_SELECT_MENU), hInst, nullptr);
     SendMessage(m_hBtnSelectMenu, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
     // 5. Preset Dropdown & "Apply Preset" Button
     m_hTemplateCombo = CreateWindowW(WC_COMBOBOXW, L"",
         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
-        550, 10, 130, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_TPL_COMBO), hInst, nullptr);
+        503, 10, 150, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_TPL_COMBO), hInst, nullptr);
     SendMessage(m_hTemplateCombo, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
+    SendMessage(m_hTemplateCombo, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1), 20);
     SendMessage(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Recommended"));
     SendMessage(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Strict Privacy"));
     SendMessage(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Minimal"));
@@ -312,18 +314,18 @@ void MainWindow::InitializeControls() {
 
     m_hBtnSelectPreset = CreateWindowW(WC_BUTTONW, L"Apply Preset",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        686, 10, 95, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_SELECT_PRESET), hInst, nullptr);
+        659, 10, 95, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_SELECT_PRESET), hInst, nullptr);
     SendMessage(m_hBtnSelectPreset, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
     // 6. Action Buttons (Apply Recommended, Restore Defaults)
     m_hBtnApply = CreateWindowW(WC_BUTTONW, L"Apply Recommended",
         WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP,
-        788, 10, 145, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_APPLY), hInst, nullptr);
+        782, 10, 145, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_APPLY), hInst, nullptr);
     SendMessage(m_hBtnApply, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontBold), TRUE);
 
     m_hBtnRevert = CreateWindowW(WC_BUTTONW, L"Restore Defaults\u2026",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        939, 10, 130, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_REVERT), hInst, nullptr);
+        935, 10, 135, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_REVERT), hInst, nullptr);
     SendMessage(m_hBtnRevert, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
     // 7. Grouped ListView (SysListView32)
@@ -427,20 +429,39 @@ void MainWindow::OnSize(int width, int height) {
     // Toolbar layout
     const int topMargin = 10;
     const int topH = 34;
+    const int ctrlH = 26;
 
-    // Position top row controls
-    SetWindowPos(m_hSearchEdit, nullptr, 10, topMargin, 160, 26, SWP_NOZORDER);
-    SetWindowPos(m_hFilterCombo, nullptr, 176, topMargin, 130, 200, SWP_NOZORDER);
-    SetWindowPos(m_hLblMatchCount, nullptr, 312, topMargin + 3, 135, 20, SWP_NOZORDER);
-    SetWindowPos(m_hBtnSelectMenu, nullptr, 452, topMargin, 85, 26, SWP_NOZORDER);
-    SetWindowPos(m_hTemplateCombo, nullptr, 543, topMargin, 125, 200, SWP_NOZORDER);
-    SetWindowPos(m_hBtnSelectPreset, nullptr, 674, topMargin, 92, 26, SWP_NOZORDER);
+    // Position top row controls with unified layout
+    const int xSearch = 10;
+    const int wSearch = 145;
+
+    const int xFilter = xSearch + wSearch + 6; // 161
+    const int wFilter = 140;
+
+    const int xCount = xFilter + wFilter + 6;  // 307
+    const int wCount = 95;
+
+    const int xActions = xCount + wCount + 10; // 412
+    const int wActions = 85;
+
+    const int xPresetCombo = xActions + wActions + 6; // 503
+    const int wPresetCombo = 150;
+
+    const int xPresetBtn = xPresetCombo + wPresetCombo + 6; // 659
+    const int wPresetBtn = 95;
+
+    SetWindowPos(m_hSearchEdit, nullptr, xSearch, topMargin, wSearch, ctrlH, SWP_NOZORDER);
+    SetWindowPos(m_hFilterCombo, nullptr, xFilter, topMargin, wFilter, 200, SWP_NOZORDER);
+    SetWindowPos(m_hLblMatchCount, nullptr, xCount, topMargin + 3, wCount, 20, SWP_NOZORDER);
+    SetWindowPos(m_hBtnSelectMenu, nullptr, xActions, topMargin, wActions, ctrlH, SWP_NOZORDER);
+    SetWindowPos(m_hTemplateCombo, nullptr, xPresetCombo, topMargin, wPresetCombo, 200, SWP_NOZORDER);
+    SetWindowPos(m_hBtnSelectPreset, nullptr, xPresetBtn, topMargin, wPresetBtn, ctrlH, SWP_NOZORDER);
 
     const int rightEdge = width - 10;
     const int btnRevertW = 135;
     const int btnApplyW = 145;
-    SetWindowPos(m_hBtnRevert, nullptr, rightEdge - btnRevertW, topMargin, btnRevertW, 26, SWP_NOZORDER);
-    SetWindowPos(m_hBtnApply, nullptr, rightEdge - btnRevertW - 8 - btnApplyW, topMargin, btnApplyW, 26, SWP_NOZORDER);
+    SetWindowPos(m_hBtnRevert, nullptr, rightEdge - btnRevertW, topMargin, btnRevertW, ctrlH, SWP_NOZORDER);
+    SetWindowPos(m_hBtnApply, nullptr, rightEdge - btnRevertW - 8 - btnApplyW, topMargin, btnApplyW, ctrlH, SWP_NOZORDER);
 
     // Calculate vertical layout using adjustable splitter (Item 13)
     const int minListH = 180;
@@ -468,9 +489,9 @@ void MainWindow::OnSize(int width, int height) {
     // Details pane and buttons below splitter
     const int detailsBtnsTop = m_splitterY + 8;
     SetWindowPos(m_hBtnToggleTweak, nullptr, 10, detailsBtnsTop, 130, 26, SWP_NOZORDER);
-    SetWindowPos(m_hBtnCopyTweak, nullptr, 146, detailsBtnsTop, 160, 26, SWP_NOZORDER);
+    SetWindowPos(m_hBtnCopyTweak, nullptr, 148, detailsBtnsTop, 165, 26, SWP_NOZORDER);
 
-    const int editTop = detailsBtnsTop + 32;
+    const int editTop = detailsBtnsTop + 34;
     const int editH = std::max(minDetailsH, height - statusH - editTop - 6);
     SetWindowPos(m_hDetailsEdit, nullptr, 10, editTop, width - 20, editH, SWP_NOZORDER);
 
@@ -640,8 +661,7 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
 }
 
 void MainWindow::UpdateSelectionCounts() {
-    std::wstring countStr = std::to_wstring(m_displayedTweaks.size()) + L" shown \u00B7 " +
-                           std::to_wstring(m_appliedCount) + L" applied";
+    std::wstring countStr = std::to_wstring(m_displayedTweaks.size()) + L" shown";
     SetWindowTextW(m_hLblMatchCount, countStr.c_str());
 }
 
