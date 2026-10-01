@@ -41,25 +41,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*l
         return PrivatizeWin::CliRunner::Execute(cliOpts);
     }
 
-    // GUI Mode: PrivatizeWin modifies machine-wide registry (HKLM) and Windows Services.
-    // If not running as administrator, attempt to prompt the OS for UAC elevation.
-    if (!PrivatizeWin::IsRunningAsAdmin()) {
-        bool noElevate = false;
-        for (int i = 1; i < argc; ++i) {
-            if (wcscmp(argv[i], L"--no-elevate") == 0) {
-                noElevate = true;
-                break;
-            }
-        }
-
-        if (!noElevate) {
-            if (PrivatizeWin::RelaunchElevated()) {
-                return 0; // Elevated child process launched successfully. Exit unelevated parent.
-            }
-            // User cancelled UAC prompt or elevation failed. Continue in Standard User mode.
-        }
-    }
-
     // GUI Mode
     const ComApartmentScope com;
 

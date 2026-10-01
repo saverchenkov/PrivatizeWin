@@ -302,7 +302,7 @@ void MainWindow::OnCreate() {
     if (IsRunningAsAdmin()) {
         title += L" [Administrator]";
     } else {
-        title += L" [Standard User - Read Only]";
+        title += L" [Standard User]";
     }
     SetWindowTextW(m_hWnd, title.c_str());
 
@@ -855,9 +855,10 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
     const int sel = ListView_GetNextItem(m_hListView, -1, LVNI_SELECTED);
     if (sel < 0 || sel >= static_cast<int>(m_displayedTweaks.size())) return;
 
-    if (!IsRunningAsAdmin()) {
+    const auto& t = m_displayedTweaks[sel];
+    if (!IsRunningAsAdmin() && t.scope != TargetScope::User) {
         const int res = MessageBoxW(m_hWnd,
-            L"Administrator privileges are required to modify system settings.\n\n"
+            L"Administrator privileges are required to modify system-wide machine settings.\n\n"
             L"Would you like to restart PrivatizeWin as Administrator now?",
             L"PrivatizeWin \u2014 Elevation Required",
             MB_YESNO | MB_ICONWARNING);
@@ -869,7 +870,6 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
         return;
     }
 
-    const auto& t = m_displayedTweaks[sel];
     const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
     const bool shouldApply = (st != SettingStatus::Applied);
 
@@ -912,7 +912,7 @@ void MainWindow::UpdateStatusBar() {
 
     // Elevation Status
     const bool isAdmin = IsRunningAsAdmin();
-    std::wstring part2 = isAdmin ? L"Administrator (Elevated)" : L"Standard User (Limited - Read Only)";
+    std::wstring part2 = isAdmin ? L"Administrator (Elevated)" : L"Standard User";
     SendMessage(m_hStatusBar, SB_SETTEXTW, 2, reinterpret_cast<LPARAM>(part2.c_str()));
 }
 
@@ -1497,13 +1497,13 @@ void MainWindow::OnNotify(NMHDR* pnmhdr) {
                         const bool shouldApply = (newCheck >> 12) == 2;
                         const auto& t = m_displayedTweaks[pItem->iItem];
 
-                        if (!IsRunningAsAdmin()) {
+                        if (!IsRunningAsAdmin() && t.scope != TargetScope::User) {
                             m_isProgrammaticCheckChange = true;
                             ListView_SetCheckState(m_hListView, pItem->iItem, !shouldApply);
                             m_isProgrammaticCheckChange = false;
 
                             const int res = MessageBoxW(m_hWnd,
-                                L"Administrator privileges are required to modify system settings.\n\n"
+                                L"Administrator privileges are required to modify system-wide machine settings.\n\n"
                                 L"Would you like to restart PrivatizeWin as Administrator now?",
                                 L"PrivatizeWin \u2014 Elevation Required",
                                 MB_YESNO | MB_ICONWARNING);
