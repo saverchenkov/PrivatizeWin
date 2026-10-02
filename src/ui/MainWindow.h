@@ -47,7 +47,7 @@ public:
 private:
     void OnCreate();
     void OnSize(int width, int height);
-    void OnCommand(int id, HWND hCtrl);
+    void OnCommand(int id, int notifyCode, HWND hCtrl);
     void OnNotify(NMHDR* pnmhdr);
     void OnContextMenu(HWND hWnd, int x, int y);
     void OnKeyDown(WPARAM vk);
@@ -125,7 +125,6 @@ private:
     std::wstring m_currentFilter;
     FilterMode m_filterMode{ FilterMode::All };
     std::vector<Tweak> m_displayedTweaks;
-    std::unordered_set<std::string> m_selectedTweakIds; // Legacy alias
     std::unordered_set<std::string> m_pendingEnableIds; // Staged to apply (Item 10)
     std::unordered_set<std::string> m_pendingRevertIds; // Staged to restore (Item 10)
     int m_appliedCount{ 0 };

@@ -139,7 +139,7 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             return 0;
         }
         case WM_COMMAND:
-            pThis->OnCommand(LOWORD(wParam), reinterpret_cast<HWND>(lParam));
+            pThis->OnCommand(LOWORD(wParam), HIWORD(wParam), reinterpret_cast<HWND>(lParam));
             return 0;
         case WM_NOTIFY:
             pThis->OnNotify(reinterpret_cast<NMHDR*>(lParam));
@@ -1581,62 +1581,39 @@ void MainWindow::ApplySelectedTweaks() {
 }
 
 void MainWindow::RestoreSelectedDefaults() {
-    if (!IsRunningAsAdmin()) {
-        const int res = MessageBoxW(m_hWnd,
-            L"Administrator privileges are required to restore Windows default settings.\n\n"
-            L"Would you like to restart PrivatizeWin as Administrator now?",
-            L"PrivatizeWin \u2014 Elevation Required",
-            MB_YESNO | MB_ICONWARNING);
-        if (res == IDYES) {
-            if (RelaunchElevated(m_hWnd)) {
-                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
-            }
+    int count = 0;
+    int i = -1;
+    while ((i = ListView_GetNextItem(m_hListView, i, LVNI_SELECTED)) != -1) {
+        if (i >= 0 && i < static_cast<int>(m_displayedTweaks.size())) {
+            const auto& t = m_displayedTweaks[i];
+            m_pendingEnableIds.erase(t.id);
+            m_pendingRevertIds.insert(t.id);
+            SetRowCheckboxState(i, CheckboxState::PendingRevert);
+            count++;
         }
-        return;
     }
 
-    if (m_selectedTweakIds.empty()) return;
-
-    // Item 6: Accurate scope confirmation
-    std::wstring prompt = L"Are you sure you want to restore Windows default values for the " +
-                          std::to_wstring(m_selectedTweakIds.size()) + L" selected setting(s)?";
-    const int choice = MessageBoxW(m_hWnd, prompt.c_str(), L"Restore Windows Defaults", MB_YESNO | MB_ICONQUESTION);
-    if (choice != IDYES) return;
-
-    ShowWindow(m_hProgressBar, SW_SHOW);
-    SendMessage(m_hProgressBar, PBM_SETRANGE32, 0, static_cast<LPARAM>(m_selectedTweakIds.size()));
-    SendMessage(m_hProgressBar, PBM_SETPOS, 0, 0);
-
-    int changedCount = 0;
-    int alreadyCount = 0;
-    int failedCount = 0;
-
-    int progress = 0;
-    for (const auto& id : m_selectedTweakIds) {
-        const SettingStatus before = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
-        if (before == SettingStatus::NotApplied) {
-            alreadyCount++;
-        } else {
-            const bool ok = TweakRegistry::Instance().ApplyTweak(id, false, UserSelectionMode::CurrentUser, {});
-            const SettingStatus after = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
-            if (ok && after == SettingStatus::NotApplied) {
-                changedCount++;
-            } else {
-                failedCount++;
+    if (count == 0) {
+        // If no rows highlighted, stage all currently displayed rows that are currently applied
+        for (int idx = 0; idx < static_cast<int>(m_displayedTweaks.size()); ++idx) {
+            const auto& t = m_displayedTweaks[idx];
+            const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+            if (st == SettingStatus::Applied) {
+                m_pendingEnableIds.erase(t.id);
+                m_pendingRevertIds.insert(t.id);
+                SetRowCheckboxState(idx, CheckboxState::PendingRevert);
+                count++;
             }
         }
-        progress++;
-        SendMessage(m_hProgressBar, PBM_SETPOS, progress, 0);
     }
 
-    ShowWindow(m_hProgressBar, SW_HIDE);
-    RefreshAuditState();
+    UpdateSelectionCounts();
+    UpdateStatusBar();
 
-    std::wstring resMsg = L"Restoration completed.\n\n"
-                          L"  \u2022 Changed: " + std::to_wstring(changedCount) + L"\n" +
-                          L"  \u2022 Already default: " + std::to_wstring(alreadyCount) + L"\n" +
-                          L"  \u2022 Failed: " + std::to_wstring(failedCount);
-    MessageBoxW(m_hWnd, resMsg.c_str(), L"PrivatizeWin", MB_OK | (failedCount == 0 ? MB_ICONINFORMATION : MB_ICONWARNING));
+    int cur = ListView_GetNextItem(m_hListView, -1, LVNI_SELECTED);
+    if (cur != -1) {
+        UpdateDetailsPane(cur);
+    }
 }
 
 void MainWindow::RestoreAllDefaults() {
@@ -1818,7 +1795,7 @@ void MainWindow::CopySelectedTweakDetails() {
     }
 }
 
-void MainWindow::OnCommand(int id, HWND hCtrl) {
+void MainWindow::OnCommand(int id, int notifyCode, HWND /*hCtrl*/) {
     switch (id) {
     case IDM_FILE_EXPORT:
         ExportConfiguration();
@@ -1847,15 +1824,9 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
     case IDM_TPL_MINIMAL:
         SelectPreset("minimal");
         break;
-    case IDM_ACT_RESTORE_SELECTED: {
-        const int sel = ListView_GetNextItem(m_hListView, -1, LVNI_SELECTED);
-        if (sel >= 0 && sel < static_cast<int>(m_displayedTweaks.size())) {
-            const auto& t = m_displayedTweaks[sel];
-            TweakRegistry::Instance().ApplyTweak(t.id, false, UserSelectionMode::CurrentUser, {});
-            RefreshAuditState();
-        }
+    case IDM_ACT_RESTORE_SELECTED:
+        RestoreSelectedDefaults();
         break;
-    }
     case IDM_ACT_RESTORE_ALL:
     case IDC_BTN_REVERT:
         RestoreAllDefaults();
@@ -1948,7 +1919,7 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
         CopySelectedTweakDetails();
         break;
     case IDC_SEARCH_EDIT:
-        if (HIWORD(reinterpret_cast<DWORD_PTR>(hCtrl)) == EN_CHANGE || (hCtrl == nullptr && GetFocus() == m_hSearchEdit)) {
+        if (notifyCode == EN_CHANGE) {
             wchar_t buf[256]{};
             GetWindowTextW(m_hSearchEdit, buf, 256);
             m_currentFilter = buf;
@@ -1956,7 +1927,7 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
         }
         break;
     case IDC_FILTER_COMBO:
-        if (HIWORD(reinterpret_cast<DWORD_PTR>(hCtrl)) == CBN_SELCHANGE) {
+        if (notifyCode == CBN_SELCHANGE) {
             const int sel = static_cast<int>(SendMessage(m_hFilterCombo, CB_GETCURSEL, 0, 0));
             if (sel == 0) m_filterMode = FilterMode::All;
             else if (sel == 1) m_filterMode = FilterMode::NotAppliedOnly;
@@ -2019,8 +1990,19 @@ void MainWindow::ExportConfiguration() {
         TemplateProfile p{};
         p.name = "Exported Configuration";
         p.description = "User exported configuration profile";
-        for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
-            p.tweakStates[m_displayedTweaks[i].id] = (m_selectedTweakIds.count(m_displayedTweaks[i].id) > 0);
+        // Export full configuration: all applied or staged tweaks across catalog
+        const auto& allTweaks = TweakRegistry::Instance().GetAllTweaks();
+        for (const auto& t : allTweaks) {
+            if (m_pendingEnableIds.count(t.id) > 0) {
+                p.tweakStates[t.id] = true;
+            } else if (m_pendingRevertIds.count(t.id) > 0) {
+                p.tweakStates[t.id] = false;
+            } else {
+                const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+                if (st == SettingStatus::Applied) {
+                    p.tweakStates[t.id] = true;
+                }
+            }
         }
 
         if (TemplateManager::Instance().SaveTemplateToFile(szFile, p)) {
@@ -2043,26 +2025,57 @@ void MainWindow::ImportConfiguration() {
 
     if (GetOpenFileNameW(&ofn)) {
         TemplateProfile p{};
-        if (TemplateManager::Instance().LoadTemplateFromFile(szFile, p)) {
-            m_selectedTweakIds.clear();
-            for (const auto& [id, shouldCheck] : p.tweakStates) {
-                if (shouldCheck) m_selectedTweakIds.insert(id);
+        std::string loadErr;
+        if (TemplateManager::Instance().LoadTemplateFromFile(szFile, p, &loadErr)) {
+            m_pendingEnableIds.clear();
+            m_pendingRevertIds.clear();
+
+            for (const auto& [id, shouldEnable] : p.tweakStates) {
+                const SettingStatus st = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
+                if (shouldEnable) {
+                    if (st != SettingStatus::Applied) {
+                        m_pendingEnableIds.insert(id);
+                    }
+                } else {
+                    if (st == SettingStatus::Applied) {
+                        m_pendingRevertIds.insert(id);
+                    }
+                }
             }
 
             for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
-                const bool isSel = (m_selectedTweakIds.count(m_displayedTweaks[i].id) > 0);
-                ListView_SetCheckState(m_hListView, i, isSel ? TRUE : FALSE);
+                const auto& t = m_displayedTweaks[i];
+                const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+                CheckboxState cbState = CheckboxState::Unchecked;
+                if (m_pendingEnableIds.count(t.id) > 0) {
+                    cbState = CheckboxState::PendingEnable;
+                } else if (m_pendingRevertIds.count(t.id) > 0) {
+                    cbState = CheckboxState::PendingRevert;
+                } else if (st == SettingStatus::Applied) {
+                    cbState = CheckboxState::AlreadyEnabled;
+                }
+                SetRowCheckboxState(i, cbState);
             }
+
             UpdateSelectionCounts();
+            UpdateStatusBar();
 
             int cur = ListView_GetNextItem(m_hListView, -1, LVNI_SELECTED);
             if (cur != -1) {
                 UpdateDetailsPane(cur);
             }
 
-            MessageBoxW(m_hWnd, L"Configuration imported successfully. Review selections and click 'Apply Selected'.", L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
+            const size_t totalStaged = m_pendingEnableIds.size() + m_pendingRevertIds.size();
+            std::wstring msg = L"Configuration profile imported successfully.\n\n" +
+                               std::to_wstring(totalStaged) + L" changes staged for review (" +
+                               std::to_wstring(m_pendingEnableIds.size()) + L" to apply, " +
+                               std::to_wstring(m_pendingRevertIds.size()) + L" to restore).\n\n" +
+                               L"Click 'Apply Selected' to apply these changes.";
+            MessageBoxW(m_hWnd, msg.c_str(), L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
         } else {
-            MessageBoxW(m_hWnd, L"Failed to load or parse configuration file.", L"Error", MB_OK | MB_ICONERROR);
+            std::wstring errMsg = L"Failed to load or parse configuration file:\n" +
+                                  std::wstring(loadErr.begin(), loadErr.end());
+            MessageBoxW(m_hWnd, errMsg.c_str(), L"Import Error", MB_OK | MB_ICONERROR);
         }
     }
 }
