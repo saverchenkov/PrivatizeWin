@@ -76,7 +76,6 @@ private:
     void SelectAllShown();
     void InvertShownSelection();
     void ClearSelection();
-    void ShowSelectMenu();
 
     void ApplySelectedTweaks();
     void RestoreSelectedDefaults();
@@ -99,7 +98,6 @@ private:
     HWND m_hLblMatchCount{ nullptr };
     HWND m_hTemplateCombo{ nullptr };
     HWND m_hBtnSelectPreset{ nullptr };
-    HWND m_hBtnSelectMenu{ nullptr };
     HWND m_hBtnApply{ nullptr };
     HWND m_hBtnRevert{ nullptr };
     HWND m_hBtnRefresh{ nullptr };

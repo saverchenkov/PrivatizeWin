@@ -348,16 +348,10 @@ void MainWindow::InitializeControls() {
         307, 13, 95, 20, m_hWnd, reinterpret_cast<HMENU>(IDC_LBL_MATCH_COUNT), hInst, nullptr);
     SendMessage(m_hLblMatchCount, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
-    // 4. Actions Menu Button
-    m_hBtnSelectMenu = CreateWindowW(WC_BUTTONW, L"Actions \u25BC",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        412, 10, 85, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_SELECT_MENU), hInst, nullptr);
-    SendMessage(m_hBtnSelectMenu, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
-
-    // 5. Preset Dropdown & "Apply Preset" Button
+    // 4. Preset Dropdown & "Apply Preset" Button
     m_hTemplateCombo = CreateWindowW(WC_COMBOBOXW, L"",
         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
-        503, 10, 150, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_TPL_COMBO), hInst, nullptr);
+        412, 10, 150, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_TPL_COMBO), hInst, nullptr);
     SendMessage(m_hTemplateCombo, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
     SendMessage(m_hTemplateCombo, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1), 20);
     SendMessage(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Recommended"));
@@ -367,7 +361,7 @@ void MainWindow::InitializeControls() {
 
     m_hBtnSelectPreset = CreateWindowW(WC_BUTTONW, L"Apply Preset",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        659, 10, 95, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_SELECT_PRESET), hInst, nullptr);
+        568, 10, 95, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_SELECT_PRESET), hInst, nullptr);
     SendMessage(m_hBtnSelectPreset, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
     // 6. Action Buttons (Apply Selected, Restore Defaults)
@@ -682,19 +676,15 @@ void MainWindow::OnSize(int width, int height) {
     const int xCount = xFilter + wFilter + 6;  // 307
     const int wCount = 95;
 
-    const int xActions = xCount + wCount + 10; // 412
-    const int wActions = 85;
-
-    const int xPresetCombo = xActions + wActions + 6; // 503
+    const int xPresetCombo = xCount + wCount + 10; // 412
     const int wPresetCombo = 150;
 
-    const int xPresetBtn = xPresetCombo + wPresetCombo + 6; // 659
+    const int xPresetBtn = xPresetCombo + wPresetCombo + 6; // 568
     const int wPresetBtn = 95;
 
     SetWindowPos(m_hSearchEdit, nullptr, xSearch, topMargin, wSearch, ctrlH, SWP_NOZORDER);
     SetWindowPos(m_hFilterCombo, nullptr, xFilter, topMargin, wFilter, 200, SWP_NOZORDER);
     SetWindowPos(m_hLblMatchCount, nullptr, xCount, topMargin + 3, wCount, 20, SWP_NOZORDER);
-    SetWindowPos(m_hBtnSelectMenu, nullptr, xActions, topMargin, wActions, ctrlH, SWP_NOZORDER);
     SetWindowPos(m_hTemplateCombo, nullptr, xPresetCombo, topMargin, wPresetCombo, 200, SWP_NOZORDER);
     SetWindowPos(m_hBtnSelectPreset, nullptr, xPresetBtn, topMargin, wPresetBtn, ctrlH, SWP_NOZORDER);
 
@@ -1388,27 +1378,6 @@ void MainWindow::ClearSelection() {
     UpdateStatusBar();
 }
 
-void MainWindow::ShowSelectMenu() {
-    RECT rcBtn{};
-    GetWindowRect(m_hBtnSelectMenu, &rcBtn);
-
-    HMENU hMenu = CreatePopupMenu();
-    AppendMenuW(hMenu, MF_STRING, IDM_SEL_RECOMMENDED, L"Select Recommended");
-    AppendMenuW(hMenu, MF_STRING, IDM_SEL_ALL_SHOWN, L"Select All Shown");
-    AppendMenuW(hMenu, MF_STRING, IDM_SEL_CLEAR, L"Clear Selection");
-    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(hMenu, MF_STRING, IDM_TPL_STRICT, L"Select Strict Privacy Preset");
-    AppendMenuW(hMenu, MF_STRING, IDM_TPL_MINIMAL, L"Select Minimal Preset");
-    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(hMenu, MF_STRING, IDM_ACT_RESTORE_ALL, L"Restore All to Windows Defaults...");
-    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(hMenu, MF_STRING, IDM_ACT_REFRESH, L"Refresh System Audit (F5)");
-    AppendMenuW(hMenu, MF_STRING, IDM_ACT_RESTORE_PT, L"Create System Restore Point...");
-
-    TrackPopupMenu(hMenu, TPM_LEFTALIGN | TPM_TOPALIGN, rcBtn.left, rcBtn.bottom, 0, m_hWnd, nullptr);
-    DestroyMenu(hMenu);
-}
-
 void MainWindow::ApplySelectedTweaks() {
     const size_t pendingApply = m_pendingEnableIds.size();
     const size_t pendingRevert = m_pendingRevertIds.size();
@@ -1854,9 +1823,6 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
         break;
     case IDM_SEL_CLEAR:
         ClearSelection();
-        break;
-    case IDC_BTN_SELECT_MENU:
-        ShowSelectMenu();
         break;
     case IDC_BTN_SELECT_PRESET: {
         const int sel = static_cast<int>(SendMessage(m_hTemplateCombo, CB_GETCURSEL, 0, 0));
