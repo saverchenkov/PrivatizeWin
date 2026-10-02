@@ -31,12 +31,16 @@ public:
         m_tests.push_back({ std::string(name), std::string(suite), std::move(func) });
     }
 
-    [[nodiscard]] int RunAll() {
+    [[nodiscard]] int Run(std::string_view filter = "") {
         int passed = 0;
         int failed = 0;
+        int matched = 0;
 
         std::cout << "\n========================================================\n";
         std::cout << "  PrivatizeWin Automated Test Runner\n";
+        if (!filter.empty()) {
+            std::cout << "  Filter: " << filter << "\n";
+        }
         std::cout << "  Total Registered Tests: " << m_tests.size() << "\n";
         std::cout << "========================================================\n\n";
 
@@ -44,6 +48,16 @@ public:
 
         std::string currentSuite;
         for (const auto& test : m_tests) {
+            const std::string fullName = test.suite + "." + test.name;
+            if (!filter.empty()) {
+                if (test.suite.find(filter) == std::string::npos &&
+                    test.name.find(filter) == std::string::npos &&
+                    fullName.find(filter) == std::string::npos) {
+                    continue;
+                }
+            }
+
+            matched++;
             if (test.suite != currentSuite) {
                 currentSuite = test.suite;
                 std::cout << "\n[" << currentSuite << "]\n";
@@ -75,10 +89,19 @@ public:
 
         std::cout << "\n--------------------------------------------------------\n";
         std::cout << "Test Summary: " << passed << " passed, " << failed << " failed, "
-                  << m_tests.size() << " total (" << totalMs << " ms)\n";
+                  << matched << " matched (" << totalMs << " ms)\n";
         std::cout << "--------------------------------------------------------\n";
 
+        if (matched == 0 && !filter.empty()) {
+            std::cout << "Warning: No tests matched filter '" << filter << "'\n";
+            return 1;
+        }
+
         return (failed == 0) ? 0 : 1;
+    }
+
+    [[nodiscard]] int RunAll() {
+        return Run("");
     }
 
 private:

@@ -32,7 +32,7 @@ static std::wstring GetPrivatizeWinExePath() {
     return candidate1;
 }
 
-static std::pair<int, std::string> RunSubprocess(const std::wstring& cmd) {
+static std::pair<int, std::string> RunSubprocess(const std::wstring& cmd, DWORD timeoutMs = 15000) {
     SECURITY_ATTRIBUTES sa{};
     sa.nLength = sizeof(sa);
     sa.bInheritHandle = TRUE;
@@ -64,21 +64,58 @@ static std::pair<int, std::string> RunSubprocess(const std::wstring& cmd) {
     UniqueHandle hProc(pi.hProcess);
     UniqueHandle hThread(pi.hThread);
 
-    // Close write handle in parent so ReadFile encounters EOF when child exits
+    // Close write handle in parent so child owns the write end
     hPipeWrite.reset();
 
     std::string output;
-    char buffer[1024];
-    DWORD bytesRead = 0;
-    while (ReadFile(hPipeRead.get(), buffer, sizeof(buffer) - 1, &bytesRead, nullptr) && bytesRead > 0) {
-        buffer[bytesRead] = 0;
-        output += buffer;
+    char buffer[4096];
+    const DWORD startTick = GetTickCount();
+    bool timedOut = false;
+
+    while (true) {
+        DWORD bytesAvailable = 0;
+        if (!PeekNamedPipe(hPipeRead.get(), nullptr, 0, nullptr, &bytesAvailable, nullptr)) {
+            // Pipe broken (child closed stdout/stderr)
+            break;
+        }
+
+        if (bytesAvailable > 0) {
+            DWORD bytesToRead = (std::min)(bytesAvailable, static_cast<DWORD>(sizeof(buffer) - 1));
+            DWORD bytesRead = 0;
+            if (ReadFile(hPipeRead.get(), buffer, bytesToRead, &bytesRead, nullptr) && bytesRead > 0) {
+                buffer[bytesRead] = 0;
+                output.append(buffer, bytesRead);
+            }
+        } else {
+            // Check if process has terminated
+            const DWORD waitRes = WaitForSingleObject(hProc.get(), 20);
+            if (waitRes == WAIT_OBJECT_0) {
+                // Drain any remaining bytes in pipe
+                if (PeekNamedPipe(hPipeRead.get(), nullptr, 0, nullptr, &bytesAvailable, nullptr) && bytesAvailable > 0) {
+                    DWORD bytesRead = 0;
+                    if (ReadFile(hPipeRead.get(), buffer, sizeof(buffer) - 1, &bytesRead, nullptr) && bytesRead > 0) {
+                        buffer[bytesRead] = 0;
+                        output.append(buffer, bytesRead);
+                    }
+                }
+                break;
+            }
+        }
+
+        if (GetTickCount() - startTick > timeoutMs) {
+            timedOut = true;
+            TerminateProcess(hProc.get(), 101);
+            WaitForSingleObject(hProc.get(), 1000);
+            break;
+        }
     }
 
-    WaitForSingleObject(hProc.get(), 10000);
+    if (timedOut) {
+        return { -999, "ERROR: Subprocess timed out after " + std::to_string(timeoutMs) + " ms" };
+    }
+
     DWORD exitCode = 0;
     GetExitCodeProcess(hProc.get(), &exitCode);
-
     return { static_cast<int>(exitCode), output };
 }
 

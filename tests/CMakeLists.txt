@@ -39,4 +39,17 @@ target_link_libraries(PrivatizeWin_Tests PRIVATE
     oleaut32
 )
 
-add_test(NAME PrivatizeWinTestSuite COMMAND PrivatizeWin_Tests)
+# Monolithic run
+add_test(NAME AllTests COMMAND PrivatizeWin_Tests)
+
+# Granular suite targets for isolated CI reporting
+add_test(NAME Unit_SimpleJson COMMAND PrivatizeWin_Tests Unit_SimpleJson)
+add_test(NAME Unit_SmartHandle COMMAND PrivatizeWin_Tests Unit_SmartHandle)
+add_test(NAME Unit_CliParser COMMAND PrivatizeWin_Tests Unit_CliParser)
+add_test(NAME Unit_TemplateManager COMMAND PrivatizeWin_Tests Unit_TemplateManager)
+add_test(NAME Unit_TweakRegistry COMMAND PrivatizeWin_Tests Unit_TweakRegistry)
+add_test(NAME Integration_RegistryHelper COMMAND PrivatizeWin_Tests Integration_RegistryHelper)
+add_test(NAME Integration_ServiceHelper COMMAND PrivatizeWin_Tests Integration_ServiceHelper)
+add_test(NAME Integration_UserHiveManager COMMAND PrivatizeWin_Tests Integration_UserHiveManager)
+add_test(NAME Integration_TaskScheduler COMMAND PrivatizeWin_Tests Integration_TaskScheduler)
+add_test(NAME Integration_CliEndToEnd COMMAND PrivatizeWin_Tests Integration_CliEndToEnd)
