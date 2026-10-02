@@ -370,8 +370,8 @@ void MainWindow::InitializeControls() {
         659, 10, 95, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_SELECT_PRESET), hInst, nullptr);
     SendMessage(m_hBtnSelectPreset, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
-    // 6. Action Buttons (Apply Recommended, Restore Defaults)
-    m_hBtnApply = CreateWindowW(WC_BUTTONW, L"Apply Recommended",
+    // 6. Action Buttons (Apply Selected, Restore Defaults)
+    m_hBtnApply = CreateWindowW(WC_BUTTONW, L"Apply Selected",
         WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP,
         782, 10, 145, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_APPLY), hInst, nullptr);
     SendMessage(m_hBtnApply, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontBold), TRUE);
@@ -1525,7 +1525,13 @@ void MainWindow::ApplySelectedTweaks() {
     const size_t pendingApply = m_pendingEnableIds.size();
     const size_t pendingRevert = m_pendingRevertIds.size();
     const size_t totalSelected = pendingApply + pendingRevert;
-    if (totalSelected == 0) return;
+    if (totalSelected == 0) {
+        MessageBoxW(m_hWnd,
+            L"No settings are currently staged for changes.\n\n"
+            L"Select settings using their checkboxes or choose a preset to stage changes.",
+            L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
+        return;
+    }
 
     bool needAdmin = false;
     for (const auto& id : m_pendingEnableIds) {
@@ -1947,7 +1953,7 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
         break;
     case IDM_ACT_APPLY:
     case IDC_BTN_APPLY:
-        ApplyPreset("recommended");
+        ApplySelectedTweaks();
         break;
     case IDM_SEL_RECOMMENDED:
         SelectRecommended();
