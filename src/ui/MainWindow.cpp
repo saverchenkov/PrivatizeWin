@@ -134,7 +134,7 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             return 0;
         case WM_GETMINMAXINFO: {
             auto* pMMI = reinterpret_cast<MINMAXINFO*>(lParam);
-            pMMI->ptMinTrackSize.x = 1050;
+            pMMI->ptMinTrackSize.x = 1060;
             pMMI->ptMinTrackSize.y = 560;
             return 0;
         }
@@ -688,11 +688,7 @@ void MainWindow::OnSize(int width, int height) {
     SetWindowPos(m_hTemplateCombo, nullptr, xPresetCombo, topMargin, wPresetCombo, 200, SWP_NOZORDER);
     SetWindowPos(m_hBtnSelectPreset, nullptr, xPresetBtn, topMargin, wPresetBtn, ctrlH, SWP_NOZORDER);
 
-    const int rightEdge = width - 10;
-    const int btnRevertW = 135;
-    const int btnApplyW = 145;
-    SetWindowPos(m_hBtnRevert, nullptr, rightEdge - btnRevertW, topMargin, btnRevertW, ctrlH, SWP_NOZORDER);
-    SetWindowPos(m_hBtnApply, nullptr, rightEdge - btnRevertW - 8 - btnApplyW, topMargin, btnApplyW, ctrlH, SWP_NOZORDER);
+    UpdateActionButtonsLayout(width);
 
     UpdateSplitterLayout();
 
@@ -1096,6 +1092,62 @@ void MainWindow::UpdateSelectionCounts() {
         }
         SetWindowTextW(m_hLblMatchCount, ss.str().c_str());
     }
+
+    UpdateActionButtonsLayout();
+}
+
+int MainWindow::GetApplyButtonWidth() const {
+    UINT dpi = 96;
+    if (m_hWnd) {
+        dpi = GetDpiForWindow(m_hWnd);
+        if (dpi == 0) dpi = 96;
+    }
+    const int baseMinW = MulDiv(145, dpi, 96);
+    const int padH = MulDiv(36, dpi, 96);
+
+    int w = baseMinW;
+    if (m_hBtnApply) {
+        wchar_t textBuf[128]{};
+        GetWindowTextW(m_hBtnApply, textBuf, 128);
+        if (textBuf[0] != L'\0') {
+            HDC hdc = GetDC(m_hBtnApply);
+            if (hdc) {
+                HGDIOBJ hOld = SelectObject(hdc, m_hFontBold ? m_hFontBold : m_hFontRegular);
+                SIZE sz{};
+                GetTextExtentPoint32W(hdc, textBuf, static_cast<int>(wcslen(textBuf)), &sz);
+                SelectObject(hdc, hOld);
+                ReleaseDC(m_hBtnApply, hdc);
+                w = std::max(baseMinW, static_cast<int>(sz.cx) + padH);
+            }
+        }
+    }
+    return w;
+}
+
+void MainWindow::UpdateActionButtonsLayout(int clientWidth) {
+    if (!m_hBtnApply || !m_hBtnRevert || !m_hWnd) return;
+    if (clientWidth <= 0) {
+        RECT rcClient{};
+        GetClientRect(m_hWnd, &rcClient);
+        clientWidth = rcClient.right - rcClient.left;
+    }
+    if (clientWidth <= 0) return;
+
+    const int topMargin = 10;
+    const int ctrlH = 26;
+    const int rightEdge = clientWidth - 10;
+    const int btnRevertW = 135;
+    const int btnGap = 8;
+    const int btnApplyW = GetApplyButtonWidth();
+
+    SetWindowPos(m_hBtnRevert, nullptr, rightEdge - btnRevertW, topMargin, btnRevertW, ctrlH, SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(m_hBtnApply, nullptr, rightEdge - btnRevertW - btnGap - btnApplyW, topMargin, btnApplyW, ctrlH, SWP_NOZORDER | SWP_NOACTIVATE);
+
+    // Repaint toolbar background area around action buttons to cleanly erase any vacated background
+    RECT rcToolbar{ rightEdge - btnRevertW - btnGap - btnApplyW - 30, topMargin - 2, clientWidth, topMargin + ctrlH + 4 };
+    InvalidateRect(m_hWnd, &rcToolbar, TRUE);
+    UpdateWindow(m_hBtnApply);
+    UpdateWindow(m_hBtnRevert);
 }
 
 void MainWindow::UpdateDetailsPane(int selectedIndex) {

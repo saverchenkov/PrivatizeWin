@@ -66,6 +66,8 @@ private:
     void UpdateDetailsPane(int selectedIndex);
     void UpdateStatusBar();
     void UpdateSelectionCounts();
+    int GetApplyButtonWidth() const;
+    void UpdateActionButtonsLayout(int clientWidth = -1);
     void ToggleSelectedTweakFromDetails();
     void UpdateSplitterLayout();
     void InitializeHeaderTooltips();
