@@ -148,7 +148,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"The Windows Copilot is based on ChatGPT from OpenAI and is an extension to the AI in the Microsoft search engine Bing. In order for this AI to provide answers, further system information is transmitted in addition to the user queries. To prevent this, Copilot can be disabled.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot", L"TurnOffWindowsCopilot", RegType::Dword, 0, 0, L"", L"", false });
+        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot", L"TurnOffWindowsCopilot", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
     {
@@ -160,7 +160,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"The Windows Copilot is based on ChatGPT from OpenAI and is an extension to the AI in the Microsoft search engine Bing. In order for this AI to provide answers, further system information is transmitted in addition to the user queries. To prevent this, Copilot can be disabled.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot", L"TurnOffWindowsCopilot", RegType::Dword, 0, 0, L"", L"", false });
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot", L"TurnOffWindowsCopilot", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
     {
@@ -195,8 +195,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"Removes the Copilot icon from the taskbar so that the search using AI (artificial intelligence) is no longer available. This setting can be used to disable this option.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Machine;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", L"ShowCopilotButton", RegType::Dword, 0, 0, L"", L"", false });
+        t.scope = TargetScope::User;
+        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", L"ShowCopilotButton", RegType::Dword, 0, 1, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -207,8 +207,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"Controls whether the user is eligible to use Bing Chat features within the Windows Copilot. When disabled, this prevents access to Bing Chat functionality in Copilot, even if the feature would otherwise be available in the user's region and Windows build.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.scope = TargetScope::Machine;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\Shell\\Copilot\\BingChat", L"IsUserEligible", RegType::Dword, 0, 0, L"", L"", false });
+        t.scope = TargetScope::User;
+        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\Shell\\Copilot\\BingChat", L"IsUserEligible", RegType::Dword, 0, 1, L"", L"", false });
         AddTweak(std::move(t));
     }
     {
@@ -220,7 +220,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"This setting deactivates the new Windows Copilot+ Recall feature. This is a component that constantly creates screenshots, evaluates their content and makes the data available via an application. Both to the user himself and to other applications that have the corresponding authorizations. Disabling the Recall feature is strongly recommended.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", L"DisableAIDataAnalysis", RegType::Dword, 0, 0, L"", L"", false });
+        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", L"DisableAIDataAnalysis", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
     {
@@ -232,7 +232,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"This setting deactivates the new Windows Copilot+ Recall feature. This is a component that constantly creates screenshots, evaluates their content and makes the data available via an application. Both to the user himself and to other applications that have the corresponding authorizations. Disabling the Recall feature is strongly recommended.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", L"DisableAIDataAnalysis", RegType::Dword, 0, 0, L"", L"", false });
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", L"DisableAIDataAnalysis", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
     {
@@ -4088,25 +4088,25 @@ void TweakRegistry::InitializeDefaultTweaks() {
     {
         Tweak t;
         t.id = "M017_USER";
-        t.title = L"UNKNOWN (User)";
+        t.title = L"Disable \"Meet now\" in the task bar (User)";
         t.scope = TargetScope::User;
         t.category = L"Taskbar & Start Menu";
         t.description = L"The \"Meet now\" feature is part of Microsoft Skype and is used to quickly create an online meeting. If you do not want this feature, then activate this setting.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", L"HideSCAMeetNow", RegType::Dword, 0, 0, L"", L"", false });
+        t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", L"HideSCAMeetNow", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
     {
         Tweak t;
         t.id = "M017_MACHINE";
-        t.title = L"UNKNOWN (Machine)";
+        t.title = L"Disable \"Meet now\" in the task bar (Machine)";
         t.scope = TargetScope::Machine;
         t.category = L"Taskbar & Start Menu";
         t.description = L"The \"Meet now\" feature is part of Microsoft Skype and is used to quickly create an online meeting. If you do not want this feature, then activate this setting.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", L"HideSCAMeetNow", RegType::Dword, 0, 0, L"", L"", false });
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", L"HideSCAMeetNow", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
     {
