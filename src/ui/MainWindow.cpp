@@ -1293,123 +1293,6 @@ void MainWindow::UpdateStatusBar() {
     SendMessage(m_hStatusBar, SB_SETTEXTW, 2, reinterpret_cast<LPARAM>(part2.c_str()));
 }
 
-void MainWindow::ApplyPreset(std::string_view templateName) {
-    if (!IsRunningAsAdmin()) {
-        const int res = MessageBoxW(m_hWnd,
-            L"Administrator privileges are required to apply presets.\n\n"
-            L"Would you like to restart PrivatizeWin as Administrator now?",
-            L"PrivatizeWin \u2014 Elevation Required",
-            MB_YESNO | MB_ICONWARNING);
-        if (res == IDYES) {
-            if (RelaunchElevated(m_hWnd)) {
-                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
-            }
-        }
-        return;
-    }
-
-    const auto tpl = TemplateManager::Instance().GetTemplate(templateName);
-    if (!tpl.has_value()) return;
-
-    std::wstring presetTitle = L"Recommended";
-    if (templateName == "strict") presetTitle = L"Strict Privacy";
-    else if (templateName == "minimal") presetTitle = L"Minimal";
-
-    // Count changes & find moderate/high impact settings
-    std::vector<const Tweak*> moderateHighTweaks;
-    bool anyReboot = false;
-    bool anySignOut = false;
-    size_t applyCount = 0;
-
-    for (const auto& [id, shouldEnable] : tpl->tweakStates) {
-        if (shouldEnable) {
-            const SettingStatus st = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
-            if (st != SettingStatus::Applied) {
-                applyCount++;
-                const Tweak* t = TweakRegistry::Instance().GetTweakById(id);
-                if (t) {
-                    if (t->impactLevel == ImpactLevel::Moderate || t->impactLevel == ImpactLevel::High) {
-                        moderateHighTweaks.push_back(t);
-                    }
-                    if (t->requiresReboot) anyReboot = true;
-                    if (t->requiresSignOut) anySignOut = true;
-                }
-            }
-        }
-    }
-
-    if (applyCount == 0) {
-        MessageBoxW(m_hWnd, (L"All settings for the " + presetTitle + L" preset are already applied.").c_str(),
-            L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
-        return;
-    }
-
-    std::wstringstream review;
-    review << L"You are about to apply the " << presetTitle << L" preset (" << applyCount << L" setting(s) will be applied).\n\n";
-
-    if (!moderateHighTweaks.empty()) {
-        review << L"Moderate / High Impact Settings Included (" << moderateHighTweaks.size() << L"):\n";
-        const size_t limit = std::min<size_t>(moderateHighTweaks.size(), 8);
-        for (size_t i = 0; i < limit; ++i) {
-            const auto* t = moderateHighTweaks[i];
-            review << L"  \u2022 " << t->title << L" (" << (t->impactLevel == ImpactLevel::High ? L"High" : L"Moderate") << L" impact)\n";
-        }
-        if (moderateHighTweaks.size() > limit) {
-            review << L"  ... and " << (moderateHighTweaks.size() - limit) << L" more.\n";
-        }
-        review << L"\n";
-    }
-
-    if (anyReboot) {
-        review << L"Note: A system restart is required for some settings to take full effect.\n\n";
-    } else if (anySignOut) {
-        review << L"Note: A user sign-out is required for some settings to take full effect.\n\n";
-    }
-
-    review << L"Do you wish to proceed?";
-
-    const int choice = MessageBoxW(m_hWnd, review.str().c_str(), (L"Apply " + presetTitle + L" Preset").c_str(), MB_YESNO | MB_ICONQUESTION);
-    if (choice != IDYES) return;
-
-    ShowWindow(m_hProgressBar, SW_SHOW);
-    SendMessage(m_hProgressBar, PBM_SETRANGE32, 0, static_cast<LPARAM>(tpl->tweakStates.size()));
-    SendMessage(m_hProgressBar, PBM_SETPOS, 0, 0);
-
-    int changedCount = 0;
-    int alreadyCount = 0;
-    int failedCount = 0;
-    int progress = 0;
-
-    for (const auto& [id, shouldEnable] : tpl->tweakStates) {
-        if (shouldEnable) {
-            const SettingStatus before = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
-            if (before == SettingStatus::Applied) {
-                alreadyCount++;
-            } else {
-                const bool ok = TweakRegistry::Instance().ApplyTweak(id, true, UserSelectionMode::CurrentUser, {});
-                const SettingStatus after = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
-                if (ok && after == SettingStatus::Applied) {
-                    changedCount++;
-                } else {
-                    failedCount++;
-                }
-            }
-        }
-        progress++;
-        SendMessage(m_hProgressBar, PBM_SETPOS, progress, 0);
-    }
-
-    ShowWindow(m_hProgressBar, SW_HIDE);
-    RefreshAuditState();
-
-    std::wstringstream resMsg;
-    resMsg << L"Preset applied successfully.\n\n"
-           << L"  \u2022 Changed: " << changedCount << L"\n"
-           << L"  \u2022 Already applied: " << alreadyCount << L"\n"
-           << L"  \u2022 Failed: " << failedCount;
-    MessageBoxW(m_hWnd, resMsg.str().c_str(), L"PrivatizeWin", MB_OK | (failedCount == 0 ? MB_ICONINFORMATION : MB_ICONWARNING));
-}
-
 void MainWindow::SelectPreset(std::string_view templateName) {
     const auto tpl = TemplateManager::Instance().GetTemplate(templateName);
     if (!tpl.has_value()) return;
@@ -1440,6 +1323,11 @@ void MainWindow::SelectPreset(std::string_view templateName) {
 
     UpdateSelectionCounts();
     UpdateStatusBar();
+
+    int cur = ListView_GetNextItem(m_hListView, -1, LVNI_SELECTED);
+    if (cur != -1) {
+        UpdateDetailsPane(cur);
+    }
 }
 
 void MainWindow::SelectRecommended() {
@@ -1972,9 +1860,9 @@ void MainWindow::OnCommand(int id, HWND hCtrl) {
         break;
     case IDC_BTN_SELECT_PRESET: {
         const int sel = static_cast<int>(SendMessage(m_hTemplateCombo, CB_GETCURSEL, 0, 0));
-        if (sel == 1) ApplyPreset("strict");
-        else if (sel == 2) ApplyPreset("minimal");
-        else ApplyPreset("recommended");
+        if (sel == 1) SelectPreset("strict");
+        else if (sel == 2) SelectPreset("minimal");
+        else SelectPreset("recommended");
         break;
     }
     case IDM_ACT_REFRESH:

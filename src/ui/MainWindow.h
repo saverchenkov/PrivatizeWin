@@ -71,7 +71,6 @@ private:
     void InitializeHeaderTooltips();
     void UpdateHeaderTooltips();
 
-    void ApplyPreset(std::string_view templateName);
     void SelectPreset(std::string_view templateName);
     void SelectRecommended();
     void SelectAllShown();
