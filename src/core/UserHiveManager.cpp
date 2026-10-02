@@ -74,22 +74,31 @@ std::vector<UserProfile> UserHiveManager::DiscoverUserProfiles() {
     return profiles;
 }
 
-void UserHiveManager::ForEachTargetUser(
+UserTargetResult UserHiveManager::ForEachTargetUser(
     UserSelectionMode mode,
     const std::vector<std::wstring>& specificUsers,
-    const std::function<void(HKEY hUserRoot, const UserProfile& profile)>& callback
+    const std::function<bool(HKEY hUserRoot, const UserProfile& profile)>& callback
 ) {
+    UserTargetResult result{};
+
     if (mode == UserSelectionMode::NoUsers) {
-        return;
+        result.allSucceeded = true;
+        return result;
     }
 
     if (mode == UserSelectionMode::CurrentUser) {
+        result.requestedUsers = 1;
+        result.resolvedUsers = 1;
+        result.mountedUsers = 1;
         UserProfile curProfile;
         curProfile.username = L"Current User";
         curProfile.sid = L"CURRENT";
         curProfile.isLoaded = true;
-        callback(HKEY_CURRENT_USER, curProfile);
-        return;
+        if (!callback(HKEY_CURRENT_USER, curProfile)) {
+            result.failedUsers++;
+            result.allSucceeded = false;
+        }
+        return result;
     }
 
     EnablePrivilege(L"SeBackupPrivilege");
@@ -97,96 +106,213 @@ void UserHiveManager::ForEachTargetUser(
 
     const auto profiles = DiscoverUserProfiles();
 
-    for (const auto& p : profiles) {
-        if (mode == UserSelectionMode::SpecificUsers) {
-            bool matched = false;
-            for (const auto& filter : specificUsers) {
-                if (_wcsicmp(p.username.c_str(), filter.c_str()) == 0 || _wcsicmp(p.sid.c_str(), filter.c_str()) == 0) {
-                    matched = true;
-                    break;
-                }
-            }
-            if (!matched) continue;
+    if (mode == UserSelectionMode::SpecificUsers) {
+        result.requestedUsers = specificUsers.size();
+        if (specificUsers.empty()) {
+            result.allSucceeded = false;
+            return result;
         }
 
-        if (p.isLoaded) {
-            UniqueHKey hUserRoot;
-            if (RegOpenKeyExW(HKEY_USERS, p.sid.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS ||
-                RegOpenKeyExW(HKEY_USERS, p.sid.c_str(), 0, KEY_READ, hUserRoot.put()) == ERROR_SUCCESS) {
-                callback(hUserRoot.get(), p);
-            }
-        } else {
-            const std::wstring ntuserPath = p.profilePath + L"\\NTUSER.DAT";
-            const std::wstring mountName = L"PrivatizeWin_" + p.sid;
+        for (const auto& filter : specificUsers) {
+            auto it = std::find_if(profiles.begin(), profiles.end(), [&](const UserProfile& p) {
+                return (_wcsicmp(p.username.c_str(), filter.c_str()) == 0 || _wcsicmp(p.sid.c_str(), filter.c_str()) == 0);
+            });
 
-            LSTATUS loadStatus = RegLoadKeyW(HKEY_USERS, mountName.c_str(), ntuserPath.c_str());
-            bool wasAlreadyMounted = false;
-            if (loadStatus != ERROR_SUCCESS) {
-                UniqueHKey testKey;
-                if (RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ, testKey.put()) == ERROR_SUCCESS) {
-                    wasAlreadyMounted = true;
-                    loadStatus = ERROR_SUCCESS;
+            if (it == profiles.end()) {
+                // Requested user does not exist on this machine
+                result.failedUsers++;
+                result.allSucceeded = false;
+                continue;
+            }
+
+            result.resolvedUsers++;
+            const UserProfile& p = *it;
+
+            if (p.isLoaded) {
+                UniqueHKey hUserRoot;
+                if (RegOpenKeyExW(HKEY_USERS, p.sid.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS ||
+                    RegOpenKeyExW(HKEY_USERS, p.sid.c_str(), 0, KEY_READ, hUserRoot.put()) == ERROR_SUCCESS) {
+                    result.mountedUsers++;
+                    if (!callback(hUserRoot.get(), p)) {
+                        result.failedUsers++;
+                        result.allSucceeded = false;
+                    }
+                } else {
+                    result.failedUsers++;
+                    result.allSucceeded = false;
                 }
-            }
+            } else {
+                const std::wstring ntuserPath = p.profilePath + L"\\NTUSER.DAT";
+                const std::wstring mountName = L"PrivatizeWin_" + p.sid;
 
-            if (loadStatus == ERROR_SUCCESS) {
-                {
-                    UniqueHKey hUserRoot;
-                    if (RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS ||
-                        RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ, hUserRoot.put()) == ERROR_SUCCESS) {
-                        callback(hUserRoot.get(), p);
+                LSTATUS loadStatus = RegLoadKeyW(HKEY_USERS, mountName.c_str(), ntuserPath.c_str());
+                bool wasAlreadyMounted = false;
+                if (loadStatus != ERROR_SUCCESS) {
+                    UniqueHKey testKey;
+                    if (RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ, testKey.put()) == ERROR_SUCCESS) {
+                        wasAlreadyMounted = true;
+                        loadStatus = ERROR_SUCCESS;
                     }
                 }
-                if (!wasAlreadyMounted) {
-                    for (int retry = 0; retry < 3; ++retry) {
-                        if (RegUnLoadKeyW(HKEY_USERS, mountName.c_str()) == ERROR_SUCCESS) {
-                            break;
+
+                if (loadStatus == ERROR_SUCCESS) {
+                    bool cbOk = true;
+                    {
+                        UniqueHKey hUserRoot;
+                        if (RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS ||
+                            RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ, hUserRoot.put()) == ERROR_SUCCESS) {
+                            result.mountedUsers++;
+                            cbOk = callback(hUserRoot.get(), p);
+                        } else {
+                            cbOk = false;
                         }
-                        Sleep(10);
                     }
+
+                    if (!wasAlreadyMounted) {
+                        for (int retry = 0; retry < 5; ++retry) {
+                            if (RegUnLoadKeyW(HKEY_USERS, mountName.c_str()) == ERROR_SUCCESS) {
+                                break;
+                            }
+                            Sleep(25);
+                        }
+                    }
+
+                    if (!cbOk) {
+                        result.failedUsers++;
+                        result.allSucceeded = false;
+                    }
+                } else {
+                    result.failedUsers++;
+                    result.allSucceeded = false;
                 }
             }
         }
+        return result;
     }
 
     if (mode == UserSelectionMode::AllUsers) {
         wchar_t sysDrive[MAX_PATH] = { 0 };
         GetEnvironmentVariableW(L"SystemDrive", sysDrive, MAX_PATH);
         const std::wstring defaultNtuser = std::wstring(sysDrive) + L"\\Users\\Default\\NTUSER.DAT";
-        const std::wstring defaultMount = L"PrivatizeWin_DefaultUser";
+        const bool defaultExists = (GetFileAttributesW(defaultNtuser.c_str()) != INVALID_FILE_ATTRIBUTES);
 
-        LSTATUS loadStatus = RegLoadKeyW(HKEY_USERS, defaultMount.c_str(), defaultNtuser.c_str());
-        bool wasAlreadyMounted = false;
-        if (loadStatus != ERROR_SUCCESS) {
-            UniqueHKey testKey;
-            if (RegOpenKeyExW(HKEY_USERS, defaultMount.c_str(), 0, KEY_READ, testKey.put()) == ERROR_SUCCESS) {
-                wasAlreadyMounted = true;
-                loadStatus = ERROR_SUCCESS;
-            }
-        }
+        result.requestedUsers = profiles.size() + (defaultExists ? 1 : 0);
 
-        if (loadStatus == ERROR_SUCCESS) {
-            {
+        for (const auto& p : profiles) {
+            result.resolvedUsers++;
+            if (p.isLoaded) {
                 UniqueHKey hUserRoot;
-                if (RegOpenKeyExW(HKEY_USERS, defaultMount.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS ||
-                    RegOpenKeyExW(HKEY_USERS, defaultMount.c_str(), 0, KEY_READ, hUserRoot.put()) == ERROR_SUCCESS) {
-                    UserProfile defaultProfile;
-                    defaultProfile.username = L"Default User Template";
-                    defaultProfile.sid = L"DEFAULT_TEMPLATE";
-                    defaultProfile.isLoaded = false;
-                    callback(hUserRoot.get(), defaultProfile);
-                }
-            }
-            if (!wasAlreadyMounted) {
-                for (int retry = 0; retry < 3; ++retry) {
-                    if (RegUnLoadKeyW(HKEY_USERS, defaultMount.c_str()) == ERROR_SUCCESS) {
-                        break;
+                if (RegOpenKeyExW(HKEY_USERS, p.sid.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS ||
+                    RegOpenKeyExW(HKEY_USERS, p.sid.c_str(), 0, KEY_READ, hUserRoot.put()) == ERROR_SUCCESS) {
+                    result.mountedUsers++;
+                    if (!callback(hUserRoot.get(), p)) {
+                        result.failedUsers++;
+                        result.allSucceeded = false;
                     }
-                    Sleep(10);
+                } else {
+                    result.failedUsers++;
+                    result.allSucceeded = false;
+                }
+            } else {
+                const std::wstring ntuserPath = p.profilePath + L"\\NTUSER.DAT";
+                const std::wstring mountName = L"PrivatizeWin_" + p.sid;
+
+                LSTATUS loadStatus = RegLoadKeyW(HKEY_USERS, mountName.c_str(), ntuserPath.c_str());
+                bool wasAlreadyMounted = false;
+                if (loadStatus != ERROR_SUCCESS) {
+                    UniqueHKey testKey;
+                    if (RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ, testKey.put()) == ERROR_SUCCESS) {
+                        wasAlreadyMounted = true;
+                        loadStatus = ERROR_SUCCESS;
+                    }
+                }
+
+                if (loadStatus == ERROR_SUCCESS) {
+                    bool cbOk = true;
+                    {
+                        UniqueHKey hUserRoot;
+                        if (RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS ||
+                            RegOpenKeyExW(HKEY_USERS, mountName.c_str(), 0, KEY_READ, hUserRoot.put()) == ERROR_SUCCESS) {
+                            result.mountedUsers++;
+                            cbOk = callback(hUserRoot.get(), p);
+                        } else {
+                            cbOk = false;
+                        }
+                    }
+
+                    if (!wasAlreadyMounted) {
+                        for (int retry = 0; retry < 5; ++retry) {
+                            if (RegUnLoadKeyW(HKEY_USERS, mountName.c_str()) == ERROR_SUCCESS) {
+                                break;
+                            }
+                            Sleep(25);
+                        }
+                    }
+
+                    if (!cbOk) {
+                        result.failedUsers++;
+                        result.allSucceeded = false;
+                    }
+                } else {
+                    result.failedUsers++;
+                    result.allSucceeded = false;
                 }
             }
         }
+
+        if (defaultExists) {
+            result.resolvedUsers++;
+            const std::wstring defaultMount = L"PrivatizeWin_DefaultUser";
+            LSTATUS loadStatus = RegLoadKeyW(HKEY_USERS, defaultMount.c_str(), defaultNtuser.c_str());
+            bool wasAlreadyMounted = false;
+            if (loadStatus != ERROR_SUCCESS) {
+                UniqueHKey testKey;
+                if (RegOpenKeyExW(HKEY_USERS, defaultMount.c_str(), 0, KEY_READ, testKey.put()) == ERROR_SUCCESS) {
+                    wasAlreadyMounted = true;
+                    loadStatus = ERROR_SUCCESS;
+                }
+            }
+
+            if (loadStatus == ERROR_SUCCESS) {
+                bool cbOk = true;
+                {
+                    UniqueHKey hUserRoot;
+                    if (RegOpenKeyExW(HKEY_USERS, defaultMount.c_str(), 0, KEY_READ | KEY_WRITE, hUserRoot.put()) == ERROR_SUCCESS ||
+                        RegOpenKeyExW(HKEY_USERS, defaultMount.c_str(), 0, KEY_READ, hUserRoot.put()) == ERROR_SUCCESS) {
+                        result.mountedUsers++;
+                        UserProfile defaultProfile;
+                        defaultProfile.username = L"Default User Template";
+                        defaultProfile.sid = L"DEFAULT_TEMPLATE";
+                        defaultProfile.isLoaded = false;
+                        cbOk = callback(hUserRoot.get(), defaultProfile);
+                    } else {
+                        cbOk = false;
+                    }
+                }
+
+                if (!wasAlreadyMounted) {
+                    for (int retry = 0; retry < 5; ++retry) {
+                        if (RegUnLoadKeyW(HKEY_USERS, defaultMount.c_str()) == ERROR_SUCCESS) {
+                            break;
+                        }
+                        Sleep(25);
+                    }
+                }
+
+                if (!cbOk) {
+                    result.failedUsers++;
+                    result.allSucceeded = false;
+                }
+            } else {
+                result.failedUsers++;
+                result.allSucceeded = false;
+            }
+        }
+
+        return result;
     }
+
+    return result;
 }
 
 SettingStatus UserHiveManager::AuditUserAction(
@@ -195,33 +321,45 @@ SettingStatus UserHiveManager::AuditUserAction(
     const std::vector<std::wstring>& specificUsers
 ) {
     if (mode == UserSelectionMode::NoUsers) {
-        return SettingStatus::Protected;
+        return SettingStatus::Applied;
     }
 
     if (mode == UserSelectionMode::CurrentUser) {
         return RegistryHelper::AuditAction(HKEY_CURRENT_USER, action);
     }
 
-    int totalUsers = 0;
-    int protectedUsers = 0;
+    size_t appliedUsers = 0;
+    size_t notAppliedUsers = 0;
+    size_t unknownUsers = 0;
 
-    ForEachTargetUser(mode, specificUsers, [&](HKEY hUserRoot, const UserProfile&) {
-        totalUsers++;
+    const auto res = ForEachTargetUser(mode, specificUsers, [&](HKEY hUserRoot, const UserProfile&) -> bool {
         const SettingStatus status = RegistryHelper::AuditAction(hUserRoot, action);
-        if (status == SettingStatus::Protected) {
-            protectedUsers++;
+        if (status == SettingStatus::Applied) {
+            appliedUsers++;
+        } else if (status == SettingStatus::NotApplied) {
+            notAppliedUsers++;
+        } else {
+            unknownUsers++;
         }
+        return true;
     });
 
-    if (totalUsers == 0) {
-        return RegistryHelper::AuditAction(HKEY_CURRENT_USER, action);
+    unknownUsers += res.failedUsers;
+
+    if (res.requestedUsers == 0 || (appliedUsers == 0 && notAppliedUsers == 0 && unknownUsers > 0)) {
+        return SettingStatus::Unknown;
     }
-    if (protectedUsers == totalUsers) {
+
+    if (notAppliedUsers > 0) {
+        return SettingStatus::NotApplied;
+    }
+
+    if (appliedUsers == res.requestedUsers && unknownUsers == 0) {
         return SettingStatus::Applied;
     }
-    return SettingStatus::NotApplied;
-}
 
+    return SettingStatus::Unknown;
+}
 
 bool UserHiveManager::ApplyUserAction(
     const RegistryAction& action,
@@ -237,13 +375,11 @@ bool UserHiveManager::ApplyUserAction(
         return RegistryHelper::ApplyAction(HKEY_CURRENT_USER, action, enableProtection);
     }
 
-    bool allSucceeded = true;
-    ForEachTargetUser(mode, specificUsers, [&](HKEY hUserRoot, const UserProfile&) {
-        const bool ok = RegistryHelper::ApplyAction(hUserRoot, action, enableProtection);
-        if (!ok) allSucceeded = false;
+    const auto res = ForEachTargetUser(mode, specificUsers, [&](HKEY hUserRoot, const UserProfile&) -> bool {
+        return RegistryHelper::ApplyAction(hUserRoot, action, enableProtection);
     });
 
-    return allSucceeded;
+    return res.allSucceeded && (res.failedUsers == 0) && (res.mountedUsers > 0);
 }
 
 } // namespace PrivatizeWin

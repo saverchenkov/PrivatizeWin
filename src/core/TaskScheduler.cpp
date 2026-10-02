@@ -34,65 +34,74 @@ private:
     HRESULT m_hr;
 };
 
+// RAII Task Service and Root Folder Connection
+class TaskServiceConnection {
+public:
+    TaskServiceConnection() {
+        if (!m_com.isOk()) return;
+        HRESULT hr = CoCreateInstance(CLSID_TaskScheduler, nullptr, CLSCTX_INPROC_SERVER, IID_ITaskService, reinterpret_cast<void**>(&m_pService));
+        if (FAILED(hr) || !m_pService) return;
+
+        hr = m_pService->Connect(_variant_t(), _variant_t(), _variant_t(), _variant_t());
+        if (FAILED(hr)) {
+            m_pService->Release();
+            m_pService = nullptr;
+            return;
+        }
+
+        hr = m_pService->GetFolder(_bstr_t(L"\\"), &m_pRootFolder);
+        if (FAILED(hr)) {
+            m_pRootFolder = nullptr;
+            m_pService->Release();
+            m_pService = nullptr;
+        }
+    }
+
+    ~TaskServiceConnection() {
+        if (m_pRootFolder) {
+            m_pRootFolder->Release();
+            m_pRootFolder = nullptr;
+        }
+        if (m_pService) {
+            m_pService->Release();
+            m_pService = nullptr;
+        }
+    }
+
+    TaskServiceConnection(const TaskServiceConnection&) = delete;
+    TaskServiceConnection& operator=(const TaskServiceConnection&) = delete;
+
+    [[nodiscard]] bool isValid() const noexcept { return m_pService != nullptr && m_pRootFolder != nullptr; }
+    [[nodiscard]] ITaskService* service() const noexcept { return m_pService; }
+    [[nodiscard]] ITaskFolder* folder() const noexcept { return m_pRootFolder; }
+
+private:
+    ComScope m_com;
+    ITaskService* m_pService{ nullptr };
+    ITaskFolder* m_pRootFolder{ nullptr };
+};
+
 bool TaskScheduler::IsTaskInstalled(std::wstring_view taskName) {
-    ComScope com;
-    if (!com.isOk()) return false;
+    TaskServiceConnection conn;
+    if (!conn.isValid()) return false;
 
-    ITaskService* pService = nullptr;
-    HRESULT hr = CoCreateInstance(CLSID_TaskScheduler, nullptr, CLSCTX_INPROC_SERVER, IID_ITaskService, reinterpret_cast<void**>(&pService));
-    if (FAILED(hr)) return false;
-
-    hr = pService->Connect(_variant_t(), _variant_t(), _variant_t(), _variant_t());
-    if (FAILED(hr)) {
-        pService->Release();
-        return false;
-    }
-
-    ITaskFolder* pRootFolder = nullptr;
-    hr = pService->GetFolder(_bstr_t(L"\\"), &pRootFolder);
-    if (FAILED(hr)) {
-        pService->Release();
-        return false;
-    }
-
-    std::wstring taskNameStr(taskName);
+    const std::wstring taskNameStr(taskName);
     IRegisteredTask* pRegisteredTask = nullptr;
-    hr = pRootFolder->GetTask(_bstr_t(taskNameStr.c_str()), &pRegisteredTask);
+    const HRESULT hr = conn.folder()->GetTask(_bstr_t(taskNameStr.c_str()), &pRegisteredTask);
     const bool exists = SUCCEEDED(hr) && (pRegisteredTask != nullptr);
 
     if (pRegisteredTask) pRegisteredTask->Release();
-    pRootFolder->Release();
-    pService->Release();
     return exists;
 }
 
 bool TaskScheduler::GetTaskConfig(ScheduledTaskConfig& outConfig, std::wstring_view taskName) {
-    ComScope com;
-    if (!com.isOk()) return false;
+    TaskServiceConnection conn;
+    if (!conn.isValid()) return false;
 
-    ITaskService* pService = nullptr;
-    HRESULT hr = CoCreateInstance(CLSID_TaskScheduler, nullptr, CLSCTX_INPROC_SERVER, IID_ITaskService, reinterpret_cast<void**>(&pService));
-    if (FAILED(hr)) return false;
-
-    hr = pService->Connect(_variant_t(), _variant_t(), _variant_t(), _variant_t());
-    if (FAILED(hr)) {
-        pService->Release();
-        return false;
-    }
-
-    ITaskFolder* pRootFolder = nullptr;
-    hr = pService->GetFolder(_bstr_t(L"\\"), &pRootFolder);
-    if (FAILED(hr)) {
-        pService->Release();
-        return false;
-    }
-
-    std::wstring taskNameStr(taskName);
+    const std::wstring taskNameStr(taskName);
     IRegisteredTask* pRegisteredTask = nullptr;
-    hr = pRootFolder->GetTask(_bstr_t(taskNameStr.c_str()), &pRegisteredTask);
+    const HRESULT hr = conn.folder()->GetTask(_bstr_t(taskNameStr.c_str()), &pRegisteredTask);
     if (FAILED(hr) || !pRegisteredTask) {
-        pRootFolder->Release();
-        pService->Release();
         return false;
     }
 
@@ -151,68 +160,125 @@ bool TaskScheduler::GetTaskConfig(ScheduledTaskConfig& outConfig, std::wstring_v
     }
 
     pRegisteredTask->Release();
-    pRootFolder->Release();
-    pService->Release();
     return true;
 }
 
 bool TaskScheduler::InstallTask(const ScheduledTaskConfig& config) {
+    TaskServiceConnection conn;
+    if (!conn.isValid()) return false;
+
+    ITaskDefinition* pDefinition = nullptr;
+    HRESULT hr = conn.service()->NewTask(0, &pDefinition);
+    if (FAILED(hr) || !pDefinition) return false;
+
+    IRegistrationInfo* pRegInfo = nullptr;
+    if (SUCCEEDED(pDefinition->get_RegistrationInfo(&pRegInfo)) && pRegInfo) {
+        pRegInfo->put_Author(_bstr_t(L"PrivatizeWin"));
+        pRegInfo->put_Description(_bstr_t(L"PrivatizeWin automated privacy protection reapplication task."));
+        pRegInfo->Release();
+    }
+
+    IPrincipal* pPrincipal = nullptr;
+    if (SUCCEEDED(pDefinition->get_Principal(&pPrincipal)) && pPrincipal) {
+        pPrincipal->put_Id(_bstr_t(L"Author"));
+        pPrincipal->put_RunLevel(TASK_RUNLEVEL_HIGHEST);
+        pPrincipal->put_LogonType(TASK_LOGON_INTERACTIVE_TOKEN);
+        pPrincipal->Release();
+    }
+
+    ITaskSettings* pSettings = nullptr;
+    if (SUCCEEDED(pDefinition->get_Settings(&pSettings)) && pSettings) {
+        pSettings->put_StartWhenAvailable(VARIANT_TRUE);
+        pSettings->put_DisallowStartIfOnBatteries(VARIANT_FALSE);
+        pSettings->put_StopIfGoingOnBatteries(VARIANT_FALSE);
+        pSettings->put_ExecutionTimeLimit(_bstr_t(L"PT1H"));
+        pSettings->Release();
+    }
+
+    ITriggerCollection* pTriggers = nullptr;
+    if (SUCCEEDED(pDefinition->get_Triggers(&pTriggers)) && pTriggers) {
+        ITrigger* pTrigger = nullptr;
+        if (config.frequency == L"logon") {
+            hr = pTriggers->Create(TASK_TRIGGER_LOGON, &pTrigger);
+            if (SUCCEEDED(hr) && pTrigger) {
+                pTrigger->put_Id(_bstr_t(L"LogonTrigger"));
+                pTrigger->put_Enabled(VARIANT_TRUE);
+                pTrigger->Release();
+            }
+        } else if (config.frequency == L"weekly") {
+            hr = pTriggers->Create(TASK_TRIGGER_WEEKLY, &pTrigger);
+            if (SUCCEEDED(hr) && pTrigger) {
+                IWeeklyTrigger* pWeeklyTrigger = nullptr;
+                if (SUCCEEDED(pTrigger->QueryInterface(IID_IWeeklyTrigger, reinterpret_cast<void**>(&pWeeklyTrigger))) && pWeeklyTrigger) {
+                    pWeeklyTrigger->put_Id(_bstr_t(L"WeeklyTrigger"));
+                    pWeeklyTrigger->put_Enabled(VARIANT_TRUE);
+                    pWeeklyTrigger->put_StartBoundary(_bstr_t(L"2026-01-01T12:00:00"));
+                    pWeeklyTrigger->put_DaysOfWeek(1); // Sunday
+                    pWeeklyTrigger->Release();
+                }
+                pTrigger->Release();
+            }
+        } else {
+            // Daily
+            hr = pTriggers->Create(TASK_TRIGGER_DAILY, &pTrigger);
+            if (SUCCEEDED(hr) && pTrigger) {
+                IDailyTrigger* pDailyTrigger = nullptr;
+                if (SUCCEEDED(pTrigger->QueryInterface(IID_IDailyTrigger, reinterpret_cast<void**>(&pDailyTrigger))) && pDailyTrigger) {
+                    pDailyTrigger->put_Id(_bstr_t(L"DailyTrigger"));
+                    pDailyTrigger->put_Enabled(VARIANT_TRUE);
+                    pDailyTrigger->put_StartBoundary(_bstr_t(L"2026-01-01T12:00:00"));
+                    pDailyTrigger->put_DaysInterval(1);
+                    pDailyTrigger->Release();
+                }
+                pTrigger->Release();
+            }
+        }
+        pTriggers->Release();
+    }
+
     const std::wstring exePath = GetExecutablePath();
     const std::wstring args = L"--apply-template " + config.templateName + L" --quiet --users " + config.userMode;
 
-    std::wstring cmd = L"schtasks.exe /Create /TN \"" + config.taskName + L"\" /TR \"\\\"" + exePath + L"\\\" " + args + L"\" /RL HIGHEST /F ";
-
-    if (config.frequency == L"logon") {
-        cmd += L"/SC ONLOGON";
-    } else if (config.frequency == L"weekly") {
-        cmd += L"/SC WEEKLY /D SUN /ST 12:00";
-    } else {
-        cmd += L"/SC DAILY /ST 12:00";
+    IActionCollection* pActions = nullptr;
+    if (SUCCEEDED(pDefinition->get_Actions(&pActions)) && pActions) {
+        IAction* pAction = nullptr;
+        if (SUCCEEDED(pActions->Create(TASK_ACTION_EXEC, &pAction)) && pAction) {
+            IExecAction* pExec = nullptr;
+            if (SUCCEEDED(pAction->QueryInterface(IID_IExecAction, reinterpret_cast<void**>(&pExec))) && pExec) {
+                pExec->put_Path(_bstr_t(exePath.c_str()));
+                pExec->put_Arguments(_bstr_t(args.c_str()));
+                pExec->Release();
+            }
+            pAction->Release();
+        }
+        pActions->Release();
     }
 
-    std::vector<wchar_t> cmdBuffer(cmd.begin(), cmd.end());
-    cmdBuffer.push_back(0);
+    IRegisteredTask* pRegisteredTask = nullptr;
+    hr = conn.folder()->RegisterTaskDefinition(
+        _bstr_t(config.taskName.c_str()),
+        pDefinition,
+        TASK_CREATE_OR_UPDATE,
+        _variant_t(),
+        _variant_t(),
+        TASK_LOGON_INTERACTIVE_TOKEN,
+        _variant_t(L""),
+        &pRegisteredTask
+    );
 
-    STARTUPINFOW si{ sizeof(si) };
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
-    PROCESS_INFORMATION pi{};
-
-    if (CreateProcessW(nullptr, cmdBuffer.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
-        UniqueHandle hProc(pi.hProcess);
-        UniqueHandle hThread(pi.hThread);
-
-        WaitForSingleObject(hProc.get(), 5000);
-        DWORD exitCode = 0;
-        GetExitCodeProcess(hProc.get(), &exitCode);
-        return (exitCode == 0);
-    }
-
-    return false;
+    const bool success = SUCCEEDED(hr) && (pRegisteredTask != nullptr);
+    if (pRegisteredTask) pRegisteredTask->Release();
+    pDefinition->Release();
+    return success;
 }
 
 bool TaskScheduler::UninstallTask(std::wstring_view taskName) {
-    std::wstring taskNameStr(taskName);
-    std::wstring cmd = L"schtasks.exe /Delete /TN \"" + taskNameStr + L"\" /F";
-    std::vector<wchar_t> cmdBuffer(cmd.begin(), cmd.end());
-    cmdBuffer.push_back(0);
+    TaskServiceConnection conn;
+    if (!conn.isValid()) return false;
 
-    STARTUPINFOW si{ sizeof(si) };
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
-    PROCESS_INFORMATION pi{};
-
-    if (CreateProcessW(nullptr, cmdBuffer.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
-        UniqueHandle hProc(pi.hProcess);
-        UniqueHandle hThread(pi.hThread);
-
-        WaitForSingleObject(hProc.get(), 5000);
-        DWORD exitCode = 0;
-        GetExitCodeProcess(hProc.get(), &exitCode);
-        return (exitCode == 0);
-    }
-
-    return false;
+    const std::wstring taskNameStr(taskName);
+    const HRESULT hr = conn.folder()->DeleteTask(_bstr_t(taskNameStr.c_str()), 0);
+    return SUCCEEDED(hr) || hr == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
 }
 
 } // namespace PrivatizeWin

@@ -22,15 +22,23 @@ struct UserProfile {
     bool isLoaded{ false };
 };
 
+struct UserTargetResult {
+    size_t requestedUsers{ 0 };
+    size_t resolvedUsers{ 0 };
+    size_t mountedUsers{ 0 };
+    size_t failedUsers{ 0 };
+    bool allSucceeded{ true };
+};
+
 class UserHiveManager {
 public:
     static bool EnablePrivilege(std::wstring_view privilegeName);
     [[nodiscard]] static std::vector<UserProfile> DiscoverUserProfiles();
     
-    static void ForEachTargetUser(
+    static UserTargetResult ForEachTargetUser(
         UserSelectionMode mode,
         const std::vector<std::wstring>& specificUsers,
-        const std::function<void(HKEY hUserRoot, const UserProfile& profile)>& callback
+        const std::function<bool(HKEY hUserRoot, const UserProfile& profile)>& callback
     );
 
     [[nodiscard]] static SettingStatus AuditUserAction(

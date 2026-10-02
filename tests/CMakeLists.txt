@@ -8,6 +8,7 @@ set(TEST_SOURCES
     integration/TestRegistryHelperLive.cpp
     integration/TestServiceHelperLive.cpp
     integration/TestUserHiveDiscovery.cpp
+    integration/TestTaskScheduler.cpp
     integration/TestCliEndToEnd.cpp
     ../src/core/RegistryHelper.cpp
     ../src/core/ServiceHelper.cpp
