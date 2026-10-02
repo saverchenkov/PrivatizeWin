@@ -84,3 +84,30 @@ TEST_CASE(Unit_SimpleJson, RoundTripSerialization) {
     ASSERT_TRUE(parsed["safe"].boolValue);
     ASSERT_EQ(parsed["items"].arrayValue.size(), 2);
 }
+
+TEST_CASE(Unit_SimpleJson, RejectTruncatedJson) {
+    bool caught = false;
+    try {
+        JsonValue::parse(R"({"incomplete": )");
+    } catch (const std::exception&) {
+        caught = true;
+    }
+    ASSERT_TRUE(caught);
+}
+
+TEST_CASE(Unit_SimpleJson, RejectTrailingGarbage) {
+    bool caught = false;
+    try {
+        JsonValue::parse(R"({"valid": true} trailing_garbage)");
+    } catch (const std::exception&) {
+        caught = true;
+    }
+    ASSERT_TRUE(caught);
+}
+
+TEST_CASE(Unit_SimpleJson, UnicodeEscapeSequence) {
+    const std::string json = R"({"text": "Hello \u0020 World \u00A9"})";
+    const JsonValue root = JsonValue::parse(json);
+    ASSERT_TRUE(root.isObject());
+    ASSERT_EQ(root["text"].stringValue, "Hello   World \xC2\xA9");
+}

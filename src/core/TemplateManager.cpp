@@ -15,43 +15,49 @@ void TemplateManager::InitializeBuiltinTemplates() {
     m_templates.clear();
     const auto& allTweaks = TweakRegistry::Instance().GetAllTweaks();
 
-    // 1. Recommended (Safe)
+    // 1. Recommended (Safe) - Sparse: only includes Safe privacy tweaks
     {
         TemplateProfile p;
         p.name = "recommended";
         p.description = "Enables all safe privacy settings. No functional side effects or broken apps.";
         p.isBuiltin = true;
         for (const auto& t : allTweaks) {
-            p.tweakStates[t.id] = (t.safety == SafetyLevel::Safe);
+            if (t.safety == SafetyLevel::Safe) {
+                p.tweakStates[t.id] = true;
+            }
         }
         m_templates[p.name] = p;
     }
 
-    // 2. Strict (Safe + Normal)
+    // 2. Strict (Safe + Normal) - Sparse: includes Safe and Normal privacy tweaks
     {
         TemplateProfile p;
         p.name = "strict";
         p.description = "Maximum privacy posture: disables all telemetry, Bing web search, AI recall, and edge tracking.";
         p.isBuiltin = true;
         for (const auto& t : allTweaks) {
-            p.tweakStates[t.id] = (t.safety == SafetyLevel::Safe || t.safety == SafetyLevel::Normal);
+            if (t.safety == SafetyLevel::Safe || t.safety == SafetyLevel::Normal) {
+                p.tweakStates[t.id] = true;
+            }
         }
         m_templates[p.name] = p;
     }
 
-    // 3. Minimal (Core Telemetry Only)
+    // 3. Minimal (Core Telemetry Only) - Sparse: only includes Telemetry & Diagnostics category
     {
         TemplateProfile p;
         p.name = "minimal";
         p.description = "Disables only low-level OS telemetry services and diagnostic data collection.";
         p.isBuiltin = true;
         for (const auto& t : allTweaks) {
-            p.tweakStates[t.id] = (t.category == L"Telemetry & Diagnostics");
+            if (t.category == L"Telemetry & Diagnostics") {
+                p.tweakStates[t.id] = true;
+            }
         }
         m_templates[p.name] = p;
     }
 
-    // 4. Defaults / Revert
+    // 4. Defaults / Revert (Explicit reset of all tweaks to Windows defaults)
     {
         TemplateProfile p;
         p.name = "defaults";
@@ -82,10 +88,14 @@ std::optional<TemplateProfile> TemplateManager::GetTemplate(std::string_view nam
     return std::nullopt;
 }
 
-bool TemplateManager::LoadTemplateFromFile(std::wstring_view filePath, TemplateProfile& outProfile) {
+bool TemplateManager::LoadTemplateFromFile(std::wstring_view filePath, TemplateProfile& outProfile, std::string* outError) {
+    if (outError) outError->clear();
     std::wstring pathStr(filePath);
     std::ifstream file(pathStr);
-    if (!file.is_open()) return false;
+    if (!file.is_open()) {
+        if (outError) *outError = "Could not open template file.";
+        return false;
+    }
 
     std::stringstream buffer;
     buffer << file.rdbuf();
@@ -93,20 +103,48 @@ bool TemplateManager::LoadTemplateFromFile(std::wstring_view filePath, TemplateP
 
     try {
         JsonValue root = JsonValue::parse(buffer.str());
-        if (!root.isObject()) return false;
+        if (!root.isObject()) {
+            if (outError) *outError = "Profile root must be a JSON object.";
+            return false;
+        }
 
+        if (!root.has("name") || !root["name"].isString()) {
+            if (outError) *outError = "Profile requires a string 'name' property.";
+            return false;
+        }
         outProfile.name = root["name"].stringValue;
-        outProfile.description = root["description"].stringValue;
+        outProfile.description = (root.has("description") && root["description"].isString()) ? root["description"].stringValue : "";
         outProfile.isBuiltin = false;
         outProfile.tweakStates.clear();
 
-        if (root["tweaks"].isObject()) {
-            for (const auto& [id, val] : root["tweaks"].objectValue) {
-                outProfile.tweakStates[id] = val.boolValue;
+        if (!root.has("tweaks") || !root["tweaks"].isObject()) {
+            if (outError) *outError = "Profile requires an object 'tweaks' property.";
+            return false;
+        }
+
+        const auto& tweaksObj = root["tweaks"].objectValue;
+        if (tweaksObj.empty()) {
+            if (outError) *outError = "Profile 'tweaks' object must not be empty.";
+            return false;
+        }
+
+        for (const auto& [id, val] : tweaksObj) {
+            if (!val.isBool()) {
+                if (outError) *outError = "Tweak '" + id + "' has non-boolean value; must be true or false.";
+                return false;
             }
+            if (!TweakRegistry::Instance().GetTweakById(id)) {
+                if (outError) *outError = "Unknown tweak ID '" + id + "'.";
+                return false;
+            }
+            outProfile.tweakStates[id] = val.boolValue;
         }
         return true;
+    } catch (const std::exception& ex) {
+        if (outError) *outError = std::string("JSON parse error: ") + ex.what();
+        return false;
     } catch (...) {
+        if (outError) *outError = "Unknown error parsing JSON profile.";
         return false;
     }
 }

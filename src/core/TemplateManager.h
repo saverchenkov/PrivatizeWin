@@ -23,7 +23,7 @@ public:
     [[nodiscard]] std::vector<std::string> GetAvailableTemplateNames() const;
     [[nodiscard]] std::optional<TemplateProfile> GetTemplate(std::string_view name) const;
 
-    bool LoadTemplateFromFile(std::wstring_view filePath, TemplateProfile& outProfile);
+    bool LoadTemplateFromFile(std::wstring_view filePath, TemplateProfile& outProfile, std::string* outError = nullptr);
     bool SaveTemplateToFile(std::wstring_view filePath, const TemplateProfile& profile);
 
     bool ApplyTemplate(

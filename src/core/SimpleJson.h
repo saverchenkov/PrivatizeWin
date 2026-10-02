@@ -77,7 +77,15 @@ public:
     static JsonValue parse(const std::string& str) {
         size_t idx = 0;
         skipWhitespace(str, idx);
-        return parseValue(str, idx);
+        if (idx >= str.size()) {
+            throw std::runtime_error("Empty JSON input");
+        }
+        JsonValue val = parseValue(str, idx);
+        skipWhitespace(str, idx);
+        if (idx < str.size()) {
+            throw std::runtime_error("Unexpected trailing characters in JSON input");
+        }
+        return val;
     }
 
 private:
@@ -89,7 +97,9 @@ private:
 
     static JsonValue parseValue(const std::string& s, size_t& idx) {
         skipWhitespace(s, idx);
-        if (idx >= s.size()) return JsonValue();
+        if (idx >= s.size()) {
+            throw std::runtime_error("Unexpected end of JSON input");
+        }
 
         char c = s[idx];
         if (c == '{') return parseObject(s, idx);
@@ -99,7 +109,7 @@ private:
         if (c == 'n') return parseNull(s, idx);
         if (c == '-' || std::isdigit(static_cast<unsigned char>(c))) return parseNumber(s, idx);
 
-        return JsonValue();
+        throw std::runtime_error(std::string("Invalid JSON token starting with '") + c + "'");
     }
 
     static JsonValue parseObject(const std::string& s, size_t& idx) {
@@ -113,12 +123,16 @@ private:
 
         while (idx < s.size()) {
             skipWhitespace(s, idx);
-            if (idx >= s.size() || s[idx] != '"') break;
+            if (idx >= s.size() || s[idx] != '"') {
+                throw std::runtime_error("Expected string key in JSON object");
+            }
             JsonValue keyVal = parseString(s, idx);
             std::string key = keyVal.stringValue;
 
             skipWhitespace(s, idx);
-            if (idx >= s.size() || s[idx] != ':') break;
+            if (idx >= s.size() || s[idx] != ':') {
+                throw std::runtime_error("Expected ':' after key in JSON object");
+            }
             idx++; // skip ':'
 
             val.objectValue[key] = parseValue(s, idx);
@@ -126,15 +140,19 @@ private:
             skipWhitespace(s, idx);
             if (idx < s.size() && s[idx] == ',') {
                 idx++;
+                skipWhitespace(s, idx);
+                if (idx < s.size() && s[idx] == '}') {
+                    throw std::runtime_error("Trailing comma in JSON object");
+                }
                 continue;
             }
             if (idx < s.size() && s[idx] == '}') {
                 idx++;
-                break;
+                return val;
             }
-            break;
+            throw std::runtime_error("Expected ',' or '}' in JSON object");
         }
-        return val;
+        throw std::runtime_error("Unterminated JSON object");
     }
 
     static JsonValue parseArray(const std::string& s, size_t& idx) {
@@ -151,24 +169,29 @@ private:
             skipWhitespace(s, idx);
             if (idx < s.size() && s[idx] == ',') {
                 idx++;
+                skipWhitespace(s, idx);
+                if (idx < s.size() && s[idx] == ']') {
+                    throw std::runtime_error("Trailing comma in JSON array");
+                }
                 continue;
             }
             if (idx < s.size() && s[idx] == ']') {
                 idx++;
-                break;
+                return val;
             }
-            break;
+            throw std::runtime_error("Expected ',' or ']' in JSON array");
         }
-        return val;
+        throw std::runtime_error("Unterminated JSON array");
     }
 
     static JsonValue parseString(const std::string& s, size_t& idx) {
-        idx++; // skip '"'
+        idx++; // skip opening '"'
         std::string res;
         while (idx < s.size()) {
             char c = s[idx++];
-            if (c == '"') break;
-            if (c == '\\' && idx < s.size()) {
+            if (c == '"') return JsonValue(res);
+            if (c == '\\') {
+                if (idx >= s.size()) throw std::runtime_error("Unterminated escape sequence in string");
                 char esc = s[idx++];
                 if (esc == '"') res += '"';
                 else if (esc == '\\') res += '\\';
@@ -178,12 +201,34 @@ private:
                 else if (esc == 'n') res += '\n';
                 else if (esc == 'r') res += '\r';
                 else if (esc == 't') res += '\t';
-                else res += esc;
+                else if (esc == 'u') {
+                    if (idx + 4 > s.size()) throw std::runtime_error("Incomplete \\uXXXX escape sequence");
+                    std::string hexStr = s.substr(idx, 4);
+                    idx += 4;
+                    unsigned int codePoint = 0;
+                    try {
+                        codePoint = static_cast<unsigned int>(std::stoul(hexStr, nullptr, 16));
+                    } catch (...) {
+                        throw std::runtime_error("Invalid hex in \\uXXXX escape sequence");
+                    }
+                    if (codePoint <= 0x7F) {
+                        res += static_cast<char>(codePoint);
+                    } else if (codePoint <= 0x7FF) {
+                        res += static_cast<char>(0xC0 | ((codePoint >> 6) & 0x1F));
+                        res += static_cast<char>(0x80 | (codePoint & 0x3F));
+                    } else {
+                        res += static_cast<char>(0xE0 | ((codePoint >> 12) & 0x0F));
+                        res += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+                        res += static_cast<char>(0x80 | (codePoint & 0x3F));
+                    }
+                } else {
+                    res += esc;
+                }
             } else {
                 res += c;
             }
         }
-        return JsonValue(res);
+        throw std::runtime_error("Unterminated string literal");
     }
 
     static JsonValue parseNumber(const std::string& s, size_t& idx) {
@@ -195,7 +240,9 @@ private:
         double num = 0.0;
         try {
             num = std::stod(s.substr(start, idx - start));
-        } catch (...) {}
+        } catch (...) {
+            throw std::runtime_error("Invalid number format in JSON");
+        }
         return JsonValue(num);
     }
 
@@ -208,14 +255,28 @@ private:
             idx += 5;
             return JsonValue(false);
         }
-        return JsonValue(false);
+        throw std::runtime_error("Invalid boolean value in JSON");
     }
 
     static JsonValue parseNull(const std::string& s, size_t& idx) {
         if (s.compare(idx, 4, "null") == 0) {
             idx += 4;
+            return JsonValue(JsonType::Null);
         }
-        return JsonValue(JsonType::Null);
+        throw std::runtime_error("Invalid null literal in JSON");
+    }
+
+    static void escapeAndWrite(std::ostringstream& ss, const std::string& str) {
+        ss << '"';
+        for (char c : str) {
+            if (c == '"') ss << "\\\"";
+            else if (c == '\\') ss << "\\\\";
+            else if (c == '\n') ss << "\\n";
+            else if (c == '\r') ss << "\\r";
+            else if (c == '\t') ss << "\\t";
+            else ss << c;
+        }
+        ss << '"';
     }
 
     void serialize(std::ostringstream& ss, int indent, int level) const {
@@ -233,16 +294,7 @@ private:
             }
             break;
         case JsonType::String: {
-            ss << '"';
-            for (char c : stringValue) {
-                if (c == '"') ss << "\\\"";
-                else if (c == '\\') ss << "\\\\";
-                else if (c == '\n') ss << "\\n";
-                else if (c == '\r') ss << "\\r";
-                else if (c == '\t') ss << "\\t";
-                else ss << c;
-            }
-            ss << '"';
+            escapeAndWrite(ss, stringValue);
             break;
         }
         case JsonType::Array: {
@@ -272,7 +324,8 @@ private:
             size_t count = 0;
             for (const auto& [k, v] : objectValue) {
                 if (indent > 0) ss << nextPad;
-                ss << '"' << k << "\": ";
+                escapeAndWrite(ss, k);
+                ss << ": ";
                 v.serialize(ss, indent, level + 1);
                 if (++count < objectValue.size()) ss << ',';
                 if (indent > 0) ss << '\n';

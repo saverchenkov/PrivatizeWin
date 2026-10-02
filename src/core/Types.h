@@ -130,6 +130,9 @@ struct CliOptions {
     
     UserSelectionMode userMode{ UserSelectionMode::AllUsers };
     std::vector<std::wstring> specificUsernames;
+
+    bool hasError{ false };
+    std::string errorMessage;
 };
 
 } // namespace PrivatizeWin

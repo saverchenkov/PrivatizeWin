@@ -4271,8 +4271,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.scope = TargetScope::User;
         t.category = L"Windows Update";
         t.description = L"Deactivating is not recommended! With this you deactivate the automatic installation of Windows Updates. Security leaks will not be tackled automatically.";
-        t.impact = L"Disabling improves privacy with zero functional side effects.";
-        t.safety = SafetyLevel::Safe;
+        t.impact = L"Disabling prevents automatic installation of critical security patches.";
+        t.safety = SafetyLevel::Advanced;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU", L"NoAutoUpdate", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -4283,8 +4283,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.scope = TargetScope::Machine;
         t.category = L"Windows Update";
         t.description = L"Deactivating is not recommended! With this you deactivate the automatic installation of Windows Updates. Security leaks will not be tackled automatically.";
-        t.impact = L"Disabling improves privacy with zero functional side effects.";
-        t.safety = SafetyLevel::Safe;
+        t.impact = L"Disabling stops the Windows Update service (wuauserv), preventing automatic security patches.";
+        t.safety = SafetyLevel::Advanced;
         t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\wuauserv", L"Start", RegType::Dword, 4, 3, L"", L"", false });
         t.serviceActions.push_back({ L"wuauserv", 4, 2, true });
         AddTweak(std::move(t));
@@ -4295,8 +4295,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.category = L"Windows Update";
         t.title = L"Disable Windows Updates for other products (e.g. Microsoft Office)";
         t.description = L"Deactivation is not recommended! The automatic update of many products, like e.g. Microsoft Office, is prevented by this.";
-        t.impact = L"Disabling improves privacy with zero functional side effects.";
-        t.safety = SafetyLevel::Safe;
+        t.impact = L"Disabling prevents automatic updates for Microsoft Office and other Microsoft products.";
+        t.safety = SafetyLevel::Advanced;
         t.scope = TargetScope::Machine;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Services\\7971f918-a847-4430-9279-4a52d1efe18d", L"RegisteredWithAU", RegType::Dword, 0, 0, L"", L"", true });
         AddTweak(std::move(t));

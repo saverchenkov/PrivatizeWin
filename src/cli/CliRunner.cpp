@@ -53,16 +53,22 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
         } else if (arg == L"--list-templates") {
             opts.listTemplates = true;
         } else if (arg == L"--apply-template") {
-            if (i + 1 < argc) {
+            if (i + 1 < argc && argv[i + 1][0] != L'-') {
                 opts.applyTemplate = WStringToUtf8(argv[++i]);
+            } else {
+                opts.hasError = true;
+                opts.errorMessage = "Missing template name or path for --apply-template";
             }
         } else if (arg == L"--revert") {
             opts.revertAll = true;
         } else if (arg == L"--status") {
             opts.showStatus = true;
         } else if (arg == L"--output") {
-            if (i + 1 < argc) {
+            if (i + 1 < argc && argv[i + 1][0] != L'-') {
                 opts.statusFormat = WStringToUtf8(argv[++i]);
+            } else {
+                opts.hasError = true;
+                opts.errorMessage = "Missing format (text|json) for --output";
             }
         } else if (arg == L"--install-task") {
             opts.installTask = true;
@@ -70,8 +76,11 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
                 opts.taskFrequency = WStringToUtf8(argv[++i]);
             }
         } else if (arg == L"--task-template") {
-            if (i + 1 < argc) {
+            if (i + 1 < argc && argv[i + 1][0] != L'-') {
                 opts.taskTemplate = WStringToUtf8(argv[++i]);
+            } else {
+                opts.hasError = true;
+                opts.errorMessage = "Missing template name for --task-template";
             }
         } else if (arg == L"--uninstall-task") {
             opts.uninstallTask = true;
@@ -84,7 +93,7 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
         } else if (arg == L"--no-restore-point") {
             opts.noRestorePoint = true;
         } else if (arg == L"--users") {
-            if (i + 1 < argc) {
+            if (i + 1 < argc && argv[i + 1][0] != L'-') {
                 const std::wstring val = argv[++i];
                 if (val == L"all") {
                     opts.userMode = UserSelectionMode::AllUsers;
@@ -100,7 +109,15 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
                         if (!item.empty()) opts.specificUsernames.push_back(item);
                     }
                 }
+            } else {
+                opts.hasError = true;
+                opts.errorMessage = "Missing value (all|current|none|user1,user2) for --users";
             }
+        } else if (arg == L"--no-elevate") {
+            // Internal flag for non-elevated relaunch
+        } else {
+            opts.hasError = true;
+            opts.errorMessage = "Unrecognized command-line option: " + WStringToUtf8(arg);
         }
     }
 
@@ -118,6 +135,13 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
 int CliRunner::Execute(const CliOptions& opts) {
     if (!opts.quiet) {
         InitializeConsoleOutput();
+    }
+
+    if (opts.hasError) {
+        InitializeConsoleOutput();
+        std::cerr << "[ERROR] " << opts.errorMessage << "\n"
+                  << "        Run 'PrivatizeWin.exe --help' for usage.\n" << std::flush;
+        return 1;
     }
 
     TweakRegistry::Instance().InitializeDefaultTweaks();
@@ -146,11 +170,20 @@ int CliRunner::Execute(const CliOptions& opts) {
 
     // 2. Install Scheduled Task
     if (opts.installTask) {
-        if (!IsRunningAsAdmin()) {
+        if (opts.dryRun) {
             if (!opts.quiet) {
-                std::cerr << "[ERROR] Administrator privileges are required to configure scheduled tasks.\n"
-                          << "        Please run Command Prompt or PowerShell as Administrator.\n" << std::flush;
+                std::cout << "[DRY RUN] Would install scheduled task 'PrivatizeWin Auto-Protect'\n"
+                          << "          Frequency: " << opts.taskFrequency << "\n"
+                          << "          Template:  " << opts.taskTemplate << "\n"
+                          << "          Users:     " << (opts.userMode == UserSelectionMode::AllUsers ? "all" : (opts.userMode == UserSelectionMode::CurrentUser ? "current" : "none")) << "\n" << std::flush;
             }
+            return 0;
+        }
+
+        if (!IsRunningAsAdmin()) {
+            InitializeConsoleOutput();
+            std::cerr << "[ERROR] Administrator privileges are required to configure scheduled tasks.\n"
+                      << "        Please run Command Prompt or PowerShell as Administrator.\n" << std::flush;
             return 5;
         }
 
@@ -178,11 +211,17 @@ int CliRunner::Execute(const CliOptions& opts) {
 
     // 3. Uninstall Scheduled Task
     if (opts.uninstallTask) {
-        if (!IsRunningAsAdmin()) {
+        if (opts.dryRun) {
             if (!opts.quiet) {
-                std::cerr << "[ERROR] Administrator privileges are required to remove scheduled tasks.\n"
-                          << "        Please run Command Prompt or PowerShell as Administrator.\n" << std::flush;
+                std::cout << "[DRY RUN] Would remove scheduled task 'PrivatizeWin Auto-Protect'\n" << std::flush;
             }
+            return 0;
+        }
+
+        if (!IsRunningAsAdmin()) {
+            InitializeConsoleOutput();
+            std::cerr << "[ERROR] Administrator privileges are required to remove scheduled tasks.\n"
+                      << "        Please run Command Prompt or PowerShell as Administrator.\n" << std::flush;
             return 5;
         }
 
@@ -247,10 +286,9 @@ int CliRunner::Execute(const CliOptions& opts) {
 
     if (!templateToApply.empty()) {
         if (!opts.dryRun && !IsRunningAsAdmin()) {
-            if (!opts.quiet) {
-                std::cerr << "[ERROR] Administrator privileges are required to modify system privacy settings.\n"
-                          << "        Please run Command Prompt or PowerShell as Administrator.\n" << std::flush;
-            }
+            InitializeConsoleOutput();
+            std::cerr << "[ERROR] Administrator privileges are required to modify system privacy settings.\n"
+                      << "        Please run Command Prompt or PowerShell as Administrator.\n" << std::flush;
             return 5;
         }
 
@@ -260,34 +298,49 @@ int CliRunner::Execute(const CliOptions& opts) {
             profile = builtin.value();
         } else {
             const std::wstring wpath(templateToApply.begin(), templateToApply.end());
-            if (!TemplateManager::Instance().LoadTemplateFromFile(wpath, profile)) {
-                if (!opts.quiet) {
-                    std::cerr << "[ERROR] Template '" << templateToApply << "' not found as preset or file.\n" << std::flush;
-                }
+            std::string loadErr;
+            if (!TemplateManager::Instance().LoadTemplateFromFile(wpath, profile, &loadErr)) {
+                InitializeConsoleOutput();
+                std::cerr << "[ERROR] Failed to load template '" << templateToApply << "': " << loadErr << "\n" << std::flush;
                 return 3;
             }
         }
 
         // Adaptive Safety Restore Point
-        if (opts.forceRestorePoint && !opts.dryRun) {
-            int64_t seq = 0;
-            if (!opts.quiet) std::cout << "[*] Creating System Restore Point...\n" << std::flush;
-            const bool rpOk = RestorePoint::Create(L"PrivatizeWin - Pre-Apply Configuration", seq);
-            if (!opts.quiet) {
-                if (rpOk) std::cout << "[+] System Restore Point created successfully.\n" << std::flush;
-                else std::cout << "[!] Warning: Could not create restore point (System Protection may be disabled).\n" << std::flush;
+        if (opts.forceRestorePoint) {
+            if (opts.dryRun) {
+                if (!opts.quiet) std::cout << "[DRY RUN] Would create System Restore Point: 'PrivatizeWin - Pre-Apply Configuration'\n" << std::flush;
+            } else {
+                int64_t seq = 0;
+                if (!opts.quiet) std::cout << "[*] Creating System Restore Point...\n" << std::flush;
+                const bool rpOk = RestorePoint::Create(L"PrivatizeWin - Pre-Apply Configuration", seq);
+                if (!opts.quiet) {
+                    if (rpOk) std::cout << "[+] System Restore Point created successfully.\n" << std::flush;
+                    else std::cout << "[!] Warning: Could not create restore point (System Protection may be disabled).\n" << std::flush;
+                }
             }
         }
 
         if (!opts.quiet) {
             std::cout << "[*] " << (opts.dryRun ? "[DRY RUN] " : "") << "Applying template: " << profile.name << "\n";
-            std::cout << "    Description: " << profile.description << "\n" << std::flush;
+            if (!profile.description.empty()) {
+                std::cout << "    Description: " << profile.description << "\n";
+            }
+            std::cout << std::flush;
         }
 
         int appliedCount = 0;
+        int failedCount = 0;
+        int skippedCount = 0;
         for (const auto& [tweakId, shouldEnable] : profile.tweakStates) {
             const Tweak* t = TweakRegistry::Instance().GetTweakById(tweakId);
-            if (!t) continue;
+            if (!t) {
+                skippedCount++;
+                if (!opts.quiet) {
+                    std::cerr << "    [!] Warning: Unknown tweak ID '" << tweakId << "'\n" << std::flush;
+                }
+                continue;
+            }
 
             if (opts.dryRun) {
                 if (!opts.quiet) {
@@ -295,21 +348,42 @@ int CliRunner::Execute(const CliOptions& opts) {
                 }
             } else {
                 const bool ok = TweakRegistry::Instance().ApplyTweak(tweakId, shouldEnable, opts.userMode, opts.specificUsernames);
-                if (ok) appliedCount++;
+                if (ok) {
+                    appliedCount++;
+                } else {
+                    failedCount++;
+                    InitializeConsoleOutput();
+                    std::cerr << "    [!] Failed to configure " << tweakId << "\n" << std::flush;
+                }
             }
         }
 
-        if (!opts.quiet) {
-            if (opts.dryRun) {
-                std::cout << "[SUCCESS] Dry run completed without making any changes.\n" << std::flush;
-            } else {
-                std::cout << "[SUCCESS] Configuration applied! " << appliedCount << " settings configured.\n" << std::flush;
+        if (opts.dryRun) {
+            if (!opts.quiet) {
+                std::cout << "[SUCCESS] Dry run completed without making any changes. (" << profile.tweakStates.size() << " operations planned)\n" << std::flush;
             }
+            return 0;
+        }
+
+        if (!opts.quiet) {
+            std::cout << "[SUMMARY] Applied: " << appliedCount << ", Failed: " << failedCount;
+            if (skippedCount > 0) std::cout << ", Skipped: " << skippedCount;
+            std::cout << "\n" << std::flush;
+        }
+
+        if (failedCount > 0) {
+            InitializeConsoleOutput();
+            std::cerr << "[ERROR] One or more tweaks failed to apply.\n" << std::flush;
+            return 1;
         }
         return 0;
     }
 
-    return 0;
+    // No valid CLI command was passed
+    InitializeConsoleOutput();
+    std::cerr << "[ERROR] No command specified.\n"
+              << "        Run 'PrivatizeWin.exe --help' for usage.\n" << std::flush;
+    return 1;
 }
 
 void CliRunner::PrintHelp() noexcept {

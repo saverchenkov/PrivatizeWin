@@ -77,3 +77,14 @@ TEST_CASE(Unit_CliParser, ElevationDetectionFunction) {
     ASSERT_TRUE(elevated == true || elevated == false);
 }
 
+TEST_CASE(Unit_CliParser, UnrecognizedOptionFlag) {
+    wchar_t* argv[] = {
+        const_cast<wchar_t*>(L"PrivatizeWin.exe"),
+        const_cast<wchar_t*>(L"--unknown-flag")
+    };
+    const auto opts = CliRunner::ParseArguments(2, argv);
+    ASSERT_TRUE(opts.isCli);
+    ASSERT_TRUE(opts.hasError);
+    ASSERT_TRUE(opts.errorMessage.find("Unrecognized") != std::string::npos);
+}
+
