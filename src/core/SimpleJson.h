@@ -95,15 +95,18 @@ private:
         }
     }
 
-    static JsonValue parseValue(const std::string& s, size_t& idx) {
+    static JsonValue parseValue(const std::string& s, size_t& idx, int depth = 0) {
+        if (depth > 64) {
+            throw std::runtime_error("JSON depth limit exceeded");
+        }
         skipWhitespace(s, idx);
         if (idx >= s.size()) {
             throw std::runtime_error("Unexpected end of JSON input");
         }
 
         char c = s[idx];
-        if (c == '{') return parseObject(s, idx);
-        if (c == '[') return parseArray(s, idx);
+        if (c == '{') return parseObject(s, idx, depth + 1);
+        if (c == '[') return parseArray(s, idx, depth + 1);
         if (c == '"') return parseString(s, idx);
         if (c == 't' || c == 'f') return parseBool(s, idx);
         if (c == 'n') return parseNull(s, idx);
@@ -112,7 +115,7 @@ private:
         throw std::runtime_error(std::string("Invalid JSON token starting with '") + c + "'");
     }
 
-    static JsonValue parseObject(const std::string& s, size_t& idx) {
+    static JsonValue parseObject(const std::string& s, size_t& idx, int depth) {
         JsonValue val(JsonType::Object);
         idx++; // skip '{'
         skipWhitespace(s, idx);
@@ -135,7 +138,7 @@ private:
             }
             idx++; // skip ':'
 
-            val.objectValue[key] = parseValue(s, idx);
+            val.objectValue[key] = parseValue(s, idx, depth);
 
             skipWhitespace(s, idx);
             if (idx < s.size() && s[idx] == ',') {
@@ -155,7 +158,7 @@ private:
         throw std::runtime_error("Unterminated JSON object");
     }
 
-    static JsonValue parseArray(const std::string& s, size_t& idx) {
+    static JsonValue parseArray(const std::string& s, size_t& idx, int depth) {
         JsonValue val(JsonType::Array);
         idx++; // skip '['
         skipWhitespace(s, idx);
@@ -165,7 +168,7 @@ private:
         }
 
         while (idx < s.size()) {
-            val.arrayValue.push_back(parseValue(s, idx));
+            val.arrayValue.push_back(parseValue(s, idx, depth));
             skipWhitespace(s, idx);
             if (idx < s.size() && s[idx] == ',') {
                 idx++;
@@ -190,6 +193,9 @@ private:
         while (idx < s.size()) {
             char c = s[idx++];
             if (c == '"') return JsonValue(res);
+            if (static_cast<unsigned char>(c) < 0x20) {
+                throw std::runtime_error("Unescaped control character in string");
+            }
             if (c == '\\') {
                 if (idx >= s.size()) throw std::runtime_error("Unterminated escape sequence in string");
                 char esc = s[idx++];
@@ -204,13 +210,13 @@ private:
                 else if (esc == 'u') {
                     if (idx + 4 > s.size()) throw std::runtime_error("Incomplete \\uXXXX escape sequence");
                     std::string hexStr = s.substr(idx, 4);
-                    idx += 4;
-                    unsigned int codePoint = 0;
-                    try {
-                        codePoint = static_cast<unsigned int>(std::stoul(hexStr, nullptr, 16));
-                    } catch (...) {
-                        throw std::runtime_error("Invalid hex in \\uXXXX escape sequence");
+                    for (char hc : hexStr) {
+                        if (!std::isxdigit(static_cast<unsigned char>(hc))) {
+                            throw std::runtime_error("Invalid hex digit in \\uXXXX escape sequence");
+                        }
                     }
+                    idx += 4;
+                    unsigned int codePoint = static_cast<unsigned int>(std::stoul(hexStr, nullptr, 16));
                     if (codePoint <= 0x7F) {
                         res += static_cast<char>(codePoint);
                     } else if (codePoint <= 0x7FF) {
@@ -222,7 +228,7 @@ private:
                         res += static_cast<char>(0x80 | (codePoint & 0x3F));
                     }
                 } else {
-                    res += esc;
+                    throw std::runtime_error(std::string("Invalid escape sequence: \\") + esc);
                 }
             } else {
                 res += c;
@@ -233,13 +239,57 @@ private:
 
     static JsonValue parseNumber(const std::string& s, size_t& idx) {
         size_t start = idx;
-        if (s[idx] == '-') idx++;
-        while (idx < s.size() && (std::isdigit(static_cast<unsigned char>(s[idx])) || s[idx] == '.' || s[idx] == 'e' || s[idx] == 'E' || s[idx] == '+' || s[idx] == '-')) {
+        if (idx < s.size() && s[idx] == '-') {
             idx++;
         }
+        if (idx >= s.size() || !std::isdigit(static_cast<unsigned char>(s[idx]))) {
+            throw std::runtime_error("Expected digit in number");
+        }
+
+        if (s[idx] == '0') {
+            idx++;
+            if (idx < s.size() && std::isdigit(static_cast<unsigned char>(s[idx]))) {
+                throw std::runtime_error("Leading zeros are not permitted in numbers");
+            }
+        } else {
+            while (idx < s.size() && std::isdigit(static_cast<unsigned char>(s[idx]))) {
+                idx++;
+            }
+        }
+
+        // Optional fraction
+        if (idx < s.size() && s[idx] == '.') {
+            idx++;
+            if (idx >= s.size() || !std::isdigit(static_cast<unsigned char>(s[idx]))) {
+                throw std::runtime_error("Expected digit after decimal point");
+            }
+            while (idx < s.size() && std::isdigit(static_cast<unsigned char>(s[idx]))) {
+                idx++;
+            }
+        }
+
+        // Optional exponent
+        if (idx < s.size() && (s[idx] == 'e' || s[idx] == 'E')) {
+            idx++;
+            if (idx < s.size() && (s[idx] == '+' || s[idx] == '-')) {
+                idx++;
+            }
+            if (idx >= s.size() || !std::isdigit(static_cast<unsigned char>(s[idx]))) {
+                throw std::runtime_error("Expected digit in exponent");
+            }
+            while (idx < s.size() && std::isdigit(static_cast<unsigned char>(s[idx]))) {
+                idx++;
+            }
+        }
+
+        const std::string numStr = s.substr(start, idx - start);
+        size_t processed = 0;
         double num = 0.0;
         try {
-            num = std::stod(s.substr(start, idx - start));
+            num = std::stod(numStr, &processed);
+            if (processed != numStr.size()) {
+                throw std::runtime_error("Trailing characters in number");
+            }
         } catch (...) {
             throw std::runtime_error("Invalid number format in JSON");
         }

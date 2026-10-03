@@ -3,22 +3,24 @@
 
 using namespace PrivatizeWin;
 
-TEST_CASE(Localization, Basic) {
+TEST_CASE(Unit_Localization, Basic) {
     auto& loc = Localization::Instance();
-    loc.SetLanguage(Language::English);
+    loc.SetLanguage(Language::English, false);
 
     ASSERT_EQ(loc.GetCurrentLanguage(), Language::English);
     ASSERT_EQ(loc.Get("app_title"), L"PrivatizeWin \u2014 Windows Privacy Settings");
     ASSERT_EQ(loc.GetCategory(L"Telemetry & Diagnostics"), L"Telemetry & Diagnostics");
 
-    std::wstring fmt = loc.Format("apply_success", { L"5", L"2", L"0" });
+    std::wstring fmt = loc.Format("apply_success", { L"5", L"2", L"1", L"0" });
     ASSERT_TRUE(fmt.find(L"Applied: 5") != std::wstring::npos);
     ASSERT_TRUE(fmt.find(L"Restored: 2") != std::wstring::npos);
+    ASSERT_TRUE(fmt.find(L"Unchanged: 1") != std::wstring::npos);
+    ASSERT_TRUE(fmt.find(L"Failed: 0") != std::wstring::npos);
 }
 
-TEST_CASE(Localization, German) {
+TEST_CASE(Unit_Localization, German) {
     auto& loc = Localization::Instance();
-    loc.SetLanguage(Language::German);
+    loc.SetLanguage(Language::German, false);
 
     ASSERT_EQ(loc.GetCurrentLanguage(), Language::German);
     ASSERT_EQ(loc.Get("btn_apply_preset"), L"Profil an&wenden");
@@ -31,9 +33,9 @@ TEST_CASE(Localization, German) {
     ASSERT_TRUE(title.find(L"Dienst") != std::wstring::npos || title.find(L"deaktivieren") != std::wstring::npos);
 }
 
-TEST_CASE(Localization, Russian) {
+TEST_CASE(Unit_Localization, Russian) {
     auto& loc = Localization::Instance();
-    loc.SetLanguage(Language::Russian);
+    loc.SetLanguage(Language::Russian, false);
 
     ASSERT_EQ(loc.GetCurrentLanguage(), Language::Russian);
     ASSERT_EQ(loc.Get("btn_apply_preset"), L"&Применить пресет");
@@ -46,13 +48,13 @@ TEST_CASE(Localization, Russian) {
     ASSERT_TRUE(title.find(L"Отключить") != std::wstring::npos);
 }
 
-TEST_CASE(Localization, AllLanguagesAvailable) {
+TEST_CASE(Unit_Localization, AllLanguagesAvailable) {
     auto& loc = Localization::Instance();
     const auto& langs = loc.GetSupportedLanguages();
     ASSERT_EQ(langs.size(), 12);
 
     for (const auto& l : langs) {
-        loc.SetLanguage(l.lang);
+        loc.SetLanguage(l.lang, false);
         ASSERT_EQ(loc.GetCurrentLanguage(), l.lang);
         std::wstring title = loc.Get("app_title");
         ASSERT_FALSE(title.empty());
@@ -61,5 +63,5 @@ TEST_CASE(Localization, AllLanguagesAvailable) {
     }
 
     // Reset to English
-    loc.SetLanguage(Language::English);
+    loc.SetLanguage(Language::English, false);
 }

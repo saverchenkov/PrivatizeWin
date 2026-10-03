@@ -79,11 +79,11 @@ TEST_CASE(Unit_TweakRegistry, SplitUserMachineAndNoPartialState) {
         // Assert scope is strictly User, Machine, or Service
         ASSERT_TRUE(t.scope == TargetScope::User || t.scope == TargetScope::Machine || t.scope == TargetScope::Service);
 
-        // Audit state is strictly all-or-nothing (never returns Partial)
+        // Audit state returns a valid SettingStatus enum value
         const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
         ASSERT_TRUE(st == SettingStatus::Applied || st == SettingStatus::NotApplied ||
-                    st == SettingStatus::Unknown || st == SettingStatus::NotApplicable);
-        ASSERT_TRUE(st != SettingStatus::Partial);
+                    st == SettingStatus::Partial || st == SettingStatus::Unknown ||
+                    st == SettingStatus::NotApplicable);
 
         if (t.id.ends_with("_USER")) {
             ASSERT_TRUE(t.scope == TargetScope::User);
@@ -103,18 +103,97 @@ TEST_CASE(Unit_TweakRegistry, PartialStatusSupport) {
     ASSERT_TRUE(SettingStatus::Partial != SettingStatus::NotApplied);
 }
 
+TEST_CASE(Unit_TweakRegistry, CeipDisablesCorrectly) {
+    TweakRegistry::Instance().InitializeDefaultTweaks();
+
+    for (const char* id : { "TEL_CEIP", "P027" }) {
+        const auto* t = TweakRegistry::Instance().GetTweakById(id);
+        ASSERT_TRUE(t != nullptr);
+        ASSERT_TRUE(!t->regActions.empty());
+
+        bool foundMainKey = false;
+        bool foundPolicyKey = false;
+
+        for (const auto& a : t->regActions) {
+            if (a.valueName == L"CEIPEnable") {
+                ASSERT_EQ(a.dwordProtected, 0u); // 0 = disabled (protected)
+                ASSERT_EQ(a.dwordDefault, 1u);   // 1 = enabled (Windows default)
+                if (a.subKey.find(L"SQMClient\\Windows") != std::wstring::npos &&
+                    a.subKey.find(L"Policies") == std::wstring::npos) {
+                    foundMainKey = true;
+                }
+                if (a.subKey.find(L"Policies") != std::wstring::npos) {
+                    foundPolicyKey = true;
+                }
+            }
+        }
+        ASSERT_TRUE(foundMainKey);
+        ASSERT_TRUE(foundPolicyKey);
+    }
+}
+
+TEST_CASE(Unit_TweakRegistry, SupportedSettingsVerification) {
+    TweakRegistry::Instance().InitializeDefaultTweaks();
+
+    // U006
+    const auto* u006 = TweakRegistry::Instance().GetTweakById("U006");
+    ASSERT_TRUE(u006 != nullptr);
+    ASSERT_FALSE(u006->regActions.empty());
+    ASSERT_EQ(u006->regActions[0].valueName, L"LimitDiagnosticLogCollection");
+    ASSERT_EQ(u006->regActions[0].dwordProtected, 1u);
+
+    // U007
+    const auto* u007 = TweakRegistry::Instance().GetTweakById("U007");
+    ASSERT_TRUE(u007 != nullptr);
+    ASSERT_FALSE(u007->regActions.empty());
+    ASSERT_EQ(u007->regActions[0].valueName, L"DisableOneSettingsDownloads");
+    ASSERT_EQ(u007->regActions[0].dwordProtected, 1u);
+
+    // U008
+    const auto* u008 = TweakRegistry::Instance().GetTweakById("U008");
+    ASSERT_TRUE(u008 != nullptr);
+    ASSERT_FALSE(u008->regActions.empty());
+    ASSERT_EQ(u008->regActions[0].valueName, L"AllowDeviceNameInTelemetry");
+    ASSERT_EQ(u008->regActions[0].dwordProtected, 0u);
+
+    // P015
+    const auto* p015 = TweakRegistry::Instance().GetTweakById("P015");
+    ASSERT_TRUE(p015 != nullptr);
+    ASSERT_FALSE(p015->regActions.empty());
+    ASSERT_EQ(p015->regActions[0].valueName, L"HttpAcceptLanguageOptOut");
+    ASSERT_EQ(p015->regActions[0].dwordProtected, 1u);
+
+    // A004_MACHINE: authoritative service action, no conflicting regAction
+    const auto* a004 = TweakRegistry::Instance().GetTweakById("A004_MACHINE");
+    ASSERT_TRUE(a004 != nullptr);
+    ASSERT_TRUE(a004->regActions.empty());
+    ASSERT_FALSE(a004->serviceActions.empty());
+    ASSERT_EQ(a004->serviceActions[0].serviceName, L"wuauserv");
+    ASSERT_EQ(a004->serviceActions[0].startupTypeProtected, 4u); // disabled
+    ASSERT_EQ(a004->serviceActions[0].startupTypeDefault, 3u);   // demand start (manual)
+}
+
 TEST_CASE(Unit_TweakRegistry, NotApplicableEvaluation) {
     TweakRegistry::Instance().InitializeDefaultTweaks();
     // Non-existent tweak evaluates to NotApplicable
     ASSERT_EQ(TweakRegistry::Instance().AuditTweak("NON_EXISTENT_ID", UserSelectionMode::CurrentUser, {}),
               SettingStatus::NotApplicable);
 
-    // Tweak with no actions evaluates to NotApplicable
-    const auto* p015 = TweakRegistry::Instance().GetTweakById("P015");
-    ASSERT_TRUE(p015 != nullptr);
-    ASSERT_TRUE(p015->regActions.empty() && p015->serviceActions.empty());
-    ASSERT_EQ(TweakRegistry::Instance().AuditTweak("P015", UserSelectionMode::CurrentUser, {}),
+    // Dynamic tweak with no actions evaluates to NotApplicable and Apply fails
+    TweakRegistry::Instance().LoadExternalTweaks(R"({
+        "tweaks": [
+            {
+                "id": "ZERO_ACTION_TEST",
+                "title": "Zero Action Tweak",
+                "category": "Testing",
+                "safety": "safe"
+            }
+        ]
+    })");
+
+    ASSERT_EQ(TweakRegistry::Instance().AuditTweak("ZERO_ACTION_TEST", UserSelectionMode::CurrentUser, {}),
               SettingStatus::NotApplicable);
+    ASSERT_FALSE(TweakRegistry::Instance().ApplyTweak("ZERO_ACTION_TEST", true, UserSelectionMode::CurrentUser, {}));
 }
 
 

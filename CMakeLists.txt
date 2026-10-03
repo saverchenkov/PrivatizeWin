@@ -47,6 +47,8 @@ set(SOURCES
     src/core/TemplateManager.cpp
     src/core/Localization.h
     src/core/Localization.cpp
+    src/core/PendingHandoff.h
+    src/core/PendingHandoff.cpp
     src/core/ProcessHelper.h
     src/cli/CliRunner.h
     src/cli/CliRunner.cpp

@@ -140,24 +140,64 @@ bool RegistryHelper::DeleteKeyIfEmpty(HKEY hRoot, std::wstring_view subKey) {
 }
 
 SettingStatus RegistryHelper::AuditAction(HKEY hRoot, const RegistryAction& action) {
+    UniqueHKey key;
+    std::wstring subKeyStr = ToNullTerminated(action.subKey);
+    std::wstring valNameStr = ToNullTerminated(action.valueName);
+
+    LSTATUS status = RegOpenKeyExW(hRoot, subKeyStr.c_str(), 0, KEY_READ, key.put());
+    if (status != ERROR_SUCCESS) {
+        if (status == ERROR_ACCESS_DENIED) {
+            return SettingStatus::Unknown;
+        }
+        if (status == ERROR_FILE_NOT_FOUND) {
+            return action.deleteOnDefault ? SettingStatus::Default : SettingStatus::NotApplied;
+        }
+        return SettingStatus::Unknown;
+    }
+
+    DWORD dwType = 0;
     if (action.type == RegType::Dword) {
-        const auto val = ReadDword(hRoot, action.subKey, action.valueName);
-        if (!val.has_value()) {
-            return SettingStatus::Default;
+        DWORD dwData = 0;
+        DWORD cbData = sizeof(dwData);
+        status = RegQueryValueExW(key.get(), valNameStr.c_str(), nullptr, &dwType, reinterpret_cast<LPBYTE>(&dwData), &cbData);
+        if (status != ERROR_SUCCESS) {
+            if (status == ERROR_ACCESS_DENIED) return SettingStatus::Unknown;
+            if (status == ERROR_FILE_NOT_FOUND) return action.deleteOnDefault ? SettingStatus::Default : SettingStatus::NotApplied;
+            return SettingStatus::Unknown;
         }
-        if (val.value() == action.dwordProtected) {
+        if (dwType != REG_DWORD) {
+            return SettingStatus::NotApplied;
+        }
+        if (dwData == action.dwordProtected) {
             return SettingStatus::Protected;
         }
-        return SettingStatus::Default;
+        if (!action.deleteOnDefault && dwData == action.dwordDefault) {
+            return SettingStatus::Default;
+        }
+        return action.deleteOnDefault ? SettingStatus::NotApplied : SettingStatus::Default;
     } else {
-        const auto val = ReadString(hRoot, action.subKey, action.valueName);
-        if (!val.has_value()) {
-            return SettingStatus::Default;
+        DWORD cbData = 0;
+        status = RegQueryValueExW(key.get(), valNameStr.c_str(), nullptr, &dwType, nullptr, &cbData);
+        if (status != ERROR_SUCCESS) {
+            if (status == ERROR_ACCESS_DENIED) return SettingStatus::Unknown;
+            if (status == ERROR_FILE_NOT_FOUND) return action.deleteOnDefault ? SettingStatus::Default : SettingStatus::NotApplied;
+            return SettingStatus::Unknown;
         }
-        if (val.value() == action.strProtected) {
-            return SettingStatus::Protected;
+        if (dwType != REG_SZ && dwType != REG_EXPAND_SZ) {
+            return SettingStatus::NotApplied;
         }
-        return SettingStatus::Default;
+        std::vector<wchar_t> strBuf(cbData / sizeof(wchar_t) + 1, 0);
+        status = RegQueryValueExW(key.get(), valNameStr.c_str(), nullptr, &dwType, reinterpret_cast<LPBYTE>(strBuf.data()), &cbData);
+        if (status == ERROR_SUCCESS) {
+            std::wstring strVal(strBuf.data());
+            if (strVal == action.strProtected) {
+                return SettingStatus::Protected;
+            }
+            if (!action.deleteOnDefault && strVal == action.strDefault) {
+                return SettingStatus::Default;
+            }
+        }
+        return action.deleteOnDefault ? SettingStatus::NotApplied : SettingStatus::Default;
     }
 }
 
@@ -170,9 +210,11 @@ bool RegistryHelper::ApplyAction(HKEY hRoot, const RegistryAction& action, bool 
         }
     } else {
         if (action.deleteOnDefault) {
-            DeleteValue(hRoot, action.subKey, action.valueName);
-            DeleteKeyIfEmpty(hRoot, action.subKey);
-            return true;
+            const bool deleted = DeleteValue(hRoot, action.subKey, action.valueName);
+            if (deleted) {
+                DeleteKeyIfEmpty(hRoot, action.subKey);
+            }
+            return deleted;
         } else {
             if (action.type == RegType::Dword) {
                 return WriteDword(hRoot, action.subKey, action.valueName, action.dwordDefault);

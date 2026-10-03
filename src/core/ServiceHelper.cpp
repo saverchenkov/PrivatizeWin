@@ -9,11 +9,19 @@ static std::wstring ToNullTerminated(std::wstring_view sv) {
 
 bool ServiceHelper::ServiceExists(std::wstring_view serviceName) noexcept {
     UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
-    if (!hSCM) return false;
+    if (!hSCM) return true; // Inaccessible SCM: do not assume missing
 
     std::wstring svcNameStr = ToNullTerminated(serviceName);
     UniqueScHandle hService(OpenServiceW(hSCM.get(), svcNameStr.c_str(), SERVICE_QUERY_CONFIG));
-    return hService.isValid();
+    if (hService.isValid()) {
+        return true;
+    }
+    const DWORD err = GetLastError();
+    if (err == ERROR_SERVICE_DOES_NOT_EXIST) {
+        return false;
+    }
+    // Access denied or other query limitation means service exists
+    return true;
 }
 
 std::optional<uint32_t> ServiceHelper::GetServiceStartType(std::wstring_view serviceName) {
@@ -99,33 +107,66 @@ bool ServiceHelper::StartService(std::wstring_view serviceName) {
 }
 
 SettingStatus ServiceHelper::AuditAction(const ServiceAction& action) {
-    if (!ServiceExists(action.serviceName)) {
-        return SettingStatus::Protected;
+    UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
+    if (!hSCM) {
+        return SettingStatus::Unknown;
     }
 
-    const auto startType = GetServiceStartType(action.serviceName);
-    if (!startType.has_value()) {
+    std::wstring svcNameStr = ToNullTerminated(action.serviceName);
+    UniqueScHandle hService(OpenServiceW(hSCM.get(), svcNameStr.c_str(), SERVICE_QUERY_CONFIG));
+    if (!hService) {
+        const DWORD err = GetLastError();
+        if (err == ERROR_SERVICE_DOES_NOT_EXIST) {
+            return SettingStatus::NotApplicable;
+        }
+        return SettingStatus::Unknown; // Access denied or query failed
+    }
+
+    DWORD bytesNeeded = 0;
+    QueryServiceConfigW(hService.get(), nullptr, 0, &bytesNeeded);
+    if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+        return SettingStatus::Unknown;
+    }
+
+    std::vector<BYTE> buffer(bytesNeeded);
+    auto pConfig = reinterpret_cast<LPQUERY_SERVICE_CONFIGW>(buffer.data());
+    if (!QueryServiceConfigW(hService.get(), pConfig, bytesNeeded, &bytesNeeded)) {
+        return SettingStatus::Unknown;
+    }
+
+    if (pConfig->dwStartType == action.startupTypeProtected) {
+        return SettingStatus::Protected;
+    }
+    if (pConfig->dwStartType == action.startupTypeDefault) {
         return SettingStatus::Default;
-    }
-
-    if (startType.value() == action.startupTypeProtected) {
-        return SettingStatus::Protected;
     }
     return SettingStatus::Default;
 }
 
 bool ServiceHelper::ApplyAction(const ServiceAction& action, bool enableProtection) {
-    if (!ServiceExists(action.serviceName)) {
-        return true;
+    UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
+    if (!hSCM) return false;
+
+    std::wstring svcNameStr = ToNullTerminated(action.serviceName);
+    UniqueScHandle hService(OpenServiceW(hSCM.get(), svcNameStr.c_str(), SERVICE_QUERY_CONFIG));
+    if (!hService) {
+        if (GetLastError() == ERROR_SERVICE_DOES_NOT_EXIST) {
+            return true; // Missing service is safely skipped
+        }
+        return false; // Access denied
     }
+    hService.reset();
 
     const uint32_t targetStartType = enableProtection ? action.startupTypeProtected : action.startupTypeDefault;
     const bool success = SetServiceStartType(action.serviceName, targetStartType);
+    if (!success) {
+        return false;
+    }
 
     if (enableProtection && action.stopService) {
         StopService(action.serviceName);
     }
-    return success;
+    return true;
 }
 
 } // namespace PrivatizeWin

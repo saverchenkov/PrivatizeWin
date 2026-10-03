@@ -22,6 +22,7 @@ void TemplateManager::InitializeBuiltinTemplates() {
         p.description = "Enables all safe privacy settings. No functional side effects or broken apps.";
         p.isBuiltin = true;
         for (const auto& t : allTweaks) {
+            if (t.regActions.empty() && t.serviceActions.empty()) continue;
             if (t.safety == SafetyLevel::Safe) {
                 p.tweakStates[t.id] = true;
             }
@@ -36,6 +37,7 @@ void TemplateManager::InitializeBuiltinTemplates() {
         p.description = "Maximum privacy posture: disables all telemetry, Bing web search, AI recall, and edge tracking.";
         p.isBuiltin = true;
         for (const auto& t : allTweaks) {
+            if (t.regActions.empty() && t.serviceActions.empty()) continue;
             if (t.safety == SafetyLevel::Safe || t.safety == SafetyLevel::Normal) {
                 p.tweakStates[t.id] = true;
             }
@@ -50,6 +52,7 @@ void TemplateManager::InitializeBuiltinTemplates() {
         p.description = "Disables only low-level OS telemetry services and diagnostic data collection.";
         p.isBuiltin = true;
         for (const auto& t : allTweaks) {
+            if (t.regActions.empty() && t.serviceActions.empty()) continue;
             if (t.category == L"Telemetry & Diagnostics") {
                 p.tweakStates[t.id] = true;
             }
@@ -64,6 +67,7 @@ void TemplateManager::InitializeBuiltinTemplates() {
         p.description = "Reverts all settings to Windows out-of-the-box defaults.";
         p.isBuiltin = true;
         for (const auto& t : allTweaks) {
+            if (t.regActions.empty() && t.serviceActions.empty()) continue;
             p.tweakStates[t.id] = false;
         }
         m_templates[p.name] = p;

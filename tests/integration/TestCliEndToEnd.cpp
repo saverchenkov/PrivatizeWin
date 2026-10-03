@@ -8,12 +8,21 @@
 using namespace PrivatizeWin;
 
 static std::wstring GetPrivatizeWinExePath() {
+#ifdef PRIVATIZEWIN_EXE_PATH
+    std::string cmakeTargetExe = PRIVATIZEWIN_EXE_PATH;
+    std::wstring cmakeWPath(cmakeTargetExe.begin(), cmakeTargetExe.end());
+    if (GetFileAttributesW(cmakeWPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        return cmakeWPath;
+    }
+#endif
+
     wchar_t exePath[MAX_PATH]{};
     GetModuleFileNameW(nullptr, exePath, MAX_PATH);
     std::wstring pathStr(exePath);
     const size_t lastSlash = pathStr.find_last_of(L"\\/");
     std::wstring dir = (lastSlash != std::wstring::npos) ? pathStr.substr(0, lastSlash) : L"";
     std::wstring parentDir = (dir.find_last_of(L"\\/") != std::wstring::npos) ? dir.substr(0, dir.find_last_of(L"\\/")) : dir;
+    std::wstring grandParentDir = (parentDir.find_last_of(L"\\/") != std::wstring::npos) ? parentDir.substr(0, parentDir.find_last_of(L"\\/")) : parentDir;
 
     const std::vector<std::wstring> names = {
         L"PrivatizeWin_x65.exe",
@@ -23,7 +32,16 @@ static std::wstring GetPrivatizeWinExePath() {
         L"PrivatizeWin.exe"
     };
 
-    for (const auto& d : { dir, parentDir }) {
+    const std::vector<std::wstring> searchDirs = {
+        dir,
+        parentDir,
+        grandParentDir,
+        grandParentDir + L"\\Release",
+        grandParentDir + L"\\Debug",
+        parentDir + L"\\Release"
+    };
+
+    for (const auto& d : searchDirs) {
         for (const auto& name : names) {
             std::wstring candidate = d + L"\\" + name;
             if (GetFileAttributesW(candidate.c_str()) != INVALID_FILE_ATTRIBUTES) {

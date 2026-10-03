@@ -19,6 +19,7 @@ set(TEST_SOURCES
     ../src/core/TweakRegistry.cpp
     ../src/core/TemplateManager.cpp
     ../src/core/Localization.cpp
+    ../src/core/PendingHandoff.cpp
     ../src/cli/CliRunner.cpp
     unit/TestLocalization.cpp
 )
@@ -42,8 +43,10 @@ target_link_libraries(PrivatizeWin_Tests PRIVATE
     oleaut32
 )
 
-# Monolithic run
-add_test(NAME AllTests COMMAND PrivatizeWin_Tests)
+add_dependencies(PrivatizeWin_Tests PrivatizeWin)
+target_compile_definitions(PrivatizeWin_Tests PRIVATE
+    PRIVATIZEWIN_EXE_PATH="$<TARGET_FILE:PrivatizeWin>"
+)
 
 # Granular suite targets for isolated CI reporting
 add_test(NAME Unit_SimpleJson COMMAND PrivatizeWin_Tests Unit_SimpleJson)

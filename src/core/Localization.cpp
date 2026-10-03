@@ -86,18 +86,20 @@ Language Localization::DetectSystemLanguage() {
     }
 }
 
-void Localization::SetLanguage(Language lang) {
+void Localization::SetLanguage(Language lang, bool persist) {
     const int idx = static_cast<int>(lang);
     if (idx >= 0 && idx < static_cast<int>(Language::Count)) {
         m_currentLang = lang;
-        SavePreference();
+        if (persist) {
+            SavePreference();
+        }
     }
 }
 
-void Localization::SetLanguageByCode(std::string_view code) {
+void Localization::SetLanguageByCode(std::string_view code, bool persist) {
     for (const auto& info : m_languages) {
         if (info.code == code) {
-            SetLanguage(info.lang);
+            SetLanguage(info.lang, persist);
             return;
         }
     }

@@ -111,6 +111,7 @@ enum class UserSelectionMode {
 struct CliOptions {
     bool isCli{ false };
     std::string applyTemplate;
+    std::wstring applyTemplateW;
     bool listTemplates{ false };
     bool revertAll{ false };
     bool showStatus{ false };
@@ -120,6 +121,7 @@ struct CliOptions {
     bool installTask{ false };
     std::string taskFrequency{ "daily" }; // daily, logon, weekly
     std::string taskTemplate{ "recommended" };
+    std::wstring taskTemplateW;
     bool uninstallTask{ false };
     
     // Safety & User flags

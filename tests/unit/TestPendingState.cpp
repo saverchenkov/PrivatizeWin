@@ -1,6 +1,7 @@
 #include "../TestFramework.h"
 #include "../../src/core/SimpleJson.h"
 #include "../../src/core/TweakRegistry.h"
+#include "../../src/core/PendingHandoff.h"
 #include <windows.h>
 #include <unordered_set>
 #include <string>
@@ -80,4 +81,71 @@ TEST_CASE(Unit_PendingState, RoundTripSerializationAndParsing) {
     for (const auto& id : pendingRevert) {
         ASSERT_TRUE(restoredRevert.count(id) > 0);
     }
+}
+
+TEST_CASE(Unit_PendingState, PendingHandoff_RoundTripAndCleanDeletion) {
+    PendingStatePlan plan;
+    plan.pendingEnable = { "TEL_DIAGTRACK", "AI_RECALL" };
+    plan.pendingRevert = { "PRIV_AD_ID_USER" };
+
+    const std::wstring outPath = PendingHandoff::SaveHandoff(plan);
+    ASSERT_FALSE(outPath.empty());
+    ASSERT_NE(GetFileAttributesW(outPath.c_str()), INVALID_FILE_ATTRIBUTES);
+
+    PendingStatePlan loadedPlan;
+    const bool loadOk = PendingHandoff::ConsumeHandoff(outPath, loadedPlan);
+    ASSERT_TRUE(loadOk);
+    ASSERT_EQ(loadedPlan.pendingEnable.size(), plan.pendingEnable.size());
+    ASSERT_EQ(loadedPlan.pendingRevert.size(), plan.pendingRevert.size());
+
+    // After successful validated read via ConsumeHandoff, file must be cleanly deleted
+    ASSERT_EQ(GetFileAttributesW(outPath.c_str()), INVALID_FILE_ATTRIBUTES);
+}
+
+TEST_CASE(Unit_PendingState, PendingHandoff_UnrelatedFileSurvivesRejection) {
+    wchar_t tempPath[MAX_PATH]{};
+    ASSERT_TRUE(GetTempPathW(MAX_PATH, tempPath) > 0);
+    const std::wstring unrelatedFile = std::wstring(tempPath) + L"unrelated_user_document.txt";
+
+    // Create an unrelated file
+    HANDLE hFile = CreateFileW(unrelatedFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    ASSERT_NE(hFile, INVALID_HANDLE_VALUE);
+    const char text[] = "Do not delete this critical document!";
+    DWORD written = 0;
+    WriteFile(hFile, text, sizeof(text), &written, nullptr);
+    CloseHandle(hFile);
+
+    // Attempt to consume via handoff mechanism
+    PendingStatePlan dummyPlan;
+    const bool loadOk = PendingHandoff::ConsumeHandoff(unrelatedFile, dummyPlan);
+    ASSERT_FALSE(loadOk);
+
+    // CRITICAL: Unrelated file MUST survive and NOT be deleted
+    ASSERT_NE(GetFileAttributesW(unrelatedFile.c_str()), INVALID_FILE_ATTRIBUTES);
+
+    DeleteFileW(unrelatedFile.c_str());
+}
+
+TEST_CASE(Unit_PendingState, PendingHandoff_MalformedAndOverlappingRejected) {
+    wchar_t tempPath[MAX_PATH]{};
+    ASSERT_TRUE(GetTempPathW(MAX_PATH, tempPath) > 0);
+    const std::wstring testHandoff = std::wstring(tempPath) + L"privatizewin_test_malformed.tmp";
+
+    // Construct a payload with overlapping IDs
+    std::string badPayload = "PRIVATIZEWIN_HANDOFF_V1\n{\"pendingEnable\": [\"OVERLAP_01\"], \"pendingRevert\": [\"OVERLAP_01\"]}";
+
+    HANDLE hFile = CreateFileW(testHandoff.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    ASSERT_NE(hFile, INVALID_HANDLE_VALUE);
+    DWORD written = 0;
+    WriteFile(hFile, badPayload.data(), static_cast<DWORD>(badPayload.size()), &written, nullptr);
+    CloseHandle(hFile);
+
+    PendingStatePlan dummyPlan;
+    const bool loadOk = PendingHandoff::ConsumeHandoff(testHandoff, dummyPlan);
+    ASSERT_FALSE(loadOk);
+
+    // File with malformed schema / overlapping IDs must NOT be deleted by reader
+    ASSERT_NE(GetFileAttributesW(testHandoff.c_str()), INVALID_FILE_ATTRIBUTES);
+
+    DeleteFileW(testHandoff.c_str());
 }

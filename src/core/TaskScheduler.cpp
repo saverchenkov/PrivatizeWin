@@ -94,6 +94,40 @@ bool TaskScheduler::IsTaskInstalled(std::wstring_view taskName) {
     return exists;
 }
 
+static std::wstring QuoteArg(const std::wstring& arg) {
+    if (arg.empty()) return L"\"\"";
+    if (arg.find(L' ') == std::wstring::npos && arg.find(L'\t') == std::wstring::npos && arg.find(L'"') == std::wstring::npos) {
+        return arg;
+    }
+    std::wstring result = L"\"";
+    for (wchar_t c : arg) {
+        if (c == L'"') result += L"\\\"";
+        else result += c;
+    }
+    result += L"\"";
+    return result;
+}
+
+static std::wstring ExtractArgValue(const std::wstring& cmdLine, const std::wstring& flag) {
+    size_t pos = cmdLine.find(flag);
+    if (pos == std::wstring::npos) return L"";
+    size_t start = pos + flag.length();
+    while (start < cmdLine.length() && cmdLine[start] == L' ') {
+        start++;
+    }
+    if (start >= cmdLine.length()) return L"";
+    if (cmdLine[start] == L'"') {
+        start++;
+        size_t end = cmdLine.find(L'"', start);
+        if (end == std::wstring::npos) return cmdLine.substr(start);
+        return cmdLine.substr(start, end - start);
+    } else {
+        size_t end = cmdLine.find(L' ', start);
+        if (end == std::wstring::npos) return cmdLine.substr(start);
+        return cmdLine.substr(start, end - start);
+    }
+}
+
 bool TaskScheduler::GetTaskConfig(ScheduledTaskConfig& outConfig, std::wstring_view taskName) {
     TaskServiceConnection conn;
     if (!conn.isValid()) return false;
@@ -122,17 +156,13 @@ bool TaskScheduler::GetTaskConfig(ScheduledTaskConfig& outConfig, std::wstring_v
                     if (SUCCEEDED(pExec->get_Arguments(&bstrArgs)) && bstrArgs) {
                         std::wstring args(bstrArgs);
                         SysFreeString(bstrArgs);
-                        size_t pos = args.find(L"--apply-template ");
-                        if (pos != std::wstring::npos) {
-                            size_t start = pos + 17;
-                            size_t end = args.find(L' ', start);
-                            outConfig.templateName = args.substr(start, (end == std::wstring::npos) ? std::wstring::npos : (end - start));
+                        std::wstring parsedTpl = ExtractArgValue(args, L"--apply-template");
+                        if (!parsedTpl.empty()) {
+                            outConfig.templateName = parsedTpl;
                         }
-                        pos = args.find(L"--users ");
-                        if (pos != std::wstring::npos) {
-                            size_t start = pos + 8;
-                            size_t end = args.find(L' ', start);
-                            outConfig.userMode = args.substr(start, (end == std::wstring::npos) ? std::wstring::npos : (end - start));
+                        std::wstring parsedUsers = ExtractArgValue(args, L"--users");
+                        if (!parsedUsers.empty()) {
+                            outConfig.userMode = parsedUsers;
                         }
                     }
                     pExec->Release();
@@ -164,6 +194,10 @@ bool TaskScheduler::GetTaskConfig(ScheduledTaskConfig& outConfig, std::wstring_v
 }
 
 bool TaskScheduler::InstallTask(const ScheduledTaskConfig& config) {
+    if (config.frequency != L"daily" && config.frequency != L"weekly" && config.frequency != L"logon") {
+        return false;
+    }
+
     TaskServiceConnection conn;
     if (!conn.isValid()) return false;
 
@@ -236,8 +270,15 @@ bool TaskScheduler::InstallTask(const ScheduledTaskConfig& config) {
         pTriggers->Release();
     }
 
+    std::wstring resolvedTemplate = config.templateName;
+    wchar_t fullPath[MAX_PATH]{};
+    if (GetFullPathNameW(config.templateName.c_str(), MAX_PATH, fullPath, nullptr) > 0 &&
+        GetFileAttributesW(fullPath) != INVALID_FILE_ATTRIBUTES) {
+        resolvedTemplate = fullPath;
+    }
+
     const std::wstring exePath = GetExecutablePath();
-    const std::wstring args = L"--apply-template " + config.templateName + L" --quiet --users " + config.userMode;
+    const std::wstring args = L"--apply-template " + QuoteArg(resolvedTemplate) + L" --quiet --users " + QuoteArg(config.userMode);
 
     IActionCollection* pActions = nullptr;
     if (SUCCEEDED(pDefinition->get_Actions(&pActions)) && pActions) {

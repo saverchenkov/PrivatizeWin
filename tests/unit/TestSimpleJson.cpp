@@ -111,3 +111,72 @@ TEST_CASE(Unit_SimpleJson, UnicodeEscapeSequence) {
     ASSERT_TRUE(root.isObject());
     ASSERT_EQ(root["text"].stringValue, "Hello   World \xC2\xA9");
 }
+
+TEST_CASE(Unit_SimpleJson, RejectInvalidEscapeSequence) {
+    bool caught = false;
+    try {
+        JsonValue::parse(R"({"invalid": "bad\q"})");
+    } catch (const std::exception&) {
+        caught = true;
+    }
+    ASSERT_TRUE(caught);
+}
+
+TEST_CASE(Unit_SimpleJson, RejectInvalidUnicodeHex) {
+    bool caught = false;
+    try {
+        JsonValue::parse(R"({"invalid": "\u00zz"})");
+    } catch (const std::exception&) {
+        caught = true;
+    }
+    ASSERT_TRUE(caught);
+}
+
+TEST_CASE(Unit_SimpleJson, RejectMalformedNumbers) {
+    const std::vector<std::string> badNumbers = {
+        R"({"n": 1+2})",
+        R"({"n": 01})",
+        R"({"n": 1.})",
+        R"({"n": 1e})",
+        R"({"n": 1e+})",
+        R"({"n": --1})",
+        R"({"n": +1})"
+    };
+
+    for (const auto& json : badNumbers) {
+        bool caught = false;
+        try {
+            JsonValue::parse(json);
+        } catch (const std::exception&) {
+            caught = true;
+        }
+        ASSERT_TRUE(caught);
+    }
+}
+
+TEST_CASE(Unit_SimpleJson, RejectUnescapedControlChars) {
+    bool caught = false;
+    try {
+        // String literal with raw unescaped newline (0x0A)
+        std::string rawJson = "{\"str\": \"line1\nline2\"}";
+        JsonValue::parse(rawJson);
+    } catch (const std::exception&) {
+        caught = true;
+    }
+    ASSERT_TRUE(caught);
+}
+
+TEST_CASE(Unit_SimpleJson, RejectDeepNesting) {
+    std::string deep;
+    for (int i = 0; i < 70; ++i) deep += "{\"a\":";
+    deep += "1";
+    for (int i = 0; i < 70; ++i) deep += "}";
+
+    bool caught = false;
+    try {
+        JsonValue::parse(deep);
+    } catch (const std::exception&) {
+        caught = true;
+    }
+    ASSERT_TRUE(caught);
+}

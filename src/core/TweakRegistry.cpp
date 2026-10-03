@@ -96,7 +96,10 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Stops scheduled CEIP uploads and background task telemetry.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\SQMClient\\Windows", L"CEIPEnable", RegType::Dword, 1, 0, L"", L"", true });
+        // Microsoft documentation: CEIPEnable: 0 = disabled, 1 = enabled
+        // Group policy takes precedence: HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows\CEIPEnable = 0
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\SQMClient\\Windows", L"CEIPEnable", RegType::Dword, 0, 1, L"", L"", true });
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\SQMClient\\Windows", L"CEIPEnable", RegType::Dword, 0, 1, L"", L"", true });
         AddTweak(std::move(t));
     }
     {
@@ -3521,7 +3524,10 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
-        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\SQMClient\\Windows", L"CEIPEnable", RegType::Dword, 1, 0, L"", L"", true });
+        // Microsoft documentation: CEIPEnable: 0 = disabled, 1 = enabled
+        // Group policy takes precedence: HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows\CEIPEnable = 0
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\SQMClient\\Windows", L"CEIPEnable", RegType::Dword, 0, 1, L"", L"", true });
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\SQMClient\\Windows", L"CEIPEnable", RegType::Dword, 0, 1, L"", L"", true });
         AddTweak(std::move(t));
     }
     {
@@ -3667,7 +3673,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"Access to the language list of the browser enables websites to display local contents.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.scope = TargetScope::Machine;
+        t.scope = TargetScope::User;
+        t.regActions.push_back({ TargetScope::User, L"Control Panel\\International\\User Profile", L"HttpAcceptLanguageOptOut", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
     {
@@ -4172,6 +4179,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection", L"LimitDiagnosticLogCollection", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
     {
@@ -4183,6 +4191,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection", L"DisableOneSettingsDownloads", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
     {
@@ -4194,6 +4203,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
+        t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection", L"AllowDeviceNameInTelemetry", RegType::Dword, 0, 1, L"", L"", true });
         AddTweak(std::move(t));
     }
 
@@ -4285,8 +4295,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"Deactivating is not recommended! With this you deactivate the automatic installation of Windows Updates. Security leaks will not be tackled automatically.";
         t.impact = L"Disabling stops the Windows Update service (wuauserv), preventing automatic security patches.";
         t.safety = SafetyLevel::Advanced;
-        t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\wuauserv", L"Start", RegType::Dword, 4, 3, L"", L"", false });
-        t.serviceActions.push_back({ L"wuauserv", 4, 2, true });
+        t.serviceActions.push_back({ L"wuauserv", 4, 3, true });
         AddTweak(std::move(t));
     }
     {
@@ -4435,24 +4444,67 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
     const Tweak* t = GetTweakById(id);
     if (!t) return SettingStatus::NotApplicable;
 
+    // Check minWindowsBuild if specified
+    if (!t->minWindowsBuild.empty()) {
+        static DWORD s_buildNumber = 0;
+        if (s_buildNumber == 0) {
+            auto optVal = RegistryHelper::ReadDword(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", L"CurrentBuildNumber");
+            if (!optVal.has_value()) {
+                auto strVal = RegistryHelper::ReadString(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", L"CurrentBuild");
+                if (strVal.has_value()) {
+                    try { s_buildNumber = std::stoul(strVal.value()); } catch (...) { s_buildNumber = 19041; }
+                } else {
+                    s_buildNumber = 19041;
+                }
+            } else {
+                s_buildNumber = optVal.value();
+            }
+        }
+        try {
+            DWORD minBuild = std::stoul(t->minWindowsBuild);
+            if (s_buildNumber < minBuild) {
+                return SettingStatus::NotApplicable;
+            }
+        } catch (...) {}
+    }
+
+    // Check if mode is NoUsers and the tweak only has user actions
+    if (mode == UserSelectionMode::NoUsers && t->serviceActions.empty()) {
+        bool hasMachine = false;
+        for (const auto& ra : t->regActions) {
+            if (ra.scope == TargetScope::Machine) { hasMachine = true; break; }
+        }
+        if (!hasMachine) {
+            return SettingStatus::NotApplicable;
+        }
+    }
+
     const size_t totalChecks = t->serviceActions.size() + t->regActions.size();
     if (totalChecks == 0) return SettingStatus::NotApplicable;
 
     size_t appliedCount = 0;
-    size_t notAppliedCount = 0;
+    size_t defaultCount = 0;
     size_t unknownCount = 0;
+    size_t notApplicableCount = 0;
+    size_t otherCount = 0;
 
     // Check services
     for (const auto& sa : t->serviceActions) {
         const SettingStatus st = ServiceHelper::AuditAction(sa);
         if (st == SettingStatus::Applied) appliedCount++;
-        else if (st == SettingStatus::NotApplied) notAppliedCount++;
+        else if (st == SettingStatus::NotApplied) defaultCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
-        else notAppliedCount++;
+        else if (st == SettingStatus::NotApplicable) notApplicableCount++;
+        else otherCount++;
     }
 
     // Check registry actions
     for (const auto& ra : t->regActions) {
+        if (mode == UserSelectionMode::NoUsers && ra.scope == TargetScope::User) {
+            notApplicableCount++;
+            continue;
+        }
+
         SettingStatus st = SettingStatus::NotApplied;
         if (ra.scope == TargetScope::Machine) {
             st = RegistryHelper::AuditAction(HKEY_LOCAL_MACHINE, ra);
@@ -4461,13 +4513,19 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
         }
 
         if (st == SettingStatus::Applied) appliedCount++;
-        else if (st == SettingStatus::NotApplied) notAppliedCount++;
+        else if (st == SettingStatus::NotApplied) defaultCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
-        else notAppliedCount++;
+        else if (st == SettingStatus::NotApplicable) notApplicableCount++;
+        else otherCount++;
     }
 
-    if (unknownCount == totalChecks) return SettingStatus::Unknown;
-    if (appliedCount == totalChecks) return SettingStatus::Applied;
+    const size_t activeChecks = totalChecks - notApplicableCount;
+    if (activeChecks == 0) return SettingStatus::NotApplicable;
+    if (unknownCount == activeChecks) return SettingStatus::Unknown;
+    if (appliedCount == activeChecks) return SettingStatus::Applied;
+    if (defaultCount == activeChecks) return SettingStatus::NotApplied;
+    if (appliedCount > 0) return SettingStatus::Partial;
+    if (unknownCount > 0) return SettingStatus::Unknown;
     return SettingStatus::NotApplied;
 }
 
@@ -4475,10 +4533,17 @@ bool TweakRegistry::ApplyTweak(std::string_view id, bool enableProtection, UserS
     const Tweak* t = GetTweakById(id);
     if (!t) return false;
 
+    const size_t totalActions = t->serviceActions.size() + t->regActions.size();
+    if (totalActions == 0) {
+        return false; // Zero executable actions
+    }
+
     bool allOk = true;
+    size_t executedCount = 0;
 
     // Apply service actions
     for (const auto& sa : t->serviceActions) {
+        executedCount++;
         if (!ServiceHelper::ApplyAction(sa, enableProtection)) {
             allOk = false;
         }
@@ -4486,6 +4551,11 @@ bool TweakRegistry::ApplyTweak(std::string_view id, bool enableProtection, UserS
 
     // Apply registry actions
     for (const auto& ra : t->regActions) {
+        if (mode == UserSelectionMode::NoUsers && ra.scope == TargetScope::User) {
+            continue;
+        }
+
+        executedCount++;
         if (ra.scope == TargetScope::Machine) {
             if (!RegistryHelper::ApplyAction(HKEY_LOCAL_MACHINE, ra, enableProtection)) {
                 allOk = false;
@@ -4495,6 +4565,10 @@ bool TweakRegistry::ApplyTweak(std::string_view id, bool enableProtection, UserS
                 allOk = false;
             }
         }
+    }
+
+    if (executedCount == 0) {
+        return false;
     }
 
     return allOk;

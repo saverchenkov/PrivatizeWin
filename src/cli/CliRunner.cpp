@@ -22,6 +22,15 @@ static std::string WStringToUtf8(const std::wstring& wstr) {
     return result;
 }
 
+static std::wstring Utf8ToWString(const std::string& str) {
+    if (str.empty()) return std::wstring();
+    const int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
+    if (size <= 1) return std::wstring();
+    std::wstring result(size - 1, 0);
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &result[0], size);
+    return result;
+}
+
 static void InitializeConsoleOutput() {
     HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hStdOut == nullptr || hStdOut == INVALID_HANDLE_VALUE) {
@@ -54,7 +63,8 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
             opts.listTemplates = true;
         } else if (arg == L"--apply-template") {
             if (i + 1 < argc && argv[i + 1][0] != L'-') {
-                opts.applyTemplate = WStringToUtf8(argv[++i]);
+                opts.applyTemplateW = argv[++i];
+                opts.applyTemplate = WStringToUtf8(opts.applyTemplateW);
             } else {
                 opts.hasError = true;
                 opts.errorMessage = "Missing template name or path for --apply-template";
@@ -74,10 +84,15 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
             opts.installTask = true;
             if (i + 1 < argc && argv[i + 1][0] != L'-') {
                 opts.taskFrequency = WStringToUtf8(argv[++i]);
+                if (opts.taskFrequency != "daily" && opts.taskFrequency != "weekly" && opts.taskFrequency != "logon") {
+                    opts.hasError = true;
+                    opts.errorMessage = "Invalid frequency for --install-task: '" + opts.taskFrequency + "'. Supported values: daily, weekly, logon";
+                }
             }
         } else if (arg == L"--task-template") {
             if (i + 1 < argc && argv[i + 1][0] != L'-') {
-                opts.taskTemplate = WStringToUtf8(argv[++i]);
+                opts.taskTemplateW = argv[++i];
+                opts.taskTemplate = WStringToUtf8(opts.taskTemplateW);
             } else {
                 opts.hasError = true;
                 opts.errorMessage = "Missing template name for --task-template";
@@ -189,12 +204,25 @@ int CliRunner::Execute(const CliOptions& opts) {
 
     // 2. Install Scheduled Task
     if (opts.installTask) {
+        std::wstring usersWStr;
+        if (opts.userMode == UserSelectionMode::AllUsers) usersWStr = L"all";
+        else if (opts.userMode == UserSelectionMode::CurrentUser) usersWStr = L"current";
+        else if (opts.userMode == UserSelectionMode::NoUsers) usersWStr = L"none";
+        else {
+            for (size_t k = 0; k < opts.specificUsernames.size(); ++k) {
+                if (k > 0) usersWStr += L",";
+                usersWStr += opts.specificUsernames[k];
+            }
+        }
+
+        const std::wstring tplW = !opts.taskTemplateW.empty() ? opts.taskTemplateW : Utf8ToWString(opts.taskTemplate);
+
         if (opts.dryRun) {
             if (!opts.quiet) {
                 std::cout << "[DRY RUN] Would install scheduled task 'PrivatizeWin Auto-Protect'\n"
                           << "          Frequency: " << opts.taskFrequency << "\n"
-                          << "          Template:  " << opts.taskTemplate << "\n"
-                          << "          Users:     " << (opts.userMode == UserSelectionMode::AllUsers ? "all" : (opts.userMode == UserSelectionMode::CurrentUser ? "current" : "none")) << "\n" << std::flush;
+                          << "          Template:  " << WStringToUtf8(tplW) << "\n"
+                          << "          Users:     " << WStringToUtf8(usersWStr) << "\n" << std::flush;
             }
             return 0;
         }
@@ -207,19 +235,16 @@ int CliRunner::Execute(const CliOptions& opts) {
         }
 
         ScheduledTaskConfig taskConfig;
-        taskConfig.frequency = std::wstring(opts.taskFrequency.begin(), opts.taskFrequency.end());
-        taskConfig.templateName = std::wstring(opts.taskTemplate.begin(), opts.taskTemplate.end());
-
-        if (opts.userMode == UserSelectionMode::AllUsers) taskConfig.userMode = L"all";
-        else if (opts.userMode == UserSelectionMode::CurrentUser) taskConfig.userMode = L"current";
-        else taskConfig.userMode = L"none";
+        taskConfig.frequency = Utf8ToWString(opts.taskFrequency);
+        taskConfig.templateName = tplW;
+        taskConfig.userMode = usersWStr;
 
         const bool ok = TaskScheduler::InstallTask(taskConfig);
         if (!opts.quiet) {
             if (ok) {
                 std::cout << "[SUCCESS] Scheduled task 'PrivatizeWin Auto-Protect' installed successfully.\n";
                 std::cout << "          Frequency: " << opts.taskFrequency << "\n";
-                std::cout << "          Template:  " << opts.taskTemplate << "\n";
+                std::cout << "          Template:  " << WStringToUtf8(taskConfig.templateName) << "\n";
                 std::cout << "          Users:     " << WStringToUtf8(taskConfig.userMode) << "\n" << std::flush;
             } else {
                 std::cerr << "[ERROR] Failed to install scheduled task. Ensure you are running as Administrator.\n" << std::flush;
@@ -316,7 +341,7 @@ int CliRunner::Execute(const CliOptions& opts) {
         if (builtin.has_value()) {
             profile = builtin.value();
         } else {
-            const std::wstring wpath(templateToApply.begin(), templateToApply.end());
+            const std::wstring wpath = !opts.applyTemplateW.empty() ? opts.applyTemplateW : Utf8ToWString(templateToApply);
             std::string loadErr;
             if (!TemplateManager::Instance().LoadTemplateFromFile(wpath, profile, &loadErr)) {
                 InitializeConsoleOutput();

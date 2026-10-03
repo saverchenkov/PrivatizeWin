@@ -14,6 +14,7 @@
 #include "../core/ProcessHelper.h"
 #include "../core/SimpleJson.h"
 #include "../core/Localization.h"
+#include "../core/PendingHandoff.h"
 #include <windowsx.h>
 #include <commctrl.h>
 #include <commdlg.h>
@@ -393,105 +394,46 @@ void MainWindow::SavePreferences() {
 }
 
 std::wstring MainWindow::SavePendingStateToTempFile() const {
-    if (m_pendingEnableIds.empty() && m_pendingRevertIds.empty()) {
-        return L"";
-    }
-
-    wchar_t tempPath[MAX_PATH]{};
-    if (GetTempPathW(MAX_PATH, tempPath) == 0) {
-        return L"";
-    }
-
-    std::wstring filePath = std::wstring(tempPath) + L"PrivatizeWin_Pending_" + std::to_wstring(GetCurrentProcessId()) + L".json";
-
-    JsonValue root;
-    root["pendingEnable"] = JsonValue(JsonType::Array);
-    for (const auto& id : m_pendingEnableIds) {
-        root["pendingEnable"].arrayValue.push_back(JsonValue(id));
-    }
-
-    root["pendingRevert"] = JsonValue(JsonType::Array);
-    for (const auto& id : m_pendingRevertIds) {
-        root["pendingRevert"].arrayValue.push_back(JsonValue(id));
-    }
-
-    std::string jsonStr = root.toString(2);
-
-    HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile == INVALID_HANDLE_VALUE) {
-        return L"";
-    }
-
-    DWORD bytesWritten = 0;
-    WriteFile(hFile, jsonStr.data(), static_cast<DWORD>(jsonStr.size()), &bytesWritten, nullptr);
-    CloseHandle(hFile);
-
-    return filePath;
+    PendingStatePlan plan;
+    plan.pendingEnable.assign(m_pendingEnableIds.begin(), m_pendingEnableIds.end());
+    plan.pendingRevert.assign(m_pendingRevertIds.begin(), m_pendingRevertIds.end());
+    return PendingHandoff::SaveHandoff(plan);
 }
 
 bool MainWindow::RestorePendingStateFromFile(const std::wstring& filePath) {
-    if (filePath.empty()) return false;
-
-    HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile == INVALID_HANDLE_VALUE) {
+    PendingStatePlan plan;
+    if (!PendingHandoff::ConsumeHandoff(filePath, plan)) {
         return false;
     }
 
-    DWORD fileSize = GetFileSize(hFile, nullptr);
-    if (fileSize == 0 || fileSize == INVALID_FILE_SIZE || fileSize > 1024 * 1024) { // Max 1MB
-        CloseHandle(hFile);
-        DeleteFileW(filePath.c_str());
-        return false;
-    }
+    m_pendingEnableIds.clear();
+    m_pendingRevertIds.clear();
 
-    std::string content(fileSize, 0);
-    DWORD bytesRead = 0;
-    const BOOL readOk = ReadFile(hFile, &content[0], fileSize, &bytesRead, nullptr);
-    CloseHandle(hFile);
-
-    DeleteFileW(filePath.c_str());
-
-    if (!readOk || bytesRead == 0) {
-        return false;
-    }
-    content.resize(bytesRead);
-
-    try {
-        JsonValue root = JsonValue::parse(content);
-        if (!root.isObject()) {
-            return false;
+    for (const auto& id : plan.pendingEnable) {
+        if (TweakRegistry::Instance().GetTweakById(id) != nullptr) {
+            m_pendingEnableIds.insert(id);
         }
-
-        m_pendingEnableIds.clear();
-        m_pendingRevertIds.clear();
-
-        if (root["pendingEnable"].isArray()) {
-            for (const auto& item : root["pendingEnable"].arrayValue) {
-                if (item.isString() && !item.stringValue.empty()) {
-                    if (TweakRegistry::Instance().GetTweakById(item.stringValue) != nullptr) {
-                        m_pendingEnableIds.insert(item.stringValue);
-                    }
-                }
-            }
-        }
-
-        if (root["pendingRevert"].isArray()) {
-            for (const auto& item : root["pendingRevert"].arrayValue) {
-                if (item.isString() && !item.stringValue.empty()) {
-                    if (TweakRegistry::Instance().GetTweakById(item.stringValue) != nullptr) {
-                        m_pendingRevertIds.insert(item.stringValue);
-                    }
-                }
-            }
-        }
-        return true;
-    } catch (...) {
-        return false;
     }
+    for (const auto& id : plan.pendingRevert) {
+        if (TweakRegistry::Instance().GetTweakById(id) != nullptr) {
+            m_pendingRevertIds.insert(id);
+        }
+    }
+    return true;
 }
 
 bool MainWindow::RelaunchAsAdminWithPendingState() {
-    const std::wstring pendingFile = SavePendingStateToTempFile();
+    const bool hasPending = (!m_pendingEnableIds.empty() || !m_pendingRevertIds.empty());
+    std::wstring pendingFile;
+    if (hasPending) {
+        pendingFile = SavePendingStateToTempFile();
+        if (pendingFile.empty()) {
+            // Abort relaunch if saving non-empty plan failed so user selections are preserved
+            MessageBoxW(m_hWnd, L"Failed to securely save pending selections for elevated restart. Relaunch aborted to prevent losing your pending changes.", L"PrivatizeWin", MB_OK | MB_ICONERROR);
+            return false;
+        }
+    }
+
     std::wstring extraArgs;
     if (!pendingFile.empty()) {
         extraArgs = L"--resume-pending \"" + pendingFile + L"\"";
@@ -502,6 +444,7 @@ bool MainWindow::RelaunchAsAdminWithPendingState() {
         return true;
     }
 
+    // If elevation was cancelled or failed, clean up the handoff file and preserve selections
     if (!pendingFile.empty()) {
         DeleteFileW(pendingFile.c_str());
     }
@@ -1992,22 +1935,26 @@ void MainWindow::ApplySelectedTweaks() {
     SendMessage(m_hProgressBar, PBM_SETRANGE32, 0, static_cast<LPARAM>(totalSelected));
     SendMessage(m_hProgressBar, PBM_SETPOS, 0, 0);
 
-    int changedCount = 0;
-    int alreadyCount = 0;
+    std::unordered_set<std::string> remainingEnable;
+    std::unordered_set<std::string> remainingRevert;
+    int appliedCount = 0;
+    int restoredCount = 0;
+    int unchangedCount = 0;
     int failedCount = 0;
     int progress = 0;
 
     for (const auto& id : m_pendingEnableIds) {
         const SettingStatus before = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
         if (before == SettingStatus::Applied) {
-            alreadyCount++;
+            unchangedCount++;
         } else {
             const bool ok = TweakRegistry::Instance().ApplyTweak(id, true, UserSelectionMode::CurrentUser, {});
             const SettingStatus after = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
             if (ok && after == SettingStatus::Applied) {
-                changedCount++;
+                appliedCount++;
             } else {
                 failedCount++;
+                remainingEnable.insert(id);
             }
         }
         progress++;
@@ -2017,14 +1964,15 @@ void MainWindow::ApplySelectedTweaks() {
     for (const auto& id : m_pendingRevertIds) {
         const SettingStatus before = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
         if (before == SettingStatus::NotApplied) {
-            alreadyCount++;
+            unchangedCount++;
         } else {
             const bool ok = TweakRegistry::Instance().ApplyTweak(id, false, UserSelectionMode::CurrentUser, {});
             const SettingStatus after = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
             if (ok && after == SettingStatus::NotApplied) {
-                changedCount++;
+                restoredCount++;
             } else {
                 failedCount++;
+                remainingRevert.insert(id);
             }
         }
         progress++;
@@ -2032,12 +1980,13 @@ void MainWindow::ApplySelectedTweaks() {
     }
 
     ShowWindow(m_hProgressBar, SW_HIDE);
-    m_pendingEnableIds.clear();
-    m_pendingRevertIds.clear();
+    m_pendingEnableIds = std::move(remainingEnable);
+    m_pendingRevertIds = std::move(remainingRevert);
 
     RefreshAuditState();
 
-    std::wstring resMsg = LocFmt("apply_success", changedCount, alreadyCount, failedCount);
+    std::wstring resMsg = (failedCount > 0 ? Loc("apply_completed_warn") : Loc("apply_completed_ok")) +
+                          LocFmt("apply_success", appliedCount, restoredCount, unchangedCount, failedCount);
     if (anyReboot) {
         resMsg += Loc("reboot_recommended");
     }
@@ -2059,12 +2008,12 @@ void MainWindow::RestoreSelectedDefaults() {
     }
 
     if (count == 0) {
-        // If no rows highlighted, stage all currently displayed rows that are currently applied
+        // If no rows highlighted, stage all currently displayed rows that are not in default state
         for (int idx = 0; idx < static_cast<int>(m_displayedTweaks.size()); ++idx) {
             const auto& t = m_displayedTweaks[idx];
             if (m_notApplicableIds.count(t.id) > 0) continue;
             const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
-            if (st == SettingStatus::Applied) {
+            if (st != SettingStatus::NotApplied) {
                 m_pendingEnableIds.erase(t.id);
                 m_pendingRevertIds.insert(t.id);
                 SetRowCheckboxState(idx, CheckboxState::PendingRevert);
@@ -2090,7 +2039,7 @@ void MainWindow::RestoreAllDefaults() {
     for (const auto& t : catalog) {
         if (m_notApplicableIds.count(t.id) > 0) continue;
         const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
-        if (st == SettingStatus::Applied) {
+        if (st != SettingStatus::NotApplied) {
             m_pendingRevertIds.insert(t.id);
         }
     }

@@ -38,8 +38,8 @@ public:
 
     void Initialize();
     [[nodiscard]] Language GetCurrentLanguage() const noexcept { return m_currentLang; }
-    void SetLanguage(Language lang);
-    void SetLanguageByCode(std::string_view code);
+    void SetLanguage(Language lang, bool persist = true);
+    void SetLanguageByCode(std::string_view code, bool persist = true);
 
     [[nodiscard]] const std::vector<LanguageInfo>& GetSupportedLanguages() const noexcept { return m_languages; }
     [[nodiscard]] const LanguageInfo& GetCurrentLanguageInfo() const;
