@@ -465,15 +465,15 @@ void MainWindow::InitializeControls() {
     // 1. Search Box (Item 15: Filter tweaks Ctrl+F)
     m_hSearchEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
         WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | WS_TABSTOP,
-        10, 10, 145, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_SEARCH_EDIT), hInst, nullptr);
+        10, 10, 180, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_SEARCH_EDIT), hInst, nullptr);
     SendMessage(m_hSearchEdit, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
-    SendMessage(m_hSearchEdit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Filter tweaks (Ctrl+F)..."));
+    SendMessage(m_hSearchEdit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(L"Filter tweaks (Ctrl+F)"));
     SetWindowSubclass(m_hSearchEdit, SearchSubclassProc, 1, reinterpret_cast<DWORD_PTR>(this));
 
     // 2. Filter Dropdown (Item 15: Labeled by what it filters)
     m_hFilterCombo = CreateWindowW(WC_COMBOBOXW, L"",
         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
-        161, 10, 140, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_FILTER_COMBO), hInst, nullptr);
+        196, 10, 140, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_FILTER_COMBO), hInst, nullptr);
     SendMessage(m_hFilterCombo, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
     SendMessage(m_hFilterCombo, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1), 20);
     SendMessage(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"All settings"));
@@ -485,13 +485,13 @@ void MainWindow::InitializeControls() {
     // 3. Match / Hidden Count Label (Item 3)
     m_hLblMatchCount = CreateWindowW(WC_STATICW, L"260 shown",
         WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,
-        307, 13, 95, 20, m_hWnd, reinterpret_cast<HMENU>(IDC_LBL_MATCH_COUNT), hInst, nullptr);
+        342, 13, 80, 20, m_hWnd, reinterpret_cast<HMENU>(IDC_LBL_MATCH_COUNT), hInst, nullptr);
     SendMessage(m_hLblMatchCount, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
     // 4. Preset Dropdown & "Apply Preset" Button
     m_hTemplateCombo = CreateWindowW(WC_COMBOBOXW, L"",
         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
-        412, 10, 150, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_TPL_COMBO), hInst, nullptr);
+        432, 10, 140, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_TPL_COMBO), hInst, nullptr);
     SendMessage(m_hTemplateCombo, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
     SendMessage(m_hTemplateCombo, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1), 20);
     SendMessage(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Recommended"));
@@ -501,19 +501,20 @@ void MainWindow::InitializeControls() {
 
     m_hBtnSelectPreset = CreateWindowW(WC_BUTTONW, L"Apply Preset",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        568, 10, 95, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_SELECT_PRESET), hInst, nullptr);
+        578, 10, 95, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_SELECT_PRESET), hInst, nullptr);
     SendMessage(m_hBtnSelectPreset, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
-    // 6. Action Buttons (Apply Selected, Restore Defaults)
+    // 5. "Apply Defaults" Button (placed to the right of "Apply Preset")
+    m_hBtnRevert = CreateWindowW(WC_BUTTONW, L"Apply Defaults",
+        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
+        679, 10, 105, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_REVERT), hInst, nullptr);
+    SendMessage(m_hBtnRevert, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
+
+    // 6. Action Button (Apply Selected - positioned dynamically on the right)
     m_hBtnApply = CreateWindowW(WC_BUTTONW, L"Apply Selected",
         WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP,
-        782, 10, 145, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_APPLY), hInst, nullptr);
+        890, 10, 145, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_APPLY), hInst, nullptr);
     SendMessage(m_hBtnApply, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontBold), TRUE);
-
-    m_hBtnRevert = CreateWindowW(WC_BUTTONW, L"Restore Defaults\u2026",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        935, 10, 135, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_REVERT), hInst, nullptr);
-    SendMessage(m_hBtnRevert, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
     // 7. Grouped ListView (SysListView32)
     m_hListView = CreateWindowExW(
@@ -828,25 +829,29 @@ void MainWindow::OnSize(int width, int height) {
 
     // Position top row controls with unified layout
     const int xSearch = 10;
-    const int wSearch = 145;
+    const int wSearch = 180;
 
-    const int xFilter = xSearch + wSearch + 6; // 161
+    const int xFilter = xSearch + wSearch + 6; // 196
     const int wFilter = 140;
 
-    const int xCount = xFilter + wFilter + 6;  // 307
-    const int wCount = 95;
+    const int xCount = xFilter + wFilter + 6;  // 342
+    const int wCount = 80;
 
-    const int xPresetCombo = xCount + wCount + 10; // 412
-    const int wPresetCombo = 150;
+    const int xPresetCombo = xCount + wCount + 10; // 432
+    const int wPresetCombo = 140;
 
-    const int xPresetBtn = xPresetCombo + wPresetCombo + 6; // 568
+    const int xPresetBtn = xPresetCombo + wPresetCombo + 6; // 578
     const int wPresetBtn = 95;
+
+    const int xDefaultsBtn = xPresetBtn + wPresetBtn + 6; // 679
+    const int wDefaultsBtn = 105;
 
     SetWindowPos(m_hSearchEdit, nullptr, xSearch, topMargin, wSearch, ctrlH, SWP_NOZORDER);
     SetWindowPos(m_hFilterCombo, nullptr, xFilter, topMargin, wFilter, 200, SWP_NOZORDER);
     SetWindowPos(m_hLblMatchCount, nullptr, xCount, topMargin + 3, wCount, 20, SWP_NOZORDER);
     SetWindowPos(m_hTemplateCombo, nullptr, xPresetCombo, topMargin, wPresetCombo, 200, SWP_NOZORDER);
     SetWindowPos(m_hBtnSelectPreset, nullptr, xPresetBtn, topMargin, wPresetBtn, ctrlH, SWP_NOZORDER);
+    SetWindowPos(m_hBtnRevert, nullptr, xDefaultsBtn, topMargin, wDefaultsBtn, ctrlH, SWP_NOZORDER);
 
     UpdateActionButtonsLayout(width);
 
@@ -1293,7 +1298,7 @@ int MainWindow::GetApplyButtonWidth() const {
 }
 
 void MainWindow::UpdateActionButtonsLayout(int clientWidth) {
-    if (!m_hBtnApply || !m_hBtnRevert || !m_hWnd) return;
+    if (!m_hBtnApply || !m_hWnd) return;
     if (clientWidth <= 0) {
         RECT rcClient{};
         GetClientRect(m_hWnd, &rcClient);
@@ -1304,18 +1309,14 @@ void MainWindow::UpdateActionButtonsLayout(int clientWidth) {
     const int topMargin = 10;
     const int ctrlH = 26;
     const int rightEdge = clientWidth - 10;
-    const int btnRevertW = 135;
-    const int btnGap = 8;
     const int btnApplyW = GetApplyButtonWidth();
 
-    SetWindowPos(m_hBtnRevert, nullptr, rightEdge - btnRevertW, topMargin, btnRevertW, ctrlH, SWP_NOZORDER | SWP_NOACTIVATE);
-    SetWindowPos(m_hBtnApply, nullptr, rightEdge - btnRevertW - btnGap - btnApplyW, topMargin, btnApplyW, ctrlH, SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(m_hBtnApply, nullptr, rightEdge - btnApplyW, topMargin, btnApplyW, ctrlH, SWP_NOZORDER | SWP_NOACTIVATE);
 
-    // Repaint toolbar background area around action buttons to cleanly erase any vacated background
-    RECT rcToolbar{ rightEdge - btnRevertW - btnGap - btnApplyW - 30, topMargin - 2, clientWidth, topMargin + ctrlH + 4 };
+    // Repaint toolbar background area around apply button to cleanly erase any vacated background
+    RECT rcToolbar{ rightEdge - btnApplyW - 30, topMargin - 2, clientWidth, topMargin + ctrlH + 4 };
     InvalidateRect(m_hWnd, &rcToolbar, TRUE);
     UpdateWindow(m_hBtnApply);
-    UpdateWindow(m_hBtnRevert);
 }
 
 void MainWindow::UpdateDetailsPane(int selectedIndex) {
@@ -1805,49 +1806,43 @@ void MainWindow::RestoreSelectedDefaults() {
 }
 
 void MainWindow::RestoreAllDefaults() {
-    if (!IsRunningAsAdmin()) {
-        const int res = MessageBoxW(m_hWnd,
-            L"Administrator privileges are required to restore Windows default settings.\n\n"
-            L"Would you like to restart PrivatizeWin as Administrator now?",
-            L"PrivatizeWin \u2014 Elevation Required",
-            MB_YESNO | MB_ICONWARNING);
-        if (res == IDYES) {
-            RelaunchAsAdminWithPendingState();
-        }
-        return;
-    }
-
-    // Item 6: Global restore in Actions menu
-    const int choice = MessageBoxW(m_hWnd,
-        L"Are you sure you want to restore Windows default values for ALL settings on this computer?\n\n"
-        L"This will reset all privacy and telemetry tweaks across every category to out-of-the-box Windows defaults.",
-        L"Confirm Restore All Defaults",
-        MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2);
-
-    if (choice != IDYES) return;
+    m_pendingEnableIds.clear();
+    m_pendingRevertIds.clear();
 
     const auto& catalog = TweakRegistry::Instance().GetAllTweaks();
-
-    ShowWindow(m_hProgressBar, SW_SHOW);
-    SendMessage(m_hProgressBar, PBM_SETRANGE32, 0, static_cast<LPARAM>(catalog.size()));
-    SendMessage(m_hProgressBar, PBM_SETPOS, 0, 0);
-
-    int changed = 0;
-    int progress = 0;
     for (const auto& t : catalog) {
-        if (TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {}) == SettingStatus::Applied) {
-            if (TweakRegistry::Instance().ApplyTweak(t.id, false, UserSelectionMode::CurrentUser, {})) {
-                changed++;
-            }
+        if (m_notApplicableIds.count(t.id) > 0) continue;
+        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        if (st == SettingStatus::Applied) {
+            m_pendingRevertIds.insert(t.id);
         }
-        progress++;
-        SendMessage(m_hProgressBar, PBM_SETPOS, progress, 0);
     }
 
-    ShowWindow(m_hProgressBar, SW_HIDE);
-    RefreshAuditState();
+    for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
+        const auto& t = m_displayedTweaks[i];
+        CheckboxState cbState = CheckboxState::Unchecked;
+        if (m_notApplicableIds.count(t.id) > 0) {
+            cbState = CheckboxState::Disabled;
+        } else if (m_pendingRevertIds.count(t.id) > 0) {
+            cbState = CheckboxState::PendingRevert;
+        } else {
+            const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+            if (st == SettingStatus::Applied) {
+                cbState = CheckboxState::AlreadyEnabled;
+            } else if (st == SettingStatus::NotApplicable) {
+                cbState = CheckboxState::Disabled;
+            }
+        }
+        SetRowCheckboxState(i, cbState);
+    }
 
-    MessageBoxW(m_hWnd, (L"Restored " + std::to_wstring(changed) + L" settings to default.").c_str(), L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
+    UpdateSelectionCounts();
+    UpdateStatusBar();
+
+    int cur = ListView_GetNextItem(m_hListView, -1, LVNI_SELECTED);
+    if (cur != -1) {
+        UpdateDetailsPane(cur);
+    }
 }
 
 void MainWindow::RefreshAuditState() {
@@ -1946,6 +1941,8 @@ void MainWindow::OnKeyDown(WPARAM vk) {
         SendMessage(m_hSearchEdit, EM_SETSEL, 0, -1);
     } else if (vk == 'A' && (GetKeyState(VK_CONTROL) & 0x8000)) {
         SelectAllShown();
+    } else if (vk == 'S' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+        ApplySelectedTweaks();
     }
 }
 
