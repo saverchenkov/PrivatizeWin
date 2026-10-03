@@ -88,3 +88,27 @@ TEST_CASE(Unit_CliParser, UnrecognizedOptionFlag) {
     ASSERT_TRUE(opts.errorMessage.find("Unrecognized") != std::string::npos);
 }
 
+TEST_CASE(Unit_CliParser, ResumePendingFlag) {
+    wchar_t* argv[] = {
+        const_cast<wchar_t*>(L"PrivatizeWin.exe"),
+        const_cast<wchar_t*>(L"--resume-pending"),
+        const_cast<wchar_t*>(L"C:\\temp\\test_pending.json")
+    };
+    const auto opts = CliRunner::ParseArguments(3, argv);
+    ASSERT_FALSE(opts.isCli); // Must route to GUI mode
+    ASSERT_FALSE(opts.hasError);
+    ASSERT_EQ(opts.resumePendingFile, L"C:\\temp\\test_pending.json");
+}
+
+TEST_CASE(Unit_CliParser, ResumePendingMissingFile) {
+    wchar_t* argv[] = {
+        const_cast<wchar_t*>(L"PrivatizeWin.exe"),
+        const_cast<wchar_t*>(L"--resume-pending")
+    };
+    const auto opts = CliRunner::ParseArguments(2, argv);
+    ASSERT_TRUE(opts.isCli);
+    ASSERT_TRUE(opts.hasError);
+    ASSERT_TRUE(opts.errorMessage.find("Missing file path") != std::string::npos);
+}
+
+

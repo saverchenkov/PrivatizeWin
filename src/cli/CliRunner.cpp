@@ -115,18 +115,37 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
             }
         } else if (arg == L"--no-elevate") {
             // Internal flag for non-elevated relaunch
+        } else if (arg == L"--resume-pending") {
+            if (i + 1 < argc && argv[i + 1][0] != L'-') {
+                opts.resumePendingFile = argv[++i];
+            } else {
+                opts.hasError = true;
+                opts.errorMessage = "Missing file path for --resume-pending";
+            }
         } else {
             opts.hasError = true;
             opts.errorMessage = "Unrecognized command-line option: " + WStringToUtf8(arg);
         }
     }
 
+    if (opts.hasError) {
+        opts.isCli = true;
+        return opts;
+    }
+
     opts.isCli = false;
     for (int j = 1; j < argc; ++j) {
-        if (wcscmp(argv[j], L"--no-elevate") != 0) {
-            opts.isCli = true;
-            break;
+        if (wcscmp(argv[j], L"--no-elevate") == 0) {
+            continue;
         }
+        if (wcscmp(argv[j], L"--resume-pending") == 0) {
+            if (j + 1 < argc && argv[j + 1][0] != L'-') {
+                j++;
+            }
+            continue;
+        }
+        opts.isCli = true;
+        break;
     }
 
     return opts;

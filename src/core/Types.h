@@ -131,6 +131,8 @@ struct CliOptions {
     UserSelectionMode userMode{ UserSelectionMode::AllUsers };
     std::vector<std::wstring> specificUsernames;
 
+    std::wstring resumePendingFile;
+
     bool hasError{ false };
     std::string errorMessage;
 };

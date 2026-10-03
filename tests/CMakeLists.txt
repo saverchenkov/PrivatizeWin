@@ -3,6 +3,7 @@ set(TEST_SOURCES
     unit/TestSimpleJson.cpp
     unit/TestSmartHandle.cpp
     unit/TestCliParser.cpp
+    unit/TestPendingState.cpp
     unit/TestTemplateManager.cpp
     unit/TestTweakRegistry.cpp
     integration/TestRegistryHelperLive.cpp
@@ -46,6 +47,7 @@ add_test(NAME AllTests COMMAND PrivatizeWin_Tests)
 add_test(NAME Unit_SimpleJson COMMAND PrivatizeWin_Tests Unit_SimpleJson)
 add_test(NAME Unit_SmartHandle COMMAND PrivatizeWin_Tests Unit_SmartHandle)
 add_test(NAME Unit_CliParser COMMAND PrivatizeWin_Tests Unit_CliParser)
+add_test(NAME Unit_PendingState COMMAND PrivatizeWin_Tests Unit_PendingState)
 add_test(NAME Unit_TemplateManager COMMAND PrivatizeWin_Tests Unit_TemplateManager)
 add_test(NAME Unit_TweakRegistry COMMAND PrivatizeWin_Tests Unit_TweakRegistry)
 add_test(NAME Integration_RegistryHelper COMMAND PrivatizeWin_Tests Integration_RegistryHelper)

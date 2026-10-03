@@ -12,6 +12,7 @@
 #include "../core/TemplateManager.h"
 #include "../core/RestorePoint.h"
 #include "../core/ProcessHelper.h"
+#include "../core/SimpleJson.h"
 #include <windowsx.h>
 #include <commctrl.h>
 #include <commdlg.h>
@@ -68,7 +69,8 @@ bool MainWindow::RegisterClass(HINSTANCE hInstance) {
     return (RegisterClassExW(&sc) != 0);
 }
 
-HWND MainWindow::Create(HINSTANCE hInstance) {
+HWND MainWindow::Create(HINSTANCE hInstance, std::wstring_view resumePendingFile) {
+    s_resumePendingFile = std::wstring(resumePendingFile);
     return CreateWindowExW(
         WS_EX_WINDOWEDGE,
         L"PrivatizeWin_MainWindow",
@@ -290,6 +292,122 @@ void MainWindow::SavePreferences() {
     }
 }
 
+std::wstring MainWindow::SavePendingStateToTempFile() const {
+    if (m_pendingEnableIds.empty() && m_pendingRevertIds.empty()) {
+        return L"";
+    }
+
+    wchar_t tempPath[MAX_PATH]{};
+    if (GetTempPathW(MAX_PATH, tempPath) == 0) {
+        return L"";
+    }
+
+    std::wstring filePath = std::wstring(tempPath) + L"PrivatizeWin_Pending_" + std::to_wstring(GetCurrentProcessId()) + L".json";
+
+    JsonValue root;
+    root["pendingEnable"] = JsonValue(JsonType::Array);
+    for (const auto& id : m_pendingEnableIds) {
+        root["pendingEnable"].arrayValue.push_back(JsonValue(id));
+    }
+
+    root["pendingRevert"] = JsonValue(JsonType::Array);
+    for (const auto& id : m_pendingRevertIds) {
+        root["pendingRevert"].arrayValue.push_back(JsonValue(id));
+    }
+
+    std::string jsonStr = root.toString(2);
+
+    HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        return L"";
+    }
+
+    DWORD bytesWritten = 0;
+    WriteFile(hFile, jsonStr.data(), static_cast<DWORD>(jsonStr.size()), &bytesWritten, nullptr);
+    CloseHandle(hFile);
+
+    return filePath;
+}
+
+bool MainWindow::RestorePendingStateFromFile(const std::wstring& filePath) {
+    if (filePath.empty()) return false;
+
+    HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    DWORD fileSize = GetFileSize(hFile, nullptr);
+    if (fileSize == 0 || fileSize == INVALID_FILE_SIZE || fileSize > 1024 * 1024) { // Max 1MB
+        CloseHandle(hFile);
+        DeleteFileW(filePath.c_str());
+        return false;
+    }
+
+    std::string content(fileSize, 0);
+    DWORD bytesRead = 0;
+    const BOOL readOk = ReadFile(hFile, &content[0], fileSize, &bytesRead, nullptr);
+    CloseHandle(hFile);
+
+    DeleteFileW(filePath.c_str());
+
+    if (!readOk || bytesRead == 0) {
+        return false;
+    }
+    content.resize(bytesRead);
+
+    try {
+        JsonValue root = JsonValue::parse(content);
+        if (!root.isObject()) {
+            return false;
+        }
+
+        m_pendingEnableIds.clear();
+        m_pendingRevertIds.clear();
+
+        if (root["pendingEnable"].isArray()) {
+            for (const auto& item : root["pendingEnable"].arrayValue) {
+                if (item.isString() && !item.stringValue.empty()) {
+                    if (TweakRegistry::Instance().GetTweakById(item.stringValue) != nullptr) {
+                        m_pendingEnableIds.insert(item.stringValue);
+                    }
+                }
+            }
+        }
+
+        if (root["pendingRevert"].isArray()) {
+            for (const auto& item : root["pendingRevert"].arrayValue) {
+                if (item.isString() && !item.stringValue.empty()) {
+                    if (TweakRegistry::Instance().GetTweakById(item.stringValue) != nullptr) {
+                        m_pendingRevertIds.insert(item.stringValue);
+                    }
+                }
+            }
+        }
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool MainWindow::RelaunchAsAdminWithPendingState() {
+    const std::wstring pendingFile = SavePendingStateToTempFile();
+    std::wstring extraArgs;
+    if (!pendingFile.empty()) {
+        extraArgs = L"--resume-pending \"" + pendingFile + L"\"";
+    }
+
+    if (RelaunchElevated(m_hWnd, extraArgs)) {
+        PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
+        return true;
+    }
+
+    if (!pendingFile.empty()) {
+        DeleteFileW(pendingFile.c_str());
+    }
+    return false;
+}
+
 void MainWindow::OnCreate() {
     DarkMode::ApplyToWindow(m_hWnd);
 
@@ -306,6 +424,12 @@ void MainWindow::OnCreate() {
 
     LoadPreferences();
 
+    bool restoredPending = false;
+    if (!s_resumePendingFile.empty()) {
+        restoredPending = RestorePendingStateFromFile(s_resumePendingFile);
+        s_resumePendingFile.clear();
+    }
+
     // Truthful window title (Item 18 & elevation indicator)
     std::wstring title = L"PrivatizeWin \u2014 Windows Privacy Settings";
     if (IsRunningAsAdmin()) {
@@ -316,7 +440,18 @@ void MainWindow::OnCreate() {
     SetWindowTextW(m_hWnd, title.c_str());
 
     PopulateListView(L"", FilterMode::All);
-    UpdateStatusBar();
+
+    if (restoredPending) {
+        const size_t total = m_pendingEnableIds.size() + m_pendingRevertIds.size();
+        if (total > 0) {
+            std::wstring stMsg = L"Restored " + std::to_wstring(total) + L" pending selections from previous session. Click 'Apply Selected' to apply.";
+            SendMessageW(m_hStatusBar, SB_SETTEXTW, 0, reinterpret_cast<LPARAM>(stMsg.c_str()));
+        } else {
+            UpdateStatusBar();
+        }
+    } else {
+        UpdateStatusBar();
+    }
 }
 
 void MainWindow::InitializeControls() {
@@ -1256,9 +1391,7 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
             L"PrivatizeWin \u2014 Elevation Required",
             MB_YESNO | MB_ICONWARNING);
         if (res == IDYES) {
-            if (RelaunchElevated(m_hWnd)) {
-                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
-            }
+            RelaunchAsAdminWithPendingState();
         }
         return;
     }
@@ -1461,9 +1594,7 @@ void MainWindow::ApplySelectedTweaks() {
             L"PrivatizeWin \u2014 Elevation Required",
             MB_YESNO | MB_ICONWARNING);
         if (res == IDYES) {
-            if (RelaunchElevated(m_hWnd)) {
-                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
-            }
+            RelaunchAsAdminWithPendingState();
         }
         return;
     }
@@ -1624,9 +1755,7 @@ void MainWindow::RestoreAllDefaults() {
             L"PrivatizeWin \u2014 Elevation Required",
             MB_YESNO | MB_ICONWARNING);
         if (res == IDYES) {
-            if (RelaunchElevated(m_hWnd)) {
-                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
-            }
+            RelaunchAsAdminWithPendingState();
         }
         return;
     }
@@ -1807,9 +1936,7 @@ void MainWindow::OnCommand(int id, int notifyCode, HWND /*hCtrl*/) {
         if (IsRunningAsAdmin()) {
             MessageBoxW(m_hWnd, L"PrivatizeWin is already running with Administrator privileges.", L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
         } else {
-            if (RelaunchElevated(m_hWnd)) {
-                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
-            }
+            RelaunchAsAdminWithPendingState();
         }
         break;
     case IDM_FILE_EXIT:
@@ -2088,9 +2215,7 @@ void MainWindow::CreateSystemRestorePoint() {
             L"PrivatizeWin \u2014 Elevation Required",
             MB_YESNO | MB_ICONWARNING);
         if (res == IDYES) {
-            if (RelaunchElevated(m_hWnd)) {
-                PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
-            }
+            RelaunchAsAdminWithPendingState();
         }
         return;
     }

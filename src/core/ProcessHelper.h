@@ -31,10 +31,12 @@ inline bool RelaunchElevated(HWND hWnd = nullptr, std::wstring_view extraArgs = 
         return false;
     }
 
+    std::wstring params(extraArgs);
+
     SHELLEXECUTEINFOW sei{ sizeof(sei) };
     sei.lpVerb = L"runas";
     sei.lpFile = szPath;
-    sei.lpParameters = extraArgs.empty() ? nullptr : extraArgs.data();
+    sei.lpParameters = params.empty() ? nullptr : params.c_str();
     sei.hwnd = hWnd;
     sei.nShow = SW_SHOWNORMAL;
 
