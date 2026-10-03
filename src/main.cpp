@@ -30,6 +30,8 @@ private:
 };
 }
 
+#include "core/Localization.h"
+
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*lpCmdLine*/, int nCmdShow) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
@@ -43,6 +45,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*l
 
     // GUI Mode
     const ComApartmentScope com;
+    PrivatizeWin::Localization::Instance().Initialize();
 
     if (!PrivatizeWin::MainWindow::RegisterClass(hInstance)) {
         MessageBoxW(nullptr, L"Failed to register window class.", L"PrivatizeWin Error", MB_OK | MB_ICONERROR);
@@ -63,10 +66,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*l
 
     MSG msg{};
     while (GetMessageW(&msg, nullptr, 0, 0)) {
-        if (!TranslateAcceleratorW(hWnd, hAccel, &msg)) {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
+        if (hAccel && TranslateAcceleratorW(hWnd, hAccel, &msg)) {
+            continue;
         }
+        if (IsDialogMessageW(hWnd, &msg)) {
+            continue;
+        }
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
     }
 
     return static_cast<int>(msg.wParam);

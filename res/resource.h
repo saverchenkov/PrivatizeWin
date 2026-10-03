@@ -59,3 +59,19 @@
 #define IDM_CTX_SELECT_ALL       40054
 #define IDM_CTX_COPY_ID          40055
 #define IDM_CTX_COPY_DETAILS     40056
+
+#define IDM_FOCUS_SEARCH        40070
+
+#define IDM_LANG_BASE           40100
+#define IDM_LANG_EN             40100
+#define IDM_LANG_DE             40101
+#define IDM_LANG_RU             40102
+#define IDM_LANG_FR             40103
+#define IDM_LANG_ES             40104
+#define IDM_LANG_IT             40105
+#define IDM_LANG_PT             40106
+#define IDM_LANG_ZH             40107
+#define IDM_LANG_JA             40108
+#define IDM_LANG_PL             40109
+#define IDM_LANG_TR             40110
+#define IDM_LANG_UK             40111

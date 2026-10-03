@@ -45,6 +45,8 @@ set(SOURCES
     src/core/TweakRegistry.cpp
     src/core/TemplateManager.h
     src/core/TemplateManager.cpp
+    src/core/Localization.h
+    src/core/Localization.cpp
     src/core/ProcessHelper.h
     src/cli/CliRunner.h
     src/cli/CliRunner.cpp

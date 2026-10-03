@@ -36,6 +36,21 @@ BEGIN
         MENUITEM "&Refresh System Audit\tF5",               IDM_ACT_REFRESH
         MENUITEM "Create &System Restore Point...",          IDM_ACT_RESTORE_PT
     END
+    POPUP "&Language"
+    BEGIN
+        MENUITEM "&English",                                IDM_LANG_EN
+        MENUITEM "&Deutsch (German)",                       IDM_LANG_DE
+        MENUITEM "&Русский (Russian)",                      IDM_LANG_RU
+        MENUITEM "&Français (French)",                      IDM_LANG_FR
+        MENUITEM "&Español (Spanish)",                      IDM_LANG_ES
+        MENUITEM "&Italiano (Italian)",                     IDM_LANG_IT
+        MENUITEM "&Português (Brasil)",                     IDM_LANG_PT
+        MENUITEM "&简体中文 (Chinese)",                     IDM_LANG_ZH
+        MENUITEM "&日本語 (Japanese)",                       IDM_LANG_JA
+        MENUITEM "P&olski (Polish)",                        IDM_LANG_PL
+        MENUITEM "&Türkçe (Turkish)",                       IDM_LANG_TR
+        MENUITEM "&Українська (Ukrainian)",                 IDM_LANG_UK
+    END
     POPUP "&Tools"
     BEGIN
         MENUITEM "&Schedule Automatic Reapplication...",    IDM_TOOLS_SCHEDULE
@@ -46,6 +61,17 @@ BEGIN
         MENUITEM "&About PrivatizeWin",                     IDM_HELP_ABOUT
         MENUITEM "Project &GitHub Repository",              IDM_HELP_GITHUB
     END
+END
+
+// Keyboard Accelerators
+MAINMENU ACCELERATORS
+BEGIN
+    "E",        IDM_FILE_EXPORT,        VIRTKEY, CONTROL
+    "O",        IDM_FILE_IMPORT,        VIRTKEY, CONTROL
+    "S",        IDM_ACT_APPLY,          VIRTKEY, CONTROL
+    "A",        IDM_SEL_ALL_SHOWN,      VIRTKEY, CONTROL
+    "F",        IDM_FOCUS_SEARCH,       VIRTKEY, CONTROL
+    VK_F5,      IDM_ACT_REFRESH,        VIRTKEY
 END
 
 // Version Information

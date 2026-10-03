@@ -18,7 +18,9 @@ set(TEST_SOURCES
     ../src/core/TaskScheduler.cpp
     ../src/core/TweakRegistry.cpp
     ../src/core/TemplateManager.cpp
+    ../src/core/Localization.cpp
     ../src/cli/CliRunner.cpp
+    unit/TestLocalization.cpp
 )
 
 add_executable(PrivatizeWin_Tests ${TEST_SOURCES})
@@ -55,3 +57,4 @@ add_test(NAME Integration_ServiceHelper COMMAND PrivatizeWin_Tests Integration_S
 add_test(NAME Integration_UserHiveManager COMMAND PrivatizeWin_Tests Integration_UserHiveManager)
 add_test(NAME Integration_TaskScheduler COMMAND PrivatizeWin_Tests Integration_TaskScheduler)
 add_test(NAME Integration_CliEndToEnd COMMAND PrivatizeWin_Tests Integration_CliEndToEnd)
+add_test(NAME Unit_Localization COMMAND PrivatizeWin_Tests Unit_Localization)

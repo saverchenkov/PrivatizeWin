@@ -1,6 +1,7 @@
 #include "ScheduleDialog.h"
 #include "DarkMode.h"
 #include "../core/TaskScheduler.h"
+#include "../core/Localization.h"
 #include <commctrl.h>
 #include <string>
 
@@ -18,14 +19,15 @@ static void RefreshScheduleDialogState(HWND /*hWnd*/) {
     const bool installed = TaskScheduler::GetTaskConfig(cfg);
 
     if (installed) {
-        std::wstring statusStr = L"Status: Active (";
-        if (cfg.frequency == L"logon") statusStr += L"At logon";
-        else if (cfg.frequency == L"weekly") statusStr += L"Weekly on Sunday at 12:00 PM";
-        else statusStr += L"Daily at 12:00 PM";
-        statusStr += L")";
+        std::wstring freqStr;
+        if (cfg.frequency == L"logon") freqStr = Loc("sched_logon");
+        else if (cfg.frequency == L"weekly") freqStr = Loc("sched_weekly");
+        else freqStr = Loc("sched_daily");
+
+        std::wstring statusStr = LocFmt("sched_status_active", { freqStr });
         SetWindowTextW(s_hStatusLabel, statusStr.c_str());
 
-        SetWindowTextW(s_hBtnInstall, L"Update Task");
+        SetWindowTextW(s_hBtnInstall, Loc("sched_btn_update").c_str());
         EnableWindow(s_hBtnRemove, TRUE);
 
         // Select combos
@@ -41,8 +43,8 @@ static void RefreshScheduleDialogState(HWND /*hWnd*/) {
         else if (cfg.userMode == L"none") SendMessage(s_hUserCombo, CB_SETCURSEL, 2, 0);
         else SendMessage(s_hUserCombo, CB_SETCURSEL, 0, 0);
     } else {
-        SetWindowTextW(s_hStatusLabel, L"Status: Off");
-        SetWindowTextW(s_hBtnInstall, L"Create Task");
+        SetWindowTextW(s_hStatusLabel, Loc("sched_status_off").c_str());
+        SetWindowTextW(s_hBtnInstall, Loc("sched_btn_create").c_str());
         EnableWindow(s_hBtnRemove, FALSE);
     }
 }
@@ -51,60 +53,61 @@ static LRESULT CALLBACK ScheduleWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
     switch (uMsg) {
     case WM_CREATE: {
         DarkMode::ApplyToWindow(hWnd);
+        SetWindowTextW(hWnd, Loc("sched_title").c_str());
 
         const auto hFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
 
         // Group / Instructions (Item 16)
         HWND hLbl = CreateWindowW(L"STATIC",
-            L"Periodically reapplies the selected preset. Windows updates may change settings between runs.",
+            Loc("sched_desc").c_str(),
             WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 15, 440, 36, hWnd, nullptr, nullptr, nullptr);
         SendMessage(hLbl, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
         // Schedule Label & Combo (Item 16)
-        HWND hLblFreq = CreateWindowW(L"STATIC", L"Schedule:", WS_CHILD | WS_VISIBLE, 20, 65, 120, 20, hWnd, nullptr, nullptr, nullptr);
+        HWND hLblFreq = CreateWindowW(L"STATIC", Loc("sched_freq").c_str(), WS_CHILD | WS_VISIBLE, 20, 65, 120, 20, hWnd, nullptr, nullptr, nullptr);
         SendMessage(hLblFreq, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
         s_hFreqCombo = CreateWindowW(WC_COMBOBOXW, L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP, 150, 63, 290, 200, hWnd, nullptr, nullptr, nullptr);
         SendMessage(s_hFreqCombo, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
-        SendMessage(s_hFreqCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Daily (12:00 PM)"));
-        SendMessage(s_hFreqCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"At User Logon"));
-        SendMessage(s_hFreqCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Weekly (Sunday 12:00 PM)"));
+        SendMessage(s_hFreqCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("sched_daily").c_str()));
+        SendMessage(s_hFreqCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("sched_logon").c_str()));
+        SendMessage(s_hFreqCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("sched_weekly").c_str()));
         SendMessage(s_hFreqCombo, CB_SETCURSEL, 0, 0);
 
         // Preset Label & Combo (Item 16)
-        HWND hLblTpl = CreateWindowW(L"STATIC", L"Preset:", WS_CHILD | WS_VISIBLE, 20, 105, 120, 20, hWnd, nullptr, nullptr, nullptr);
+        HWND hLblTpl = CreateWindowW(L"STATIC", Loc("sched_preset").c_str(), WS_CHILD | WS_VISIBLE, 20, 105, 120, 20, hWnd, nullptr, nullptr, nullptr);
         SendMessage(hLblTpl, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
         s_hTplCombo = CreateWindowW(WC_COMBOBOXW, L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP, 150, 103, 290, 200, hWnd, nullptr, nullptr, nullptr);
         SendMessage(s_hTplCombo, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
-        SendMessage(s_hTplCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Recommended"));
-        SendMessage(s_hTplCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Strict Privacy"));
-        SendMessage(s_hTplCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Minimal"));
+        SendMessage(s_hTplCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("tpl_recommended").c_str()));
+        SendMessage(s_hTplCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("tpl_strict").c_str()));
+        SendMessage(s_hTplCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("tpl_minimal").c_str()));
         SendMessage(s_hTplCombo, CB_SETCURSEL, 0, 0);
 
         // Apply To (Item 16)
-        HWND hLblUsers = CreateWindowW(L"STATIC", L"Apply to:", WS_CHILD | WS_VISIBLE, 20, 145, 120, 20, hWnd, nullptr, nullptr, nullptr);
+        HWND hLblUsers = CreateWindowW(L"STATIC", Loc("sched_users").c_str(), WS_CHILD | WS_VISIBLE, 20, 145, 120, 20, hWnd, nullptr, nullptr, nullptr);
         SendMessage(hLblUsers, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
         s_hUserCombo = CreateWindowW(WC_COMBOBOXW, L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP, 150, 143, 290, 200, hWnd, nullptr, nullptr, nullptr);
         SendMessage(s_hUserCombo, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
-        SendMessage(s_hUserCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"All User Profiles"));
-        SendMessage(s_hUserCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Current User Only"));
-        SendMessage(s_hUserCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Machine Settings Only (HKLM)"));
+        SendMessage(s_hUserCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("sched_all_users").c_str()));
+        SendMessage(s_hUserCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("sched_current_user").c_str()));
+        SendMessage(s_hUserCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("sched_machine_only").c_str()));
         SendMessage(s_hUserCombo, CB_SETCURSEL, 0, 0);
 
         // Status Label (Item 16)
-        s_hStatusLabel = CreateWindowW(L"STATIC", L"Status: Checking...", WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 190, 420, 25, hWnd, nullptr, nullptr, nullptr);
+        s_hStatusLabel = CreateWindowW(L"STATIC", Loc("sched_status_checking").c_str(), WS_CHILD | WS_VISIBLE | SS_LEFT, 20, 190, 420, 25, hWnd, nullptr, nullptr, nullptr);
         SendMessage(s_hStatusLabel, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
         // Buttons (Item 17)
-        s_hBtnInstall = CreateWindowW(WC_BUTTONW, L"Create Task", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 70, 230, 120, 30, hWnd, reinterpret_cast<HMENU>(1001), nullptr, nullptr);
+        s_hBtnInstall = CreateWindowW(WC_BUTTONW, Loc("sched_btn_create").c_str(), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 50, 230, 130, 30, hWnd, reinterpret_cast<HMENU>(1001), nullptr, nullptr);
         SendMessage(s_hBtnInstall, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
-        s_hBtnRemove = CreateWindowW(WC_BUTTONW, L"Remove Task", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 200, 230, 120, 30, hWnd, reinterpret_cast<HMENU>(1002), nullptr, nullptr);
+        s_hBtnRemove = CreateWindowW(WC_BUTTONW, Loc("sched_btn_remove").c_str(), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 190, 230, 130, 30, hWnd, reinterpret_cast<HMENU>(1002), nullptr, nullptr);
         SendMessage(s_hBtnRemove, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
-        HWND hBtnClose = CreateWindowW(WC_BUTTONW, L"Close", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 330, 230, 90, 30, hWnd, reinterpret_cast<HMENU>(IDCANCEL), nullptr, nullptr);
+        HWND hBtnClose = CreateWindowW(WC_BUTTONW, Loc("sched_btn_close").c_str(), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 330, 230, 100, 30, hWnd, reinterpret_cast<HMENU>(IDCANCEL), nullptr, nullptr);
         SendMessage(hBtnClose, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
         RefreshScheduleDialogState(hWnd);
@@ -132,7 +135,7 @@ static LRESULT CALLBACK ScheduleWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
             const bool ok = TaskScheduler::InstallTask(cfg);
             if (ok) {
                 RefreshScheduleDialogState(hWnd);
-                MessageBoxW(hWnd, L"Scheduled Task configured successfully.\nSettings will be reapplied automatically according to the schedule.", L"Reapply Settings Automatically", MB_OK | MB_ICONINFORMATION);
+                MessageBoxW(hWnd, L"Scheduled Task configured successfully.\nSettings will be reapplied automatically according to the schedule.", Loc("sched_title").c_str(), MB_OK | MB_ICONINFORMATION);
             } else {
                 MessageBoxW(hWnd, L"Failed to create scheduled task. Ensure PrivatizeWin is running as Administrator.", L"Error", MB_OK | MB_ICONERROR);
             }
@@ -140,7 +143,7 @@ static LRESULT CALLBACK ScheduleWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
             const bool ok = TaskScheduler::UninstallTask();
             if (ok) {
                 RefreshScheduleDialogState(hWnd);
-                MessageBoxW(hWnd, L"Scheduled Task removed successfully.", L"Reapply Settings Automatically", MB_OK | MB_ICONINFORMATION);
+                MessageBoxW(hWnd, L"Scheduled Task removed successfully.", Loc("sched_title").c_str(), MB_OK | MB_ICONINFORMATION);
             } else {
                 MessageBoxW(hWnd, L"Could not remove task (it may not be currently installed, or administrator privileges are required).", L"Info", MB_OK | MB_ICONWARNING);
             }
@@ -176,7 +179,7 @@ void ScheduleDialog::Show(HWND hParent) {
     HWND hWnd = CreateWindowExW(
         WS_EX_DLGMODALFRAME,
         CLASS_NAME,
-        L"Reapply Settings Automatically",
+        Loc("sched_title").c_str(),
         WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
         x, y, 480, 320,
         hParent, nullptr, GetModuleHandle(nullptr), nullptr
@@ -186,6 +189,7 @@ void ScheduleDialog::Show(HWND hParent) {
 
     MSG msg{};
     while (IsWindow(hWnd) && GetMessageW(&msg, nullptr, 0, 0)) {
+        if (IsDialogMessageW(hWnd, &msg)) continue;
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }

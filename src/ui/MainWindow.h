@@ -69,9 +69,12 @@ private:
     void UpdateSelectionCounts();
     int GetApplyButtonWidth() const;
     void UpdateActionButtonsLayout(int clientWidth = -1);
+    void UpdateToolbarLayout(int clientWidth = -1);
     void UpdateSplitterLayout();
     void InitializeHeaderTooltips();
     void UpdateHeaderTooltips();
+    void UpdateLocalization();
+    void UpdateMenus();
 
     void SelectPreset(std::string_view templateName);
     void SelectRecommended();

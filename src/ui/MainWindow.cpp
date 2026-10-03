@@ -13,6 +13,7 @@
 #include "../core/RestorePoint.h"
 #include "../core/ProcessHelper.h"
 #include "../core/SimpleJson.h"
+#include "../core/Localization.h"
 #include <windowsx.h>
 #include <commctrl.h>
 #include <commdlg.h>
@@ -32,16 +33,35 @@ namespace PrivatizeWin {
 
 static std::unique_ptr<MainWindow> s_pMainWnd = nullptr;
 
-// Subclass procedure for search box to support Esc to clear (Item 15)
+// Subclass procedure for search box to support Esc to clear and Enter to focus list
 static LRESULT CALLBACK SearchSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR /*uIdSubclass*/, DWORD_PTR dwRefData) {
-    if (uMsg == WM_KEYDOWN && wParam == VK_ESCAPE) {
-        SetWindowTextW(hWnd, L"");
-        auto* pMain = reinterpret_cast<MainWindow*>(dwRefData);
-        if (pMain) {
-            HWND hList = FindWindowExW(GetParent(hWnd), nullptr, WC_LISTVIEWW, nullptr);
-            if (hList) SetFocus(hList);
+    if (uMsg == WM_KEYDOWN) {
+        if (wParam == VK_ESCAPE) {
+            SetWindowTextW(hWnd, L"");
+            auto* pMain = reinterpret_cast<MainWindow*>(dwRefData);
+            if (pMain) {
+                HWND hList = FindWindowExW(GetParent(hWnd), nullptr, WC_LISTVIEWW, nullptr);
+                if (hList) SetFocus(hList);
+            }
+            return 0;
         }
-        return 0;
+        if (wParam == VK_RETURN) {
+            auto* pMain = reinterpret_cast<MainWindow*>(dwRefData);
+            if (pMain) {
+                HWND hList = FindWindowExW(GetParent(hWnd), nullptr, WC_LISTVIEWW, nullptr);
+                if (hList) SetFocus(hList);
+            }
+            return 0;
+        }
+    }
+    return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+}
+
+// Subclass procedure for details edit to support accessible Tab navigation out of read-only edit
+static LRESULT CALLBACK DetailsSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR /*uIdSubclass*/, DWORD_PTR /*dwRefData*/) {
+    if (uMsg == WM_GETDLGCODE) {
+        // Do not consume TAB or ESCAPE; let dialog manager navigate focus
+        return DefSubclassProc(hWnd, uMsg, wParam, lParam) & ~(DLGC_WANTTAB | DLGC_WANTALLKEYS);
     }
     return DefSubclassProc(hWnd, uMsg, wParam, lParam);
 }
@@ -298,6 +318,9 @@ MainWindow::~MainWindow() {
     if (m_hListView) {
         RemoveWindowSubclass(m_hListView, ListViewSubclassProc, 1);
     }
+    if (m_hDetailsEdit) {
+        RemoveWindowSubclass(m_hDetailsEdit, DetailsSubclassProc, 2);
+    }
 }
 
 void MainWindow::InitializeFonts() {
@@ -507,27 +530,14 @@ void MainWindow::OnCreate() {
         s_resumePendingFile.clear();
     }
 
-    // Truthful window title (Item 18 & elevation indicator)
-    std::wstring title = L"PrivatizeWin \u2014 Windows Privacy Settings";
-    if (IsRunningAsAdmin()) {
-        title += L" [Administrator]";
-    } else {
-        title += L" [Standard User]";
-    }
-    SetWindowTextW(m_hWnd, title.c_str());
-
-    PopulateListView(L"", FilterMode::All);
+    UpdateLocalization();
 
     if (restoredPending) {
         const size_t total = m_pendingEnableIds.size() + m_pendingRevertIds.size();
         if (total > 0) {
-            std::wstring stMsg = L"Restored " + std::to_wstring(total) + L" pending selections from previous session. Click 'Apply Selected' to apply.";
+            std::wstring stMsg = LocFmt("restored_pending", total);
             SendMessageW(m_hStatusBar, SB_SETTEXTW, 0, reinterpret_cast<LPARAM>(stMsg.c_str()));
-        } else {
-            UpdateStatusBar();
         }
-    } else {
-        UpdateStatusBar();
     }
 }
 
@@ -891,36 +901,7 @@ void MainWindow::OnSize(int width, int height) {
     SendMessage(m_hStatusBar, SB_SETPARTS, 3, reinterpret_cast<LPARAM>(parts));
 
     // Toolbar layout
-    const int topMargin = 10;
-    const int ctrlH = 26;
-
-    // Position top row controls with unified layout
-    const int xSearch = 10;
-    const int wSearch = 180;
-
-    const int xFilter = xSearch + wSearch + 6; // 196
-    const int wFilter = 140;
-
-    const int xCount = xFilter + wFilter + 6;  // 342
-    const int wCount = 80;
-
-    const int xPresetCombo = xCount + wCount + 10; // 432
-    const int wPresetCombo = 140;
-
-    const int xPresetBtn = xPresetCombo + wPresetCombo + 6; // 578
-    const int wPresetBtn = 95;
-
-    const int xDefaultsBtn = xPresetBtn + wPresetBtn + 6; // 679
-    const int wDefaultsBtn = 105;
-
-    SetWindowPos(m_hSearchEdit, nullptr, xSearch, topMargin, wSearch, ctrlH, SWP_NOZORDER);
-    SetWindowPos(m_hFilterCombo, nullptr, xFilter, topMargin, wFilter, 200, SWP_NOZORDER);
-    SetWindowPos(m_hLblMatchCount, nullptr, xCount, topMargin + 3, wCount, 20, SWP_NOZORDER);
-    SetWindowPos(m_hTemplateCombo, nullptr, xPresetCombo, topMargin, wPresetCombo, 200, SWP_NOZORDER);
-    SetWindowPos(m_hBtnSelectPreset, nullptr, xPresetBtn, topMargin, wPresetBtn, ctrlH, SWP_NOZORDER);
-    SetWindowPos(m_hBtnRevert, nullptr, xDefaultsBtn, topMargin, wDefaultsBtn, ctrlH, SWP_NOZORDER);
-
-    UpdateActionButtonsLayout(width);
+    UpdateToolbarLayout(width);
 
     UpdateSplitterLayout();
 
@@ -1181,7 +1162,8 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
         group.stateMask = LVGS_COLLAPSIBLE;
         group.state = LVGS_COLLAPSIBLE;
         group.iGroupId = groupId;
-        group.pszHeader = const_cast<LPWSTR>(cat.name.c_str());
+        std::wstring locCat = Localization::Instance().GetCategory(cat.name);
+        group.pszHeader = const_cast<LPWSTR>(locCat.c_str());
 
         ListView_InsertGroup(m_hListView, -1, &group);
         categoryToGroupId[cat.name] = groupId;
@@ -1209,15 +1191,20 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
             m_appliedCount++;
         }
 
+        std::wstring locTitle = Localization::Instance().GetTweakTitle(t.id, t.title);
+
         // Filter logic
         if (!lowerSearch.empty()) {
             std::wstring lowerTitle = t.title;
             std::transform(lowerTitle.begin(), lowerTitle.end(), lowerTitle.begin(), ::towlower);
+            std::wstring lowerLocTitle = locTitle;
+            std::transform(lowerLocTitle.begin(), lowerLocTitle.end(), lowerLocTitle.begin(), ::towlower);
             std::wstring lowerDesc = t.description;
             std::transform(lowerDesc.begin(), lowerDesc.end(), lowerDesc.begin(), ::towlower);
             std::wstring wideId(t.id.begin(), t.id.end());
             std::transform(wideId.begin(), wideId.end(), wideId.begin(), ::towlower);
             if (lowerTitle.find(lowerSearch) == std::wstring::npos &&
+                lowerLocTitle.find(lowerSearch) == std::wstring::npos &&
                 lowerDesc.find(lowerSearch) == std::wstring::npos &&
                 wideId.find(lowerSearch) == std::wstring::npos) {
                 continue;
@@ -1234,7 +1221,7 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
         lvi.mask = LVIF_TEXT | LVIF_GROUPID | LVIF_PARAM;
         lvi.iItem = itemIndex;
         lvi.iSubItem = 0;
-        lvi.pszText = const_cast<LPWSTR>(t.title.c_str());
+        lvi.pszText = const_cast<LPWSTR>(locTitle.c_str());
         lvi.lParam = itemIndex;
 
         auto it = categoryToGroupId.find(t.category);
@@ -1247,29 +1234,29 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
         // Status text (Item 4: Applied, Not applied, Unknown, Not applicable)
         std::wstring stStr;
         switch (st) {
-        case SettingStatus::Applied:       stStr = L"\u25CF Applied"; break;
-        case SettingStatus::NotApplied:    stStr = L"\u25CB Not applied"; break;
-        case SettingStatus::Unknown:       stStr = L"? Unknown"; break;
-        case SettingStatus::NotApplicable: stStr = L"\u2014 Not applicable"; break;
-        default:                           stStr = L"\u25CB Not applied"; break;
+        case SettingStatus::Applied:       stStr = L"\u25CF " + Loc("status_raw_applied"); break;
+        case SettingStatus::NotApplied:    stStr = L"\u25CB " + Loc("status_raw_not_applied"); break;
+        case SettingStatus::Unknown:       stStr = L"? " + Loc("status_raw_unknown"); break;
+        case SettingStatus::NotApplicable: stStr = L"\u2014 " + Loc("status_raw_not_applicable"); break;
+        default:                           stStr = L"\u25CB " + Loc("status_raw_not_applied"); break;
         }
         ListView_SetItemText(m_hListView, itemIndex, 1, const_cast<LPWSTR>(stStr.c_str()));
 
         // Impact text (Item 5: Low, Moderate, High)
         std::wstring impactStr;
         switch (t.impactLevel) {
-        case ImpactLevel::Low:      impactStr = L"Low"; break;
-        case ImpactLevel::Moderate: impactStr = L"Moderate"; break;
-        case ImpactLevel::High:     impactStr = L"High"; break;
+        case ImpactLevel::Low:      impactStr = Loc("impact_low"); break;
+        case ImpactLevel::Moderate: impactStr = Loc("impact_moderate"); break;
+        case ImpactLevel::High:     impactStr = Loc("impact_high"); break;
         }
         ListView_SetItemText(m_hListView, itemIndex, 2, const_cast<LPWSTR>(impactStr.c_str()));
 
         // Scope text (Item 12: User, Machine, or Service)
         std::wstring scopeStr;
         switch (t.scope) {
-        case TargetScope::Machine: scopeStr = L"Machine"; break;
-        case TargetScope::User:    scopeStr = L"User"; break;
-        case TargetScope::Service: scopeStr = L"Machine (Service)"; break;
+        case TargetScope::Machine: scopeStr = Loc("scope_machine"); break;
+        case TargetScope::User:    scopeStr = Loc("scope_user"); break;
+        case TargetScope::Service: scopeStr = Loc("scope_service"); break;
         }
         ListView_SetItemText(m_hListView, itemIndex, 3, const_cast<LPWSTR>(scopeStr.c_str()));
 
@@ -1297,7 +1284,7 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
         ListView_SetItemState(m_hListView, 0, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
         UpdateDetailsPane(0);
     } else {
-        SetWindowTextW(m_hDetailsEdit, L"No settings match the current filter.");
+        SetWindowTextW(m_hDetailsEdit, Loc("no_match_filter").c_str());
     }
 
     UpdateSelectionCounts();
@@ -1322,16 +1309,16 @@ void MainWindow::UpdateSelectionCounts() {
         if (totalSelected > 0) {
             std::wstring btnText;
             if (pendingApply > 0 && pendingRevert > 0) {
-                btnText = L"Apply Changes (" + std::to_wstring(totalSelected) + L")";
+                btnText = LocFmt("btn_apply_changes_n", totalSelected);
             } else if (pendingRevert > 0) {
-                btnText = L"Restore Selected (" + std::to_wstring(pendingRevert) + L")";
+                btnText = LocFmt("btn_restore_selected_n", pendingRevert);
             } else {
-                btnText = L"Apply Selected (" + std::to_wstring(pendingApply) + L")";
+                btnText = LocFmt("btn_apply_selected_n", pendingApply);
             }
             SetWindowTextW(m_hBtnApply, btnText.c_str());
             EnableWindow(m_hBtnApply, TRUE);
         } else {
-            SetWindowTextW(m_hBtnApply, L"Apply Selected");
+            SetWindowTextW(m_hBtnApply, Loc("btn_apply_selected").c_str());
             EnableWindow(m_hBtnApply, FALSE);
         }
     }
@@ -1339,17 +1326,17 @@ void MainWindow::UpdateSelectionCounts() {
     // Update compact count label next to filter/search (Item 3)
     if (m_hLblMatchCount) {
         std::wstringstream ss;
-        ss << m_displayedTweaks.size() << L" shown";
+        ss << LocFmt("match_shown", m_displayedTweaks.size());
         if (totalSelected > 0) {
-            ss << L" \u00B7 " << totalSelected << L" selected";
+            ss << L" \u00B7 " << LocFmt("match_selected", totalSelected);
             if (hiddenSelected > 0) {
-                ss << L" (" << hiddenSelected << L" hidden)";
+                ss << L" " << LocFmt("match_hidden", hiddenSelected);
             }
         }
         SetWindowTextW(m_hLblMatchCount, ss.str().c_str());
     }
 
-    UpdateActionButtonsLayout();
+    UpdateToolbarLayout();
 }
 
 int MainWindow::GetApplyButtonWidth() const {
@@ -1389,17 +1376,303 @@ void MainWindow::UpdateActionButtonsLayout(int clientWidth) {
     }
     if (clientWidth <= 0) return;
 
-    const int topMargin = 10;
-    const int ctrlH = 26;
+    UINT dpi = 96;
+    if (m_hWnd) {
+        dpi = GetDpiForWindow(m_hWnd);
+        if (dpi == 0) dpi = 96;
+    }
+
+    const int topMargin = MulDiv(10, dpi, 96);
+    const int ctrlH = MulDiv(26, dpi, 96);
+    const int gap = MulDiv(6, dpi, 96);
     const int rightEdge = clientWidth - 10;
     const int btnApplyW = GetApplyButtonWidth();
 
-    SetWindowPos(m_hBtnApply, nullptr, rightEdge - btnApplyW, topMargin, btnApplyW, ctrlH, SWP_NOZORDER | SWP_NOACTIVATE);
+    int applyX = rightEdge - btnApplyW;
+    if (m_hBtnRevert) {
+        RECT rcDefaults{};
+        GetWindowRect(m_hBtnRevert, &rcDefaults);
+        POINT pt{ rcDefaults.right, rcDefaults.top };
+        ScreenToClient(m_hWnd, &pt);
+        if (applyX < pt.x + gap) {
+            applyX = pt.x + gap;
+        }
+    }
+
+    SetWindowPos(m_hBtnApply, nullptr, applyX, topMargin, btnApplyW, ctrlH, SWP_NOZORDER | SWP_NOACTIVATE);
 
     // Repaint toolbar background area around apply button to cleanly erase any vacated background
-    RECT rcToolbar{ rightEdge - btnApplyW - 30, topMargin - 2, clientWidth, topMargin + ctrlH + 4 };
+    RECT rcToolbar{ 0, topMargin - 2, clientWidth, topMargin + ctrlH + 4 };
     InvalidateRect(m_hWnd, &rcToolbar, TRUE);
     UpdateWindow(m_hBtnApply);
+}
+
+static int MeasureWindowTextWidth(HWND hCtrl, HFONT hFont, int padding = 20) {
+    if (!hCtrl) return 60;
+    wchar_t buf[256]{};
+    GetWindowTextW(hCtrl, buf, 256);
+    if (buf[0] == L'\0') return 60;
+    HDC hdc = GetDC(hCtrl);
+    if (!hdc) return 60;
+    HGDIOBJ hOld = SelectObject(hdc, hFont ? hFont : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT)));
+    SIZE sz{};
+    GetTextExtentPoint32W(hdc, buf, static_cast<int>(wcslen(buf)), &sz);
+    SelectObject(hdc, hOld);
+    ReleaseDC(hCtrl, hdc);
+    return static_cast<int>(sz.cx) + padding;
+}
+
+static int MeasureComboMaxTextWidth(HWND hCombo, HFONT hFont) {
+    if (!hCombo) return 120;
+    int count = static_cast<int>(SendMessageW(hCombo, CB_GETCOUNT, 0, 0));
+    if (count <= 0) return 120;
+    HDC hdc = GetDC(hCombo);
+    if (!hdc) return 120;
+    HGDIOBJ hOld = SelectObject(hdc, hFont ? hFont : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT)));
+    int maxW = 0;
+    for (int i = 0; i < count; ++i) {
+        int len = static_cast<int>(SendMessageW(hCombo, CB_GETLBTEXTLEN, i, 0));
+        if (len > 0 && len < 256) {
+            std::wstring s(len, L'\0');
+            SendMessageW(hCombo, CB_GETLBTEXT, i, reinterpret_cast<LPARAM>(s.data()));
+            SIZE sz{};
+            GetTextExtentPoint32W(hdc, s.c_str(), len, &sz);
+            if (static_cast<int>(sz.cx) > maxW) maxW = static_cast<int>(sz.cx);
+        }
+    }
+    SelectObject(hdc, hOld);
+    ReleaseDC(hCombo, hdc);
+    return maxW;
+}
+
+void MainWindow::UpdateToolbarLayout(int clientWidth) {
+    if (!m_hWnd) return;
+    if (clientWidth <= 0) {
+        RECT rcClient{};
+        GetClientRect(m_hWnd, &rcClient);
+        clientWidth = rcClient.right - rcClient.left;
+    }
+    if (clientWidth <= 0) return;
+
+    UINT dpi = 96;
+    if (m_hWnd) {
+        dpi = GetDpiForWindow(m_hWnd);
+        if (dpi == 0) dpi = 96;
+    }
+
+    const int topMargin = MulDiv(10, dpi, 96);
+    const int ctrlH = MulDiv(26, dpi, 96);
+    const int gap = MulDiv(6, dpi, 96);
+
+    // Measure combo boxes content width
+    int filterContentW = MeasureComboMaxTextWidth(m_hFilterCombo, m_hFontRegular);
+    int wFilter = std::max(MulDiv(140, dpi, 96), filterContentW + MulDiv(32, dpi, 96));
+    SendMessageW(m_hFilterCombo, CB_SETDROPPEDWIDTH, std::max(wFilter, filterContentW + MulDiv(28, dpi, 96)), 0);
+
+    int tplContentW = MeasureComboMaxTextWidth(m_hTemplateCombo, m_hFontRegular);
+    int wPresetCombo = std::max(MulDiv(130, dpi, 96), tplContentW + MulDiv(32, dpi, 96));
+    SendMessageW(m_hTemplateCombo, CB_SETDROPPEDWIDTH, std::max(wPresetCombo, tplContentW + MulDiv(28, dpi, 96)), 0);
+
+    // Measure buttons
+    int wPresetBtn = std::max(MulDiv(95, dpi, 96), MeasureWindowTextWidth(m_hBtnSelectPreset, m_hFontRegular, MulDiv(22, dpi, 96)));
+    int wDefaultsBtn = std::max(MulDiv(105, dpi, 96), MeasureWindowTextWidth(m_hBtnRevert, m_hFontRegular, MulDiv(22, dpi, 96)));
+
+    // Match count label
+    int wCount = std::max(MulDiv(75, dpi, 96), MeasureWindowTextWidth(m_hLblMatchCount, m_hFontRegular, MulDiv(10, dpi, 96)));
+
+    // Search box: base 170
+    int wSearch = MulDiv(170, dpi, 96);
+
+    const int applyBtnW = GetApplyButtonWidth();
+    const int rightAvail = clientWidth - 10 - applyBtnW - gap;
+    int totalLeftW = 10 + wSearch + gap + wFilter + gap + wCount + MulDiv(10, dpi, 96) + wPresetCombo + gap + wPresetBtn + gap + wDefaultsBtn;
+
+    int excess = totalLeftW - rightAvail;
+    if (excess > 0) {
+        int shrinkSearch = std::min(wSearch - MulDiv(90, dpi, 96), excess);
+        wSearch -= shrinkSearch;
+        excess -= shrinkSearch;
+    }
+    if (excess > 0) {
+        int shrinkFilter = std::min(wFilter - MulDiv(130, dpi, 96), excess);
+        wFilter -= shrinkFilter;
+        excess -= shrinkFilter;
+    }
+    if (excess > 0) {
+        int shrinkPreset = std::min(wPresetCombo - MulDiv(120, dpi, 96), excess);
+        wPresetCombo -= shrinkPreset;
+        excess -= shrinkPreset;
+    }
+
+    int x = 10;
+    SetWindowPos(m_hSearchEdit, nullptr, x, topMargin, wSearch, ctrlH, SWP_NOZORDER | SWP_NOACTIVATE);
+    x += wSearch + gap;
+
+    SetWindowPos(m_hFilterCombo, nullptr, x, topMargin, wFilter, MulDiv(200, dpi, 96), SWP_NOZORDER | SWP_NOACTIVATE);
+    x += wFilter + gap;
+
+    SetWindowPos(m_hLblMatchCount, nullptr, x, topMargin + MulDiv(3, dpi, 96), wCount, MulDiv(20, dpi, 96), SWP_NOZORDER | SWP_NOACTIVATE);
+    x += wCount + MulDiv(10, dpi, 96);
+
+    SetWindowPos(m_hTemplateCombo, nullptr, x, topMargin, wPresetCombo, MulDiv(200, dpi, 96), SWP_NOZORDER | SWP_NOACTIVATE);
+    x += wPresetCombo + gap;
+
+    SetWindowPos(m_hBtnSelectPreset, nullptr, x, topMargin, wPresetBtn, ctrlH, SWP_NOZORDER | SWP_NOACTIVATE);
+    x += wPresetBtn + gap;
+
+    SetWindowPos(m_hBtnRevert, nullptr, x, topMargin, wDefaultsBtn, ctrlH, SWP_NOZORDER | SWP_NOACTIVATE);
+
+    UpdateActionButtonsLayout(clientWidth);
+}
+
+void MainWindow::UpdateMenus() {
+    HMENU hMenu = GetMenu(m_hWnd);
+    if (!hMenu) return;
+
+    // Top-level popups (by position)
+    ModifyMenuW(hMenu, 0, MF_BYPOSITION | MF_POPUP, reinterpret_cast<UINT_PTR>(GetSubMenu(hMenu, 0)), Loc("menu_file").c_str());
+    ModifyMenuW(hMenu, 1, MF_BYPOSITION | MF_POPUP, reinterpret_cast<UINT_PTR>(GetSubMenu(hMenu, 1)), Loc("menu_presets").c_str());
+    ModifyMenuW(hMenu, 2, MF_BYPOSITION | MF_POPUP, reinterpret_cast<UINT_PTR>(GetSubMenu(hMenu, 2)), Loc("menu_actions").c_str());
+    ModifyMenuW(hMenu, 3, MF_BYPOSITION | MF_POPUP, reinterpret_cast<UINT_PTR>(GetSubMenu(hMenu, 3)), Loc("menu_language").c_str());
+    ModifyMenuW(hMenu, 4, MF_BYPOSITION | MF_POPUP, reinterpret_cast<UINT_PTR>(GetSubMenu(hMenu, 4)), Loc("menu_tools").c_str());
+    ModifyMenuW(hMenu, 5, MF_BYPOSITION | MF_POPUP, reinterpret_cast<UINT_PTR>(GetSubMenu(hMenu, 5)), Loc("menu_help").c_str());
+
+    // File menu
+    ModifyMenuW(hMenu, IDM_FILE_EXPORT, MF_BYCOMMAND | MF_STRING, IDM_FILE_EXPORT, Loc("menu_export").c_str());
+    ModifyMenuW(hMenu, IDM_FILE_IMPORT, MF_BYCOMMAND | MF_STRING, IDM_FILE_IMPORT, Loc("menu_import").c_str());
+    ModifyMenuW(hMenu, IDM_FILE_RESTART_ADMIN, MF_BYCOMMAND | MF_STRING, IDM_FILE_RESTART_ADMIN, Loc("menu_restart_admin").c_str());
+    ModifyMenuW(hMenu, IDM_FILE_EXIT, MF_BYCOMMAND | MF_STRING, IDM_FILE_EXIT, Loc("menu_exit").c_str());
+
+    // Presets menu
+    ModifyMenuW(hMenu, IDM_TPL_RECOMMENDED, MF_BYCOMMAND | MF_STRING, IDM_TPL_RECOMMENDED, Loc("menu_tpl_recommended").c_str());
+    ModifyMenuW(hMenu, IDM_TPL_STRICT, MF_BYCOMMAND | MF_STRING, IDM_TPL_STRICT, Loc("menu_tpl_strict").c_str());
+    ModifyMenuW(hMenu, IDM_TPL_MINIMAL, MF_BYCOMMAND | MF_STRING, IDM_TPL_MINIMAL, Loc("menu_tpl_minimal").c_str());
+
+    // Actions menu
+    ModifyMenuW(hMenu, IDM_ACT_APPLY, MF_BYCOMMAND | MF_STRING, IDM_ACT_APPLY, Loc("menu_apply").c_str());
+    ModifyMenuW(hMenu, IDM_ACT_RESTORE_SELECTED, MF_BYCOMMAND | MF_STRING, IDM_ACT_RESTORE_SELECTED, Loc("menu_restore_selected").c_str());
+    ModifyMenuW(hMenu, IDM_ACT_RESTORE_ALL, MF_BYCOMMAND | MF_STRING, IDM_ACT_RESTORE_ALL, Loc("menu_restore_all").c_str());
+    ModifyMenuW(hMenu, IDM_SEL_RECOMMENDED, MF_BYCOMMAND | MF_STRING, IDM_SEL_RECOMMENDED, Loc("menu_sel_recommended").c_str());
+    ModifyMenuW(hMenu, IDM_SEL_ALL_SHOWN, MF_BYCOMMAND | MF_STRING, IDM_SEL_ALL_SHOWN, Loc("menu_sel_all").c_str());
+    ModifyMenuW(hMenu, IDM_SEL_INVERT_SHOWN, MF_BYCOMMAND | MF_STRING, IDM_SEL_INVERT_SHOWN, Loc("menu_sel_invert").c_str());
+    ModifyMenuW(hMenu, IDM_SEL_CLEAR, MF_BYCOMMAND | MF_STRING, IDM_SEL_CLEAR, Loc("menu_sel_clear").c_str());
+    ModifyMenuW(hMenu, IDM_ACT_REFRESH, MF_BYCOMMAND | MF_STRING, IDM_ACT_REFRESH, Loc("menu_refresh").c_str());
+    ModifyMenuW(hMenu, IDM_ACT_RESTORE_PT, MF_BYCOMMAND | MF_STRING, IDM_ACT_RESTORE_PT, Loc("menu_restore_pt").c_str());
+
+    // Language submenu items
+    HMENU hLangSub = GetSubMenu(hMenu, 3);
+    if (hLangSub) {
+        const auto& langs = Localization::Instance().GetSupportedLanguages();
+        for (const auto& l : langs) {
+            std::wstring label = L"&" + l.nativeName;
+            if (l.lang != Language::English) {
+                label += L" (" + l.englishName + L")";
+            }
+            ModifyMenuW(hLangSub, l.menuId, MF_BYCOMMAND | MF_STRING, l.menuId, label.c_str());
+        }
+        int curLangIdx = static_cast<int>(Localization::Instance().GetCurrentLanguage());
+        CheckMenuRadioItem(hLangSub, IDM_LANG_BASE, IDM_LANG_BASE + 11, IDM_LANG_BASE + curLangIdx, MF_BYCOMMAND);
+    }
+
+    // Tools menu
+    ModifyMenuW(hMenu, IDM_TOOLS_SCHEDULE, MF_BYCOMMAND | MF_STRING, IDM_TOOLS_SCHEDULE, Loc("menu_schedule").c_str());
+    ModifyMenuW(hMenu, IDM_TOOLS_TASKSCHD, MF_BYCOMMAND | MF_STRING, IDM_TOOLS_TASKSCHD, Loc("menu_taskschd").c_str());
+
+    // Help menu
+    ModifyMenuW(hMenu, IDM_HELP_ABOUT, MF_BYCOMMAND | MF_STRING, IDM_HELP_ABOUT, Loc("menu_about").c_str());
+    ModifyMenuW(hMenu, IDM_HELP_GITHUB, MF_BYCOMMAND | MF_STRING, IDM_HELP_GITHUB, Loc("menu_github").c_str());
+
+    DrawMenuBar(m_hWnd);
+}
+
+void MainWindow::UpdateLocalization() {
+    // Window title
+    std::wstring title = Loc("app_title");
+    if (IsRunningAsAdmin()) {
+        title += Loc("admin_suffix");
+    } else {
+        title += Loc("user_suffix");
+    }
+    SetWindowTextW(m_hWnd, title.c_str());
+
+    // Menus
+    UpdateMenus();
+
+    // Search cue banner
+    if (m_hSearchEdit) {
+        SendMessageW(m_hSearchEdit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(Loc("search_cue").c_str()));
+    }
+
+    // Filter combo
+    if (m_hFilterCombo) {
+        int curSel = static_cast<int>(SendMessageW(m_hFilterCombo, CB_GETCURSEL, 0, 0));
+        if (curSel < 0) curSel = 0;
+        SendMessageW(m_hFilterCombo, CB_RESETCONTENT, 0, 0);
+        SendMessageW(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("filter_all").c_str()));
+        SendMessageW(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("filter_not_applied").c_str()));
+        SendMessageW(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("filter_applied").c_str()));
+        SendMessageW(m_hFilterCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("filter_recommended").c_str()));
+        SendMessageW(m_hFilterCombo, CB_SETCURSEL, curSel, 0);
+    }
+
+    // Template combo
+    if (m_hTemplateCombo) {
+        int curSel = static_cast<int>(SendMessageW(m_hTemplateCombo, CB_GETCURSEL, 0, 0));
+        if (curSel < 0) curSel = 0;
+        SendMessageW(m_hTemplateCombo, CB_RESETCONTENT, 0, 0);
+        SendMessageW(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("tpl_recommended").c_str()));
+        SendMessageW(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("tpl_strict").c_str()));
+        SendMessageW(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Loc("tpl_minimal").c_str()));
+        SendMessageW(m_hTemplateCombo, CB_SETCURSEL, curSel, 0);
+    }
+
+    // Buttons
+    if (m_hBtnSelectPreset) {
+        SetWindowTextW(m_hBtnSelectPreset, Loc("btn_apply_preset").c_str());
+    }
+    if (m_hBtnRevert) {
+        SetWindowTextW(m_hBtnRevert, Loc("btn_apply_defaults").c_str());
+    }
+
+    // ListView columns
+    if (m_hListView) {
+        LVCOLUMNW col{};
+        col.mask = LVCF_TEXT;
+
+        col.pszText = const_cast<LPWSTR>(Loc("col_setting").c_str());
+        ListView_SetColumn(m_hListView, 0, &col);
+
+        col.pszText = const_cast<LPWSTR>(Loc("col_status").c_str());
+        ListView_SetColumn(m_hListView, 1, &col);
+
+        col.pszText = const_cast<LPWSTR>(Loc("col_impact").c_str());
+        ListView_SetColumn(m_hListView, 2, &col);
+
+        col.pszText = const_cast<LPWSTR>(Loc("col_scope").c_str());
+        ListView_SetColumn(m_hListView, 3, &col);
+    }
+
+    // Header Tooltips
+    HWND hHeader = ListView_GetHeader(m_hListView);
+    if (m_hHeaderTooltip && hHeader) {
+        std::wstring tt0 = Loc("tip_col_setting");
+        std::wstring tt1 = Loc("tip_col_status");
+        std::wstring tt2 = Loc("tip_col_impact");
+        std::wstring tt3 = Loc("tip_col_scope");
+
+        std::wstring* tts[4] = { &tt0, &tt1, &tt2, &tt3 };
+        for (int i = 0; i < 4; ++i) {
+            TOOLINFOW ti{};
+            ti.cbSize = sizeof(ti);
+            ti.hwnd = hHeader;
+            ti.uId = static_cast<UINT_PTR>(i);
+            ti.lpszText = const_cast<LPWSTR>(tts[i]->c_str());
+            SendMessageW(m_hHeaderTooltip, TTM_UPDATETIPTEXTW, 0, reinterpret_cast<LPARAM>(&ti));
+        }
+    }
+
+    PopulateListView(m_currentFilter, m_filterMode);
+    UpdateToolbarLayout();
 }
 
 void MainWindow::UpdateDetailsPane(int selectedIndex) {
@@ -1411,62 +1684,63 @@ void MainWindow::UpdateDetailsPane(int selectedIndex) {
     const auto& t = m_displayedTweaks[selectedIndex];
     const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
 
-    // Item 10: Reordered and shortened details content in sentence-case
+    std::wstring locTitle = Localization::Instance().GetTweakTitle(t.id, t.title);
+    std::wstring locCat = Localization::Instance().GetCategory(t.category);
+
     std::wstringstream ss;
-    ss << t.title << L"\r\n";
+    ss << locTitle << L"\r\n";
 
     // State, impact, scope metadata line
     std::wstring stStr;
     switch (st) {
-    case SettingStatus::Applied:       stStr = L"Applied"; break;
-    case SettingStatus::NotApplied:    stStr = L"Not applied"; break;
-    case SettingStatus::Unknown:       stStr = L"Unknown"; break;
-    case SettingStatus::NotApplicable: stStr = L"Not applicable"; break;
-    default:                           stStr = L"Not applied"; break;
+    case SettingStatus::Applied:       stStr = Loc("status_raw_applied"); break;
+    case SettingStatus::NotApplied:    stStr = Loc("status_raw_not_applied"); break;
+    case SettingStatus::Unknown:       stStr = Loc("status_raw_unknown"); break;
+    case SettingStatus::NotApplicable: stStr = Loc("status_raw_not_applicable"); break;
+    default:                           stStr = Loc("status_raw_not_applied"); break;
     }
 
     std::wstring impactStr;
     switch (t.impactLevel) {
-    case ImpactLevel::Low:      impactStr = L"Low"; break;
-    case ImpactLevel::Moderate: impactStr = L"Moderate"; break;
-    case ImpactLevel::High:     impactStr = L"High"; break;
+    case ImpactLevel::Low:      impactStr = Loc("impact_low"); break;
+    case ImpactLevel::Moderate: impactStr = Loc("impact_moderate"); break;
+    case ImpactLevel::High:     impactStr = Loc("impact_high"); break;
     }
 
     std::wstring scopeStr;
     switch (t.scope) {
-    case TargetScope::Machine: scopeStr = L"Machine"; break;
-    case TargetScope::User:    scopeStr = L"User"; break;
-    case TargetScope::Service: scopeStr = L"Machine (Service)"; break;
+    case TargetScope::Machine: scopeStr = Loc("scope_machine"); break;
+    case TargetScope::User:    scopeStr = Loc("scope_user"); break;
+    case TargetScope::Service: scopeStr = Loc("scope_service"); break;
     }
 
-
-    ss << L"State: " << stStr
-       << L"  |  Impact: " << impactStr
-       << L"  |  Scope: " << scopeStr
-       << (t.isRecommended ? L"  |  Recommended: Yes" : L"  |  Recommended: No")
-       << L"  |  Category: " << t.category << L"\r\n\r\n";
+    ss << Loc("label_state") << stStr
+       << Loc("label_impact") << impactStr
+       << Loc("label_scope") << scopeStr
+       << Loc("label_recommended") << (t.isRecommended ? Loc("yes") : Loc("no"))
+       << Loc("label_category") << locCat << L"\r\n\r\n";
 
     // 1. What applying it does (practical explanation first)
-    ss << L"What applying it does:\r\n" << t.description << L"\r\n\r\n";
+    ss << Loc("what_it_does") << L"\r\n" << t.description << L"\r\n\r\n";
 
     // 2. Features it may affect (specific consequence & tradeoff)
     if (!t.impact.empty()) {
-        ss << L"Features it may affect:\r\n" << t.impact << L"\r\n\r\n";
+        ss << Loc("features_affected") << L"\r\n" << t.impact << L"\r\n\r\n";
     }
 
     // 3. Restart/sign-out requirement
-    ss << L"Restart requirement:\r\n";
+    ss << Loc("restart_requirement") << L"\r\n";
     if (t.requiresReboot) {
-        ss << L"System restart required for changes to take full effect.\r\n\r\n";
+        ss << Loc("reboot_system") << L"\r\n\r\n";
     } else if (t.requiresSignOut) {
-        ss << L"User sign-out required for changes to take full effect.\r\n\r\n";
+        ss << Loc("reboot_signout") << L"\r\n\r\n";
     } else {
-        ss << L"None. Takes effect immediately or on next process launch.\r\n\r\n";
+        ss << Loc("reboot_none") << L"\r\n\r\n";
     }
 
     // 4. Technical information below practical explanation
     if (!t.regActions.empty() || !t.serviceActions.empty()) {
-        ss << L"Technical information:\r\n";
+        ss << Loc("technical_info") << L"\r\n";
         for (const auto& reg : t.regActions) {
             ss << L"  [" << (reg.scope == TargetScope::Machine ? L"HKLM\\" : L"HKCU\\") << reg.subKey << L"]\r\n";
             if (reg.type == RegType::Dword) {
@@ -1498,21 +1772,21 @@ void MainWindow::UpdateStatusBar() {
     const size_t hiddenSelected = (totalSelected >= shownSelected) ? (totalSelected - shownSelected) : 0;
 
     std::wstringstream ss;
-    ss << m_appliedCount << L" applied \u00B7 ";
+    ss << LocFmt("status_applied_count", m_appliedCount) << L" \u00B7 ";
     if (totalSelected > 0) {
-        ss << totalSelected << L" selected";
+        ss << LocFmt("match_selected", totalSelected);
         if (hiddenSelected > 0) {
-            ss << L" (" << hiddenSelected << L" hidden)";
+            ss << L" " << LocFmt("match_hidden", hiddenSelected);
         }
         ss << L" \u00B7 ";
     }
-    ss << m_displayedTweaks.size() << L" shown";
+    ss << LocFmt("match_shown", m_displayedTweaks.size());
 
     SendMessage(m_hStatusBar, SB_SETTEXTW, 0, reinterpret_cast<LPARAM>(ss.str().c_str()));
 
     // Elevation Status
     const bool isAdmin = IsRunningAsAdmin();
-    std::wstring part2 = isAdmin ? L"Administrator (Elevated)" : L"Standard User";
+    std::wstring part2 = isAdmin ? Loc("elevation_admin") : Loc("elevation_user");
     SendMessage(m_hStatusBar, SB_SETTEXTW, 2, reinterpret_cast<LPARAM>(part2.c_str()));
 }
 
@@ -1628,10 +1902,7 @@ void MainWindow::ApplySelectedTweaks() {
     const size_t pendingRevert = m_pendingRevertIds.size();
     const size_t totalSelected = pendingApply + pendingRevert;
     if (totalSelected == 0) {
-        MessageBoxW(m_hWnd,
-            L"No settings are currently staged for changes.\n\n"
-            L"Select settings using their checkboxes or choose a preset to stage changes.",
-            L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(m_hWnd, Loc("no_staged_msg").c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONINFORMATION);
         return;
     }
 
@@ -1649,9 +1920,8 @@ void MainWindow::ApplySelectedTweaks() {
 
     if (needAdmin && !IsRunningAsAdmin()) {
         const int res = MessageBoxW(m_hWnd,
-            L"Administrator privileges are required to modify system-wide machine settings.\n\n"
-            L"Would you like to restart PrivatizeWin as Administrator now?",
-            L"PrivatizeWin \u2014 Elevation Required",
+            Loc("admin_required_prompt").c_str(),
+            Loc("app_title").c_str(),
             MB_YESNO | MB_ICONWARNING);
         if (res == IDYES) {
             RelaunchAsAdminWithPendingState();
@@ -1685,33 +1955,37 @@ void MainWindow::ApplySelectedTweaks() {
     }
 
     std::wstringstream review;
-    review << L"You are about to modify " << totalSelected << L" setting(s)";
-    if (pendingApply > 0 && pendingRevert > 0) {
-        review << L" (" << pendingApply << L" to apply, " << pendingRevert << L" to restore)";
+    if (pendingApply > 0) {
+        review << LocFmt("review_apply_count", pendingApply);
     }
-    review << L".\n\n";
+    if (pendingRevert > 0) {
+        review << LocFmt("review_revert_count", pendingRevert);
+    }
+    review << L"\n";
 
     if (!moderateHighTweaks.empty()) {
-        review << L"Moderate / High Impact Settings (" << moderateHighTweaks.size() << L"):\n";
+        review << Loc("col_impact") << L" (" << moderateHighTweaks.size() << L"):\n";
         const size_t limit = std::min<size_t>(moderateHighTweaks.size(), 8);
         for (size_t i = 0; i < limit; ++i) {
             const auto* t = moderateHighTweaks[i];
-            review << L"  \u2022 " << t->title << L" (" << (t->impactLevel == ImpactLevel::High ? L"High" : L"Moderate") << L" impact)\n";
+            std::wstring locT = Localization::Instance().GetTweakTitle(t->id, t->title);
+            std::wstring impactName = (t->impactLevel == ImpactLevel::High) ? Loc("impact_high") : Loc("impact_moderate");
+            review << L"  \u2022 " << locT << L" (" << impactName << L")\n";
         }
         if (moderateHighTweaks.size() > limit) {
-            review << L"  ... and " << (moderateHighTweaks.size() - limit) << L" more.\n";
+            review << L"  ... (" << (moderateHighTweaks.size() - limit) << L")\n";
         }
         review << L"\n";
     }
 
     if (anyReboot) {
-        review << L"Note: A system restart is required for some settings to take full effect.\n\n";
+        review << Loc("reboot_system") << L"\n\n";
     } else if (anySignOut) {
-        review << L"Note: A user sign-out is required for some settings to take full effect.\n\n";
+        review << Loc("reboot_signout") << L"\n\n";
     }
 
-    review << L"Do you wish to proceed?";
-    const int choice = MessageBoxW(m_hWnd, review.str().c_str(), L"Apply Selected Settings", MB_YESNO | MB_ICONQUESTION);
+    review << Loc("review_proceed");
+    const int choice = MessageBoxW(m_hWnd, review.str().c_str(), Loc("review_title").c_str(), MB_YESNO | MB_ICONQUESTION);
     if (choice != IDYES) return;
 
     ShowWindow(m_hProgressBar, SW_SHOW);
@@ -1763,12 +2037,11 @@ void MainWindow::ApplySelectedTweaks() {
 
     RefreshAuditState();
 
-    std::wstringstream resMsg;
-    resMsg << L"Operation completed.\n\n"
-           << L"  \u2022 Changed: " << changedCount << L"\n"
-           << L"  \u2022 Already in requested state: " << alreadyCount << L"\n"
-           << L"  \u2022 Failed: " << failedCount;
-    MessageBoxW(m_hWnd, resMsg.str().c_str(), L"PrivatizeWin", MB_OK | (failedCount == 0 ? MB_ICONINFORMATION : MB_ICONWARNING));
+    std::wstring resMsg = LocFmt("apply_success", changedCount, alreadyCount, failedCount);
+    if (anyReboot) {
+        resMsg += Loc("reboot_recommended");
+    }
+    MessageBoxW(m_hWnd, resMsg.c_str(), Loc("app_title").c_str(), MB_OK | (failedCount == 0 ? MB_ICONINFORMATION : MB_ICONWARNING));
 }
 
 void MainWindow::RestoreSelectedDefaults() {
@@ -1869,11 +2142,11 @@ void MainWindow::RefreshAuditState() {
 
         std::wstring stStr;
         switch (st) {
-        case SettingStatus::Applied:       stStr = L"\u25CF Applied"; break;
-        case SettingStatus::NotApplied:    stStr = L"\u25CB Not applied"; break;
-        case SettingStatus::Unknown:       stStr = L"? Unknown"; break;
-        case SettingStatus::NotApplicable: stStr = L"\u2014 Not applicable"; break;
-        default:                           stStr = L"\u25CB Not applied"; break;
+        case SettingStatus::Applied:       stStr = L"\u25CF " + Loc("status_raw_applied"); break;
+        case SettingStatus::NotApplied:    stStr = L"\u25CB " + Loc("status_raw_not_applied"); break;
+        case SettingStatus::Unknown:       stStr = L"? " + Loc("status_raw_unknown"); break;
+        case SettingStatus::NotApplicable: stStr = L"\u2014 " + Loc("status_raw_not_applicable"); break;
+        default:                           stStr = L"\u25CB " + Loc("status_raw_not_applied"); break;
         }
 
         ListView_SetItemText(m_hListView, i, 1, const_cast<LPWSTR>(stStr.c_str()));
@@ -1929,11 +2202,11 @@ void MainWindow::OnContextMenu(HWND hWnd, int x, int y) {
     const UINT actionFlag = hasApplicable ? MF_STRING : (MF_STRING | MF_GRAYED | MF_DISABLED);
 
     HMENU hMenu = CreatePopupMenu();
-    AppendMenuW(hMenu, actionFlag, IDM_CTX_PROTECT_SELECTED, L"Select for Application");
-    AppendMenuW(hMenu, actionFlag, IDM_CTX_DEFAULT_SELECTED, L"Deselect");
+    AppendMenuW(hMenu, actionFlag, IDM_CTX_PROTECT_SELECTED, Loc("ctx_select").c_str());
+    AppendMenuW(hMenu, actionFlag, IDM_CTX_DEFAULT_SELECTED, Loc("ctx_deselect").c_str());
     AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(hMenu, MF_STRING, IDM_CTX_COPY_ID, L"Copy Setting ID");
-    AppendMenuW(hMenu, MF_STRING, IDM_CTX_COPY_DETAILS, L"Copy Technical Details");
+    AppendMenuW(hMenu, MF_STRING, IDM_CTX_COPY_ID, Loc("ctx_copy_id").c_str());
+    AppendMenuW(hMenu, MF_STRING, IDM_CTX_COPY_DETAILS, Loc("ctx_copy_details").c_str());
 
     TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, x, y, 0, m_hWnd, nullptr);
     DestroyMenu(hMenu);
@@ -1947,6 +2220,12 @@ void MainWindow::OnKeyDown(WPARAM vk) {
         SelectAllShown();
     } else if (vk == 'S' && (GetKeyState(VK_CONTROL) & 0x8000)) {
         ApplySelectedTweaks();
+    } else if (vk == 'E' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+        ExportConfiguration();
+    } else if (vk == 'O' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+        ImportConfiguration();
+    } else if (vk == VK_F5) {
+        RefreshAuditState();
     }
 }
 
@@ -2010,7 +2289,7 @@ void MainWindow::OnCommand(int id, int notifyCode, HWND /*hCtrl*/) {
         break;
     case IDM_FILE_RESTART_ADMIN:
         if (IsRunningAsAdmin()) {
-            MessageBoxW(m_hWnd, L"PrivatizeWin is already running with Administrator privileges.", L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
+            MessageBoxW(m_hWnd, Loc("already_admin").c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONINFORMATION);
         } else {
             RelaunchAsAdminWithPendingState();
         }
@@ -2135,6 +2414,18 @@ void MainWindow::OnCommand(int id, int notifyCode, HWND /*hCtrl*/) {
             PopulateListView(m_currentFilter, m_filterMode);
         }
         break;
+    case IDM_FOCUS_SEARCH:
+        SetFocus(m_hSearchEdit);
+        SendMessage(m_hSearchEdit, EM_SETSEL, 0, -1);
+        break;
+    default:
+        if (id >= IDM_LANG_BASE && id <= IDM_LANG_BASE + 11) {
+            Language lang = static_cast<Language>(id - IDM_LANG_BASE);
+            Localization::Instance().SetLanguage(lang);
+            UpdateLocalization();
+            return;
+        }
+        break;
     }
 }
 
@@ -2188,8 +2479,12 @@ LRESULT MainWindow::OnCustomDraw(NMHDR* pnmhdr) {
         if (itemIndex >= 0 && itemIndex < static_cast<int>(m_displayedTweaks.size())) {
             const auto& t = m_displayedTweaks[itemIndex];
             if (m_notApplicableIds.count(t.id) > 0) {
-                const bool isDark = DarkMode::IsDarkModeActive();
-                pCustomDraw->clrText = isDark ? RGB(115, 115, 115) : RGB(145, 145, 145);
+                if (DarkMode::IsHighContrastActive()) {
+                    pCustomDraw->clrText = GetSysColor(COLOR_GRAYTEXT);
+                } else {
+                    const bool isDark = DarkMode::IsDarkModeActive();
+                    pCustomDraw->clrText = isDark ? RGB(115, 115, 115) : RGB(145, 145, 145);
+                }
                 return CDRF_NEWFONT | CDRF_NOTIFYSUBITEMDRAW;
             }
         }
@@ -2201,8 +2496,12 @@ LRESULT MainWindow::OnCustomDraw(NMHDR* pnmhdr) {
         if (itemIndex >= 0 && itemIndex < static_cast<int>(m_displayedTweaks.size())) {
             const auto& t = m_displayedTweaks[itemIndex];
             if (m_notApplicableIds.count(t.id) > 0) {
-                const bool isDark = DarkMode::IsDarkModeActive();
-                pCustomDraw->clrText = isDark ? RGB(115, 115, 115) : RGB(145, 145, 145);
+                if (DarkMode::IsHighContrastActive()) {
+                    pCustomDraw->clrText = GetSysColor(COLOR_GRAYTEXT);
+                } else {
+                    const bool isDark = DarkMode::IsDarkModeActive();
+                    pCustomDraw->clrText = isDark ? RGB(115, 115, 115) : RGB(145, 145, 145);
+                }
                 return CDRF_NEWFONT;
             }
         }
@@ -2245,9 +2544,9 @@ void MainWindow::ExportConfiguration() {
         }
 
         if (TemplateManager::Instance().SaveTemplateToFile(szFile, p)) {
-            MessageBoxW(m_hWnd, L"Configuration exported successfully.", L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
+            MessageBoxW(m_hWnd, Loc("export_success").c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONINFORMATION);
         } else {
-            MessageBoxW(m_hWnd, L"Failed to export configuration to file.", L"Error", MB_OK | MB_ICONERROR);
+            MessageBoxW(m_hWnd, Loc("export_fail").c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONERROR);
         }
     }
 }
@@ -2305,16 +2604,10 @@ void MainWindow::ImportConfiguration() {
             }
 
             const size_t totalStaged = m_pendingEnableIds.size() + m_pendingRevertIds.size();
-            std::wstring msg = L"Configuration profile imported successfully.\n\n" +
-                               std::to_wstring(totalStaged) + L" changes staged for review (" +
-                               std::to_wstring(m_pendingEnableIds.size()) + L" to apply, " +
-                               std::to_wstring(m_pendingRevertIds.size()) + L" to restore).\n\n" +
-                               L"Click 'Apply Selected' to apply these changes.";
-            MessageBoxW(m_hWnd, msg.c_str(), L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
+            std::wstring msg = LocFmt("import_success", totalStaged, m_pendingEnableIds.size(), m_pendingRevertIds.size());
+            MessageBoxW(m_hWnd, msg.c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONINFORMATION);
         } else {
-            std::wstring errMsg = L"Failed to load or parse configuration file:\n" +
-                                  std::wstring(loadErr.begin(), loadErr.end());
-            MessageBoxW(m_hWnd, errMsg.c_str(), L"Import Error", MB_OK | MB_ICONERROR);
+            MessageBoxW(m_hWnd, Loc("import_fail").c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONERROR);
         }
     }
 }
@@ -2322,9 +2615,8 @@ void MainWindow::ImportConfiguration() {
 void MainWindow::CreateSystemRestorePoint() {
     if (!IsRunningAsAdmin()) {
         const int res = MessageBoxW(m_hWnd,
-            L"Administrator privileges are required to create a Windows System Restore Point.\n\n"
-            L"Would you like to restart PrivatizeWin as Administrator now?",
-            L"PrivatizeWin \u2014 Elevation Required",
+            Loc("admin_required_prompt").c_str(),
+            Loc("app_title").c_str(),
             MB_YESNO | MB_ICONWARNING);
         if (res == IDYES) {
             RelaunchAsAdminWithPendingState();
@@ -2333,8 +2625,8 @@ void MainWindow::CreateSystemRestorePoint() {
     }
 
     const int choice = MessageBoxW(m_hWnd,
-        L"Do you want to create a Windows System Restore Point before applying tweaks?",
-        L"System Restore Point",
+        Loc("review_restore_point").c_str(),
+        Loc("menu_restore_pt").c_str(),
         MB_YESNO | MB_ICONQUESTION);
 
     if (choice != IDYES) return;
@@ -2345,10 +2637,9 @@ void MainWindow::CreateSystemRestorePoint() {
     SetCursor(LoadCursor(nullptr, IDC_ARROW));
 
     if (success) {
-        std::wstring msg = L"System Restore Point created successfully (Sequence #" + std::to_wstring(seqNumber) + L").";
-        MessageBoxW(m_hWnd, msg.c_str(), L"PrivatizeWin", MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(m_hWnd, Loc("restore_pt_success").c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONINFORMATION);
     } else {
-        MessageBoxW(m_hWnd, L"Failed to create Restore Point. Ensure System Protection is enabled in Windows.", L"Restore Point", MB_OK | MB_ICONWARNING);
+        MessageBoxW(m_hWnd, Loc("restore_pt_fail").c_str(), Loc("menu_restore_pt").c_str(), MB_OK | MB_ICONWARNING);
     }
 }
 
@@ -2445,6 +2736,18 @@ LRESULT CALLBACK MainWindow::ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM w
         break;
     }
     case WM_KEYDOWN: {
+        if (wParam == VK_UP && (GetKeyState(VK_CONTROL) & 0x8000)) {
+            pThis->m_splitterY = std::max(180, pThis->m_splitterY - 20);
+            pThis->UpdateSplitterLayout();
+            pThis->SavePreferences();
+            return 0;
+        }
+        if (wParam == VK_DOWN && (GetKeyState(VK_CONTROL) & 0x8000)) {
+            pThis->m_splitterY = std::min(1000, pThis->m_splitterY + 20);
+            pThis->UpdateSplitterLayout();
+            pThis->SavePreferences();
+            return 0;
+        }
         if (wParam == VK_SPACE) {
             const int focused = ListView_GetNextItem(hWnd, -1, LVNI_FOCUSED);
             if (focused >= 0 && focused < static_cast<int>(pThis->m_displayedTweaks.size())) {

@@ -13,11 +13,20 @@
 namespace PrivatizeWin {
 
 bool DarkMode::s_isDark = false;
+bool DarkMode::s_isHighContrast = false;
 bool DarkMode::s_initialized = false;
 
 void DarkMode::Initialize() {
     if (s_initialized) return;
     s_initialized = true;
+
+    // Check system High Contrast accessibility mode first
+    HIGHCONTRASTW hc{ sizeof(hc) };
+    if (SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(hc), &hc, 0) && (hc.dwFlags & HCF_HIGHCONTRASTON)) {
+        s_isHighContrast = true;
+        s_isDark = false;
+        return;
+    }
 
     // Check registry for AppsUseLightTheme
     auto lightVal = RegistryHelper::ReadDword(
@@ -31,12 +40,17 @@ void DarkMode::Initialize() {
 
 bool DarkMode::IsDarkModeActive() {
     if (!s_initialized) Initialize();
-    return s_isDark;
+    return s_isDark && !s_isHighContrast;
+}
+
+bool DarkMode::IsHighContrastActive() {
+    if (!s_initialized) Initialize();
+    return s_isHighContrast;
 }
 
 void DarkMode::ApplyToWindow(HWND hWnd) {
     if (!s_initialized) Initialize();
-    if (!hWnd) return;
+    if (!hWnd || s_isHighContrast) return;
 
     BOOL useDark = s_isDark ? TRUE : FALSE;
     DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &useDark, sizeof(useDark));
@@ -44,7 +58,7 @@ void DarkMode::ApplyToWindow(HWND hWnd) {
 
 void DarkMode::ApplyToControl(HWND hCtrl) {
     if (!s_initialized) Initialize();
-    if (!hCtrl) return;
+    if (!hCtrl || s_isHighContrast) return;
 
     if (s_isDark) {
         SetWindowTheme(hCtrl, L"DarkMode_Explorer", nullptr);
