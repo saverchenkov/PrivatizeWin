@@ -25,7 +25,8 @@ enum class CheckboxState : UINT {
     Unchecked = 1,      // [ ] Empty box - Windows default / not applied
     AlreadyEnabled = 2, // [✔] Solid green box - Already applied in Windows
     PendingEnable = 3,  // [☑] Solid blue box - Selected / pending to be applied
-    PendingRevert = 4   // [-] Solid red box - Selected / pending to be restored/reverted
+    PendingRevert = 4,  // [-] Solid red box - Selected / pending to be restored/reverted
+    Disabled = 5        // [ ] Faint grey box - Not applicable / disabled
 };
 
 class MainWindow {
@@ -132,6 +133,7 @@ private:
     std::vector<Tweak> m_displayedTweaks;
     std::unordered_set<std::string> m_pendingEnableIds; // Staged to apply (Item 10)
     std::unordered_set<std::string> m_pendingRevertIds; // Staged to restore (Item 10)
+    std::unordered_set<std::string> m_notApplicableIds; // Evaluated as NotApplicable
     int m_appliedCount{ 0 };
     bool m_isProgrammaticCheckChange{ false };
     HMODULE m_hRichEditLib{ nullptr };

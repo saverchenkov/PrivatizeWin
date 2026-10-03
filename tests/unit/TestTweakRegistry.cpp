@@ -103,3 +103,18 @@ TEST_CASE(Unit_TweakRegistry, PartialStatusSupport) {
     ASSERT_TRUE(SettingStatus::Partial != SettingStatus::NotApplied);
 }
 
+TEST_CASE(Unit_TweakRegistry, NotApplicableEvaluation) {
+    TweakRegistry::Instance().InitializeDefaultTweaks();
+    // Non-existent tweak evaluates to NotApplicable
+    ASSERT_EQ(TweakRegistry::Instance().AuditTweak("NON_EXISTENT_ID", UserSelectionMode::CurrentUser, {}),
+              SettingStatus::NotApplicable);
+
+    // Tweak with no actions evaluates to NotApplicable
+    const auto* p015 = TweakRegistry::Instance().GetTweakById("P015");
+    ASSERT_TRUE(p015 != nullptr);
+    ASSERT_TRUE(p015->regActions.empty() && p015->serviceActions.empty());
+    ASSERT_EQ(TweakRegistry::Instance().AuditTweak("P015", UserSelectionMode::CurrentUser, {}),
+              SettingStatus::NotApplicable);
+}
+
+

@@ -143,9 +143,14 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
         case WM_COMMAND:
             pThis->OnCommand(LOWORD(wParam), HIWORD(wParam), reinterpret_cast<HWND>(lParam));
             return 0;
-        case WM_NOTIFY:
-            pThis->OnNotify(reinterpret_cast<NMHDR*>(lParam));
+        case WM_NOTIFY: {
+            auto* pnmhdr = reinterpret_cast<NMHDR*>(lParam);
+            if (pnmhdr->code == NM_CUSTOMDRAW && pnmhdr->idFrom == IDC_LIST_TWEAKS) {
+                return pThis->OnCustomDraw(pnmhdr);
+            }
+            pThis->OnNotify(pnmhdr);
             return 0;
+        }
         case WM_CONTEXTMENU:
             pThis->OnContextMenu(reinterpret_cast<HWND>(wParam), GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
@@ -621,7 +626,7 @@ void MainWindow::CreateStateImages() {
     }
 
     const int iconSize = 16;
-    m_hStateImageList = ImageList_Create(iconSize, iconSize, ILC_COLOR32 | ILC_MASK, 4, 1);
+    m_hStateImageList = ImageList_Create(iconSize, iconSize, ILC_COLOR32 | ILC_MASK, 5, 1);
     if (!m_hStateImageList) return;
 
     HDC hdcScreen = GetDC(nullptr);
@@ -733,6 +738,23 @@ void MainWindow::CreateStateImages() {
         DeleteObject(hBrush);
     });
 
+    // State 5: Disabled (Faint grey outline box, cannot be checked/toggled)
+    addStateBitmap([](HDC hdc, bool dark) {
+        COLORREF clrBorder = dark ? RGB(75, 75, 75) : RGB(190, 190, 190);
+        COLORREF clrBg = dark ? RGB(40, 40, 40) : RGB(235, 235, 235);
+        HPEN hPen = CreatePen(PS_SOLID, 1, clrBorder);
+        HBRUSH hBrush = CreateSolidBrush(clrBg);
+        HPEN hOldPen = static_cast<HPEN>(SelectObject(hdc, hPen));
+        HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(hdc, hBrush));
+
+        RoundRect(hdc, 1, 1, 15, 15, 3, 3);
+
+        SelectObject(hdc, hOldPen);
+        SelectObject(hdc, hOldBrush);
+        DeleteObject(hPen);
+        DeleteObject(hBrush);
+    });
+
     DeleteDC(hdcMem);
     ReleaseDC(nullptr, hdcScreen);
 }
@@ -755,8 +777,11 @@ CheckboxState MainWindow::GetRowCheckboxState(int itemIndex) const {
 void MainWindow::ToggleRowCheckbox(int itemIndex) {
     if (itemIndex < 0 || itemIndex >= static_cast<int>(m_displayedTweaks.size())) return;
     const auto& t = m_displayedTweaks[itemIndex];
+    if (m_notApplicableIds.count(t.id) > 0) return;
     const SettingStatus auditSt = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+    if (auditSt == SettingStatus::NotApplicable) return;
     const CheckboxState cur = GetRowCheckboxState(itemIndex);
+    if (cur == CheckboxState::Disabled) return;
 
     CheckboxState nextState = CheckboxState::Unchecked;
 
@@ -1075,6 +1100,7 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
 
     // 2. Populate Tweaks into their Groups
     m_displayedTweaks.clear();
+    m_notApplicableIds.clear();
     m_appliedCount = 0;
 
     std::wstring lowerSearch(searchFilter);
@@ -1083,6 +1109,11 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
     int itemIndex = 0;
     for (const auto& t : catalog) {
         const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        if (st == SettingStatus::NotApplicable) {
+            m_notApplicableIds.insert(t.id);
+            m_pendingEnableIds.erase(t.id);
+            m_pendingRevertIds.erase(t.id);
+        }
         const bool isApplied = (st == SettingStatus::Applied);
         if (isApplied) {
             m_appliedCount++;
@@ -1154,7 +1185,9 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
 
         // Multi-state Checkbox (Item 10)
         CheckboxState cbState = CheckboxState::Unchecked;
-        if (m_pendingEnableIds.count(t.id) > 0) {
+        if (st == SettingStatus::NotApplicable) {
+            cbState = CheckboxState::Disabled;
+        } else if (m_pendingEnableIds.count(t.id) > 0) {
             cbState = CheckboxState::PendingEnable;
         } else if (m_pendingRevertIds.count(t.id) > 0) {
             cbState = CheckboxState::PendingRevert;
@@ -1300,10 +1333,15 @@ void MainWindow::UpdateDetailsPane(int selectedIndex) {
     const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
 
     // Item 11: Consistent per-setting action labels
-    if (st == SettingStatus::Applied) {
+    if (st == SettingStatus::NotApplicable || m_notApplicableIds.count(t.id) > 0) {
+        SetWindowTextW(m_hBtnToggleTweak, L"Not Applicable");
+        EnableWindow(m_hBtnToggleTweak, FALSE);
+    } else if (st == SettingStatus::Applied) {
         SetWindowTextW(m_hBtnToggleTweak, L"Restore Setting");
+        EnableWindow(m_hBtnToggleTweak, TRUE);
     } else {
         SetWindowTextW(m_hBtnToggleTweak, L"Apply Setting");
+        EnableWindow(m_hBtnToggleTweak, TRUE);
     }
 
     // Item 10: Reordered and shortened details content in sentence-case
@@ -1384,6 +1422,10 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
     if (sel < 0 || sel >= static_cast<int>(m_displayedTweaks.size())) return;
 
     const auto& t = m_displayedTweaks[sel];
+    if (m_notApplicableIds.count(t.id) > 0) return;
+    const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+    if (st == SettingStatus::NotApplicable) return;
+
     if (!IsRunningAsAdmin() && t.scope != TargetScope::User) {
         const int res = MessageBoxW(m_hWnd,
             L"Administrator privileges are required to modify system-wide machine settings.\n\n"
@@ -1396,7 +1438,6 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
         return;
     }
 
-    const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
     const bool shouldApply = (st != SettingStatus::Applied);
 
     const bool ok = TweakRegistry::Instance().ApplyTweak(t.id, shouldApply, UserSelectionMode::CurrentUser, {});
@@ -1418,7 +1459,9 @@ void MainWindow::ToggleSelectedTweakFromDetails() {
         m_pendingEnableIds.erase(t.id);
         m_pendingRevertIds.erase(t.id);
         CheckboxState cbState = CheckboxState::Unchecked;
-        if (newSt == SettingStatus::Applied) {
+        if (newSt == SettingStatus::NotApplicable) {
+            cbState = CheckboxState::Disabled;
+        } else if (newSt == SettingStatus::Applied) {
             cbState = CheckboxState::AlreadyEnabled;
         }
         SetRowCheckboxState(sel, cbState);
@@ -1477,8 +1520,11 @@ void MainWindow::SelectPreset(std::string_view templateName) {
 
     for (const auto& [id, shouldEnable] : tpl->tweakStates) {
         if (shouldEnable) {
+            if (m_notApplicableIds.count(id) > 0) {
+                continue;
+            }
             const SettingStatus st = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
-            if (st != SettingStatus::Applied) {
+            if (st != SettingStatus::Applied && st != SettingStatus::NotApplicable) {
                 m_pendingEnableIds.insert(id);
             }
         }
@@ -1488,7 +1534,9 @@ void MainWindow::SelectPreset(std::string_view templateName) {
         const auto& t = m_displayedTweaks[i];
         const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
         CheckboxState cbState = CheckboxState::Unchecked;
-        if (m_pendingEnableIds.count(t.id) > 0) {
+        if (st == SettingStatus::NotApplicable || m_notApplicableIds.count(t.id) > 0) {
+            cbState = CheckboxState::Disabled;
+        } else if (m_pendingEnableIds.count(t.id) > 0) {
             cbState = CheckboxState::PendingEnable;
         } else if (st == SettingStatus::Applied) {
             cbState = CheckboxState::AlreadyEnabled;
@@ -1512,7 +1560,9 @@ void MainWindow::SelectRecommended() {
 void MainWindow::SelectAllShown() {
     for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
         const auto& t = m_displayedTweaks[i];
+        if (m_notApplicableIds.count(t.id) > 0) continue;
         const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        if (st == SettingStatus::NotApplicable) continue;
         if (st != SettingStatus::Applied) {
             m_pendingEnableIds.insert(t.id);
             m_pendingRevertIds.erase(t.id);
@@ -1526,8 +1576,11 @@ void MainWindow::SelectAllShown() {
 void MainWindow::InvertShownSelection() {
     for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
         const auto& t = m_displayedTweaks[i];
+        if (m_notApplicableIds.count(t.id) > 0) continue;
         const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        if (st == SettingStatus::NotApplicable) continue;
         const CheckboxState cur = GetRowCheckboxState(i);
+        if (cur == CheckboxState::Disabled) continue;
         if (cur == CheckboxState::PendingEnable) {
             m_pendingEnableIds.erase(t.id);
             SetRowCheckboxState(i, (st == SettingStatus::Applied) ? CheckboxState::AlreadyEnabled : CheckboxState::Unchecked);
@@ -1554,7 +1607,9 @@ void MainWindow::ClearSelection() {
         const auto& t = m_displayedTweaks[i];
         const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
         CheckboxState cbState = CheckboxState::Unchecked;
-        if (st == SettingStatus::Applied) {
+        if (st == SettingStatus::NotApplicable || m_notApplicableIds.count(t.id) > 0) {
+            cbState = CheckboxState::Disabled;
+        } else if (st == SettingStatus::Applied) {
             cbState = CheckboxState::AlreadyEnabled;
         }
         SetRowCheckboxState(i, cbState);
@@ -1717,6 +1772,7 @@ void MainWindow::RestoreSelectedDefaults() {
     while ((i = ListView_GetNextItem(m_hListView, i, LVNI_SELECTED)) != -1) {
         if (i >= 0 && i < static_cast<int>(m_displayedTweaks.size())) {
             const auto& t = m_displayedTweaks[i];
+            if (m_notApplicableIds.count(t.id) > 0) continue;
             m_pendingEnableIds.erase(t.id);
             m_pendingRevertIds.insert(t.id);
             SetRowCheckboxState(i, CheckboxState::PendingRevert);
@@ -1728,6 +1784,7 @@ void MainWindow::RestoreSelectedDefaults() {
         // If no rows highlighted, stage all currently displayed rows that are currently applied
         for (int idx = 0; idx < static_cast<int>(m_displayedTweaks.size()); ++idx) {
             const auto& t = m_displayedTweaks[idx];
+            if (m_notApplicableIds.count(t.id) > 0) continue;
             const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
             if (st == SettingStatus::Applied) {
                 m_pendingEnableIds.erase(t.id);
@@ -1795,10 +1852,14 @@ void MainWindow::RestoreAllDefaults() {
 
 void MainWindow::RefreshAuditState() {
     m_appliedCount = 0;
+    m_notApplicableIds.clear();
     const auto& catalog = TweakRegistry::Instance().GetAllTweaks();
     for (const auto& t : catalog) {
-        if (TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {}) == SettingStatus::Applied) {
+        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        if (st == SettingStatus::Applied) {
             m_appliedCount++;
+        } else if (st == SettingStatus::NotApplicable) {
+            m_notApplicableIds.insert(t.id);
         }
     }
 
@@ -1819,7 +1880,9 @@ void MainWindow::RefreshAuditState() {
         ListView_SetItemText(m_hListView, i, 1, const_cast<LPWSTR>(stStr.c_str()));
 
         CheckboxState cbState = CheckboxState::Unchecked;
-        if (m_pendingEnableIds.count(t.id) > 0) {
+        if (st == SettingStatus::NotApplicable || m_notApplicableIds.count(t.id) > 0) {
+            cbState = CheckboxState::Disabled;
+        } else if (m_pendingEnableIds.count(t.id) > 0) {
             cbState = CheckboxState::PendingEnable;
         } else if (m_pendingRevertIds.count(t.id) > 0) {
             cbState = CheckboxState::PendingRevert;
@@ -1829,6 +1892,8 @@ void MainWindow::RefreshAuditState() {
         SetRowCheckboxState(i, cbState);
     }
     m_isProgrammaticCheckChange = false;
+
+    InvalidateRect(m_hListView, nullptr, TRUE);
 
     UpdateSelectionCounts();
     UpdateStatusBar();
@@ -1854,9 +1919,19 @@ void MainWindow::OnContextMenu(HWND hWnd, int x, int y) {
         }
     }
 
+    bool hasApplicable = false;
+    int s = -1;
+    while ((s = ListView_GetNextItem(m_hListView, s, LVNI_SELECTED)) != -1) {
+        if (s >= 0 && s < static_cast<int>(m_displayedTweaks.size()) && m_notApplicableIds.count(m_displayedTweaks[s].id) == 0) {
+            hasApplicable = true;
+            break;
+        }
+    }
+    const UINT actionFlag = hasApplicable ? MF_STRING : (MF_STRING | MF_GRAYED | MF_DISABLED);
+
     HMENU hMenu = CreatePopupMenu();
-    AppendMenuW(hMenu, MF_STRING, IDM_CTX_PROTECT_SELECTED, L"Select for Application");
-    AppendMenuW(hMenu, MF_STRING, IDM_CTX_DEFAULT_SELECTED, L"Deselect");
+    AppendMenuW(hMenu, actionFlag, IDM_CTX_PROTECT_SELECTED, L"Select for Application");
+    AppendMenuW(hMenu, actionFlag, IDM_CTX_DEFAULT_SELECTED, L"Deselect");
     AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(hMenu, MF_STRING, IDM_CTX_COPY_ID, L"Copy Setting ID");
     AppendMenuW(hMenu, MF_STRING, IDM_CTX_COPY_DETAILS, L"Copy Technical Details");
@@ -2014,6 +2089,7 @@ void MainWindow::OnCommand(int id, int notifyCode, HWND /*hCtrl*/) {
         int i = -1;
         while ((i = ListView_GetNextItem(m_hListView, i, LVNI_SELECTED)) != -1) {
             const auto& t = m_displayedTweaks[i];
+            if (m_notApplicableIds.count(t.id) > 0) continue;
             m_pendingEnableIds.insert(t.id);
             m_pendingRevertIds.erase(t.id);
             SetRowCheckboxState(i, CheckboxState::PendingEnable);
@@ -2026,6 +2102,7 @@ void MainWindow::OnCommand(int id, int notifyCode, HWND /*hCtrl*/) {
         int i = -1;
         while ((i = ListView_GetNextItem(m_hListView, i, LVNI_SELECTED)) != -1) {
             const auto& t = m_displayedTweaks[i];
+            if (m_notApplicableIds.count(t.id) > 0) continue;
             m_pendingEnableIds.erase(t.id);
             m_pendingRevertIds.erase(t.id);
             const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
@@ -2089,6 +2166,9 @@ void MainWindow::OnNotify(NMHDR* pnmhdr) {
                 // Item 15: Space toggles checkbox of focused row
                 const int focused = ListView_GetNextItem(m_hListView, -1, LVNI_FOCUSED);
                 if (focused >= 0 && focused < static_cast<int>(m_displayedTweaks.size())) {
+                    if (m_notApplicableIds.count(m_displayedTweaks[focused].id) > 0) {
+                        return;
+                    }
                     ToggleRowCheckbox(focused);
                 }
             } else if (pnkd->wVKey == 'A' && (GetKeyState(VK_CONTROL) & 0x8000)) {
@@ -2099,6 +2179,43 @@ void MainWindow::OnNotify(NMHDR* pnmhdr) {
             GetCursorPos(&pt);
             OnContextMenu(m_hListView, pt.x, pt.y);
         }
+    }
+}
+
+LRESULT MainWindow::OnCustomDraw(NMHDR* pnmhdr) {
+    auto* pCustomDraw = reinterpret_cast<NMLVCUSTOMDRAW*>(pnmhdr);
+    switch (pCustomDraw->nmcd.dwDrawStage) {
+    case CDDS_PREPAINT:
+        return CDRF_NOTIFYITEMDRAW;
+
+    case CDDS_ITEMPREPAINT: {
+        const int itemIndex = static_cast<int>(pCustomDraw->nmcd.dwItemSpec);
+        if (itemIndex >= 0 && itemIndex < static_cast<int>(m_displayedTweaks.size())) {
+            const auto& t = m_displayedTweaks[itemIndex];
+            if (m_notApplicableIds.count(t.id) > 0) {
+                const bool isDark = DarkMode::IsDarkModeActive();
+                pCustomDraw->clrText = isDark ? RGB(115, 115, 115) : RGB(145, 145, 145);
+                return CDRF_NEWFONT | CDRF_NOTIFYSUBITEMDRAW;
+            }
+        }
+        return CDRF_DODEFAULT;
+    }
+
+    case CDDS_SUBITEM | CDDS_ITEMPREPAINT: {
+        const int itemIndex = static_cast<int>(pCustomDraw->nmcd.dwItemSpec);
+        if (itemIndex >= 0 && itemIndex < static_cast<int>(m_displayedTweaks.size())) {
+            const auto& t = m_displayedTweaks[itemIndex];
+            if (m_notApplicableIds.count(t.id) > 0) {
+                const bool isDark = DarkMode::IsDarkModeActive();
+                pCustomDraw->clrText = isDark ? RGB(115, 115, 115) : RGB(145, 145, 145);
+                return CDRF_NEWFONT;
+            }
+        }
+        return CDRF_DODEFAULT;
+    }
+
+    default:
+        return CDRF_DODEFAULT;
     }
 }
 
@@ -2253,6 +2370,12 @@ LRESULT CALLBACK MainWindow::ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM w
         hti.pt.y = GET_Y_LPARAM(lParam);
         SendMessageW(hWnd, LVM_HITTEST, static_cast<WPARAM>(-1), reinterpret_cast<LPARAM>(&hti));
         if (hti.flags & LVHT_ONITEMSTATEICON) {
+            if (hti.iItem >= 0 && hti.iItem < static_cast<int>(pThis->m_displayedTweaks.size())) {
+                if (pThis->m_notApplicableIds.count(pThis->m_displayedTweaks[hti.iItem].id) > 0) {
+                    pThis->m_mouseDownCheckboxItem = -1;
+                    return 0;
+                }
+            }
             pThis->m_mouseDownCheckboxItem = hti.iItem;
             return 0;
         } else if ((hti.flags & LVHT_EX_GROUP_HEADER) && !(hti.flags & LVHT_EX_GROUP_COLLAPSE)) {
@@ -2302,6 +2425,11 @@ LRESULT CALLBACK MainWindow::ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM w
         hti.pt.y = GET_Y_LPARAM(lParam);
         SendMessageW(hWnd, LVM_HITTEST, static_cast<WPARAM>(-1), reinterpret_cast<LPARAM>(&hti));
         if (hti.flags & LVHT_ONITEMSTATEICON) {
+            if (hti.iItem >= 0 && hti.iItem < static_cast<int>(pThis->m_displayedTweaks.size())) {
+                if (pThis->m_notApplicableIds.count(pThis->m_displayedTweaks[hti.iItem].id) > 0) {
+                    return 0;
+                }
+            }
             pThis->ToggleRowCheckbox(hti.iItem);
             return 0;
         }
@@ -2325,6 +2453,9 @@ LRESULT CALLBACK MainWindow::ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM w
         if (wParam == VK_SPACE) {
             const int focused = ListView_GetNextItem(hWnd, -1, LVNI_FOCUSED);
             if (focused >= 0 && focused < static_cast<int>(pThis->m_displayedTweaks.size())) {
+                if (pThis->m_notApplicableIds.count(pThis->m_displayedTweaks[focused].id) > 0) {
+                    return 0;
+                }
                 pThis->ToggleRowCheckbox(focused);
                 return 0;
             }
