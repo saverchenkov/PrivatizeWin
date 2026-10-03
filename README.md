@@ -203,19 +203,33 @@ PrivatizeWin is built with pure native Win32 controls and modern **C++20** (`/st
 
 ### Build Instructions
 
-```powershell
-# 1. Clone repository
-git clone https://github.com/saverchenkov/PrivatizeWin.git
-cd PrivatizeWin
+PrivatizeWin includes a universal Makefile and `build.bat` helper to easily produce both **`_x65`** (x64) and **`_arm`** (ARM64) standalone binaries:
 
-# 2. Configure build environment (from an x64 Developer Command Prompt)
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+```cmd
+# Option A: One-click batch runner (auto-detects Visual Studio environment)
+build.bat all       # Compiles both _x65 and _arm binaries into bin\
+build.bat x65       # Compiles PrivatizeWin_x65.exe (and PrivatizeWin_x64.exe)
+build.bat arm       # Compiles PrivatizeWin_arm.exe (and PrivatizeWin_arm64.exe)
 
-# 3. Compile standalone single executable
-cmake --build build --config Release
+# Option B: Using NMake or GNU Make
+nmake all           # or 'make all'
+nmake x65           # or 'make x65'
+nmake arm           # or 'make arm'
 
-# Output binary located at: .\build\PrivatizeWin.exe
+# Option C: Direct CMake configuration
+# x65 / x64:
+cmake -B build_x64 -G Ninja -DCMAKE_BUILD_TYPE=Release -DARCH_SUFFIX=_x65
+cmake --build build_x64 --config Release
+
+# ARM / ARM64:
+cmake -B build_arm -G Ninja -DCMAKE_BUILD_TYPE=Release -DARCH_SUFFIX=_arm -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64
+cmake --build build_arm --config Release
 ```
+
+Output binaries are placed in `bin/` (and the respective build directories):
+* `PrivatizeWin_x65.exe` (with `PrivatizeWin_x64.exe` alias)
+* `PrivatizeWin_arm.exe` (with `PrivatizeWin_arm64.exe` alias)
+
 
 ---
 

@@ -1,4 +1,4 @@
-name: CI & Release Build
+name: CI & Multi-Arch Release Build
 
 on:
   push:
@@ -9,17 +9,31 @@ on:
 
 jobs:
   build:
-    name: Build & Test (x64 Release)
+    name: Build (${{ matrix.target_name }})
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target_name: x65
+            arch: x64
+            suffix: _x65
+            cmake_flags: "-DBUILD_TESTING=ON"
+            run_tests: true
+          - target_name: arm
+            arch: arm64
+            suffix: _arm
+            cmake_flags: "-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DBUILD_TESTING=OFF"
+            run_tests: false
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup MSVC developer environment
+      - name: Setup MSVC developer environment (${{ matrix.arch }})
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: x64
+          arch: ${{ matrix.arch }}
 
       - name: Setup Ninja
         uses: ashutoshvarma/setup-ninja@master
@@ -28,51 +42,64 @@ jobs:
 
       - name: Configure CMake
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DARCH_SUFFIX=${{ matrix.suffix }} ${{ matrix.cmake_flags }}
 
-      - name: Build PrivatizeWin and Tests
+      - name: Build PrivatizeWin (${{ matrix.target_name }})
         run: |
           cmake --build build --config Release
 
       - name: Run Automated Test Suite (CTest)
+        if: ${{ matrix.run_tests }}
         run: |
           ctest --test-dir build -C Release --output-on-failure
 
-      - name: Prepare Release Package
+      - name: Prepare Architecture Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist -Force
-          Copy-Item build/PrivatizeWin.exe dist/PrivatizeWin.exe
+          Copy-Item build/*.exe dist/
           Copy-Item -Recurse templates dist/templates
           Copy-Item README.md dist/README.md
+          Copy-Item CATALOG.md dist/CATALOG.md
           if (Test-Path LICENSE) { Copy-Item LICENSE dist/LICENSE }
           
           # Create standalone zip
-          Compress-Archive -Path dist/* -DestinationPath PrivatizeWin-x64.zip
+          Compress-Archive -Path dist/* -DestinationPath PrivatizeWin-${{ matrix.target_name }}.zip
           
-          # Calculate SHA-256
-          $hash = (Get-FileHash -Algorithm SHA256 dist/PrivatizeWin.exe).Hash
-          "$hash  PrivatizeWin.exe" | Out-File -Encoding utf8 dist/checksums.txt
-          "$((Get-FileHash -Algorithm SHA256 PrivatizeWin-x64.zip).Hash)  PrivatizeWin-x64.zip" | Out-File -Encoding utf8 -Append dist/checksums.txt
+          # Calculate SHA-256 for all binaries
+          Get-ChildItem dist/*.exe | ForEach-Object {
+            $hash = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash
+            "$hash  $($_.Name)" | Out-File -Encoding utf8 -Append dist/checksums.txt
+          }
+          $zipHash = (Get-FileHash -Algorithm SHA256 "PrivatizeWin-${{ matrix.target_name }}.zip").Hash
+          "$zipHash  PrivatizeWin-${{ matrix.target_name }}.zip" | Out-File -Encoding utf8 -Append dist/checksums.txt
           Get-Content dist/checksums.txt
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: PrivatizeWin-x64
+          name: PrivatizeWin-${{ matrix.target_name }}
           path: |
-            dist/PrivatizeWin.exe
-            PrivatizeWin-x64.zip
+            dist/*.exe
+            PrivatizeWin-${{ matrix.target_name }}.zip
             dist/checksums.txt
 
+  release:
+    name: GitHub Release
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/PrivatizeWin.exe
-            PrivatizeWin-x64.zip
-            dist/checksums.txt
+            PrivatizeWin-*/*.exe
+            PrivatizeWin-*/*.zip
+            PrivatizeWin-*/checksums.txt
           draft: false
           prerelease: false
           generate_release_notes: true

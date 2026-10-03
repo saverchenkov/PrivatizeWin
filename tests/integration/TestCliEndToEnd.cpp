@@ -13,23 +13,26 @@ static std::wstring GetPrivatizeWinExePath() {
     std::wstring pathStr(exePath);
     const size_t lastSlash = pathStr.find_last_of(L"\\/");
     std::wstring dir = (lastSlash != std::wstring::npos) ? pathStr.substr(0, lastSlash) : L"";
+    std::wstring parentDir = (dir.find_last_of(L"\\/") != std::wstring::npos) ? dir.substr(0, dir.find_last_of(L"\\/")) : dir;
 
-    // 1. Check same directory
-    std::wstring candidate1 = dir + L"\\PrivatizeWin.exe";
-    if (GetFileAttributesW(candidate1.c_str()) != INVALID_FILE_ATTRIBUTES) {
-        return candidate1;
-    }
+    const std::vector<std::wstring> names = {
+        L"PrivatizeWin_x65.exe",
+        L"PrivatizeWin_x64.exe",
+        L"PrivatizeWin_arm.exe",
+        L"PrivatizeWin_arm64.exe",
+        L"PrivatizeWin.exe"
+    };
 
-    // 2. Check parent directory (e.g. build/tests/ -> build/)
-    const size_t parentSlash = dir.find_last_of(L"\\/");
-    if (parentSlash != std::wstring::npos) {
-        std::wstring candidate2 = dir.substr(0, parentSlash) + L"\\PrivatizeWin.exe";
-        if (GetFileAttributesW(candidate2.c_str()) != INVALID_FILE_ATTRIBUTES) {
-            return candidate2;
+    for (const auto& d : { dir, parentDir }) {
+        for (const auto& name : names) {
+            std::wstring candidate = d + L"\\" + name;
+            if (GetFileAttributesW(candidate.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                return candidate;
+            }
         }
     }
 
-    return candidate1;
+    return dir + L"\\PrivatizeWin.exe";
 }
 
 static std::pair<int, std::string> RunSubprocess(const std::wstring& cmd, DWORD timeoutMs = 15000) {
