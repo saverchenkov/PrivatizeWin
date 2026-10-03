@@ -12,8 +12,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/Standard-C%2B%2B20-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B20)
 [![Platform: Windows 10 / 11](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6.svg)](https://microsoft.com)
-[![Footprint: < 1 MB](https://img.shields.io/badge/Binary%20Size-%3C%201%20MB-brightgreen.svg)]()
-[![Settings: 350+ Tweaks](https://img.shields.io/badge/Catalog-350%2B%20Exhaustive%20Settings-blueviolet.svg)]()
+[![Footprint: < 1 MB](https://img.shields.io/badge/Binary%20Size-%3C%201%20MB-brightgreen.svg)](#-lightweight-native-architecture)
+[![Settings: 354 Exhaustive Tweaks](https://img.shields.io/badge/Catalog-354%20Exhaustive%20Settings-blueviolet.svg)](CATALOG.md)
 
 </div>
 
@@ -94,7 +94,7 @@ PrivatizeWin.exe --install-task daily --task-template recommended
 
 | Option | Argument | Description |
 | :--- | :--- | :--- |
-| `--status` | *None* | Audits all catalog settings and displays their current state (`Applied`, `Not applied`, or `Not applicable`). |
+| `--status` | *None* | Audits all 354 settings in the [Catalog](CATALOG.md) and displays their current state (`Applied`, `Not applied`, or `Not applicable`). |
 | `--output` | `text` \| `json` | Sets status output format. `text` displays a formatted console table; `json` outputs structured JSON for scripting. |
 | `--apply-template` | `<name\|path>` | Applies a privacy profile. Accepts built-in presets (`recommended`, `strict`, `minimal`) or a file path to a `.json` profile. |
 | `--list-templates` | *None* | Lists all built-in presets and auto-detected JSON profiles in the current directory. |
