@@ -69,7 +69,6 @@ private:
     void UpdateSelectionCounts();
     int GetApplyButtonWidth() const;
     void UpdateActionButtonsLayout(int clientWidth = -1);
-    void ToggleSelectedTweakFromDetails();
     void UpdateSplitterLayout();
     void InitializeHeaderTooltips();
     void UpdateHeaderTooltips();
@@ -115,8 +114,6 @@ private:
     HWND m_hHeaderTooltip{ nullptr };
     HWND m_hSplitterBar{ nullptr };
     HWND m_hDetailsEdit{ nullptr };
-    HWND m_hBtnToggleTweak{ nullptr };
-    HWND m_hBtnCopyTweak{ nullptr };
     HWND m_hStatusBar{ nullptr };
     HWND m_hProgressBar{ nullptr };
 

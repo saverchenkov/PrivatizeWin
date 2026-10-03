@@ -5,192 +5,200 @@
 <img src="assets/logo.png" width="160" height="160" alt="PrivatizeWin Logo" />
 
 ### PrivatizeWin
-**Modern, Minimalist Windows Privacy & Telemetry Silencer**  
-*A lightweight, transparent, open-source alternative to O&O ShutUp10++.*
+**Modern, Transparent Windows Privacy & Telemetry Silencer**  
+*A lightweight, open-source alternative to O&O ShutUp10++ with complete dual GUI and headless CLI.*
 
 [![CI & Release Build](https://github.com/saverchenkov/PrivatizeWin/actions/workflows/ci.yml/badge.svg)](https://github.com/saverchenkov/PrivatizeWin/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![C++20](https://img.shields.io/badge/Standard-C%2B%2B20-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B20)
-[![ISO C++ Core Guidelines](https://img.shields.io/badge/Guidelines-ISO%20CppCoreGuidelines-success.svg)](https://github.com/isocpp/CppCoreGuidelines)
 [![Platform: Windows 10 / 11](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6.svg)](https://microsoft.com)
 [![Footprint: < 1 MB](https://img.shields.io/badge/Binary%20Size-%3C%201%20MB-brightgreen.svg)]()
-[![Settings: 260 Tweaks](https://img.shields.io/badge/Catalog-260%20Exhaustive%20Settings-blueviolet.svg)]()
+[![Settings: 350+ Tweaks](https://img.shields.io/badge/Catalog-350%2B%20Exhaustive%20Settings-blueviolet.svg)]()
 
 </div>
 
 ---
 
-## ⚡ Highlights
+## 🎯 Why PrivatizeWin?
 
-* **Sub-1 MB Single Executable:** Written in clean modern **C++20** with pure Win32 API. Zero runtime bloat, instant startup time, zero DLL dependencies.
-* **Exhaustive 260-Setting Catalog:** Reverse-engineered complete coverage of all privacy, telemetry, security, and tracking settings from O&O ShutUp10++ across 17 structured categories.
-* **Master-Detail Utility UX:** Built using native Common Controls (`SysTreeView32` + `SysListView32`) in the classic, battle-tested Sysinternals / Device Manager style. No webviews, no electron, no lag.
-* **Full Modern Windows 11 & 24H2 Coverage:** Shuts down Windows Copilot, Recall snapshot recordings, dynamic MSN taskbar search widgets, forced web Outlook migration, Edge shopping trackers, and Delivery Optimization.
-* **Dual GUI & Headless CLI:** Run interactively, or invoke headless via terminal and automated deployment scripts (`--apply-template`, `--dry-run`, `--status --output json`).
-* **Automated Background Reapplication:** Windows Updates frequently reset privacy keys. PrivatizeWin features built-in Task Scheduler management (`--install-task daily|logon|weekly`) to silently enforce your templates in the background.
-* **Configurable Multi-User Hive Targeting (`--users`):** Elevates to iterate mounted `HKEY_USERS` and dynamically mount unloaded user `NTUSER.DAT` files and the Default User template.
-* **Adaptive Safety:** Automatically creates System Restore Points (`srclient.dll`) in interactive mode while avoiding VSS shadow storage exhaustion during recurring CLI task runs.
-* **Strict ISO C++ Core Guidelines Compliance:** Built with RAII handle managers, zero explicit manual memory allocations, `std::string_view` parameter interfaces, and strict compiler warnings (`/W4`, `/permissive-`).
+Recent headlines suggest that [*the future of Windows could include fewer ads and distracting upsells*](https://www.digitaltrends.com/computing/the-future-of-windows-could-include-fewer-ads-and-distracting-upsells/).
 
----
+**How about no ads and no upsells at all?**
 
-## 🖥️ UI Architecture (Sysinternals Style)
+Windows 10 and Windows 11 are powerful operating systems, but out of the box they increasingly treat your PC as a data-harvesting terminal and an ad-delivery network. Diagnostic telemetry, biometric analysis, keystroke tracking, Recall AI desktop snapshot recordings, Copilot integration, Start menu "promoted apps", lock screen advertisements, Edge shopping trackers, and persistent OneDrive/Microsoft 365 upgrade banners run continuously in the background.
 
-```
-+------------------------------------------------------------------------------------+
-| [File]  [Templates]  [Actions]  [Tools]  [Help]                                    |
-+------------------------------------------------------------------------------------+
-| [ Filter (Ctrl+F)... ] [Preset: Recommended v] [ ] Check All  [Apply] [Revert] [ ] |
-+------------------------+--[||]-----------------------------------------------------+
-| Categories             |  ||  [x] Privacy Tweak      | Status    | Safety  | Scope |
-|------------------------+--||-------------------------+-----------+---------+-------|
-| > All Settings (260)   |  ||  [x] Disable Telemetry  | Protected | Safe    | HKLM  |
-|   Telemetry & Diag (10)|  ||  [x] Disable DiagTrack  | Protected | Safe    | Svc   |
-|   AI & Copilot (12)    |  ||  [x] Disable Copilot    | Protected | Safe    | Both  |
-|   Cortana & Search (15)|  ||  [x] Disable Recall AI  | Protected | Safe    | Both  |
-|   Edge Browser (56)    |  ||  [x] Bing in Start      | Protected | Safe    | HKCU  |
-|   App Permissions (43) |  ||  [x] Block Web Outlook  | Protected | Safe    | HKCU  |
-|   Office & Outlook (22)|  ||  [x] Disable Edge Svc   | Protected | Safe    | HKLM  |
-|   Privacy & Track (24) |  ||  [x] Disable P2P Updates| Protected | Safe    | HKLM  |
-|   Windows Update (11)  |  ||  ...                   | ...       | ...     | ...   |
-+========================+==[==]=====================================================+
-| TWEAK: Disable Windows Recall Automated Screen Snapshots [AI_RECALL]               |
-| CATEGORY: AI & Copilot  |  RECOMMENDATION: SAFE (Recommended for all users)         |
-|                                                                                    |
-| DESCRIPTION:                                                                       |
-| Disables Microsoft Recall from recording screenshots of your desktop, apps, etc.  |
-|                                                                                    |
-| AFFECTED REGISTRY KEYS:                                                            |
-|   * [HKLM\] SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot -> DisableAIData=1  |
-|   * [HKCU\] SOFTWARE\Microsoft\Windows\CurrentVersion\Recall -> EnableRecall=0     |
-+------------------------------------------------------------------------------------+
-| Privatized: 159 / 260 settings | Active Category: All Settings | Administrator     |
-+------------------------------------------------------------------------------------+
-```
+While Microsoft provides privacy toggles in the Settings app, they are deliberately fragmented across dozens of convoluted submenus, Group Policy Editor paths, and cryptic registry keys. Worse, **cumulative Windows Updates routinely reset these choices back to factory defaults without notice**.
 
-* **Interactive Resizable Panels:** Click and drag the vertical splitter (`||`) to resize the category rail or the horizontal splitter (`==`) to expand the detail inspector.
-* **Master "Check All" Header:** One-click toggle in the toolbar to check or uncheck all visible settings, with intelligent tri-state support.
-* **Full Multi-Select Support:** Select multiple rows using `Ctrl` or `Shift`, press `Ctrl+A` to select all, or tap `Spacebar` to toggle check states across all highlighted rows.
-* **Right-Click Context Menu:** Right-click any row to access quick actions: *Check Selected*, *Uncheck Selected*, *Invert Selection*, *Apply Selected Immediately*, *Copy Tweak ID*, and *Copy Details*.
+**PrivatizeWin puts you back in complete control of your operating system:**
+* **You Decide:** Control exactly what data Windows transmits to Microsoft servers and what stays strictly on your machine.
+* **No Upsells, No Nagware:** Silence promotional suggestions, lock screen ads, dynamic MSN taskbar feeds, and forced cloud migrations with a single click.
+* **Stay Privatized Permanently:** Use built-in automated scheduling to re-enforce your privacy configuration in the background, preventing Windows Update from undoing your settings.
+* **100% Free & Transparent:** Standalone, portable C++ executable. No installers, no background telemetry, no web wrappers, no third-party ads, licensed under MIT.
 
 ---
 
-## 🚀 CLI & Automation Reference
+## 🖥️ Graphical Interface
 
-PrivatizeWin automatically routes to the command-line engine when arguments are passed:
+<p align="center">
+  <img src="assets/screenshot.png" alt="PrivatizeWin GUI Screenshot" width="880" />
+</p>
+
+* **Non-Destructive Staging:** Applying presets or clicking "Apply Defaults" simply stages checkboxes with color-coded intent badges. Nothing touches your system until you review your selection and click **Apply Selected**.
+  * <span style="color:#2ea043">**[✔] Solid Green:**</span> Already active and verified protected on your system.
+  * <span style="color:#0969da">**[☑] Solid Blue:**</span> Pending change staged to be applied/protected.
+  * <span style="color:#cf222e">**[-] Solid Red:**</span> Pending change staged to be reverted back to Windows defaults.
+  * <span style="color:#6e7781">**[ ] Faint Grey:**</span> Not applicable to your current Windows edition or hardware.
+* **Compact Draggable Inspector:** Click and drag the centered grip handle to smoothly expand or shrink the lower technical details pane.
+* **Rich Setting Inspector:** Instantly inspect why each setting matters, its functional impact (Low, Moderate, High), whether a restart is required, and the exact registry keys and services modified.
+* **Fast Filter:** Instant fuzzy search by setting title, category, or registry key (`Ctrl+F`).
+* **Presets for Every Need:** One-click presets for **Recommended** (maximum privacy with zero breakage), **Strict Privacy** (hardened privacy for power users), and **Minimal**.
+* **Safety First:** Prompts for administrator elevation on-demand only when modifying system-wide machine policies, with built-in System Restore Point creation.
+
+---
+
+## 🚀 Command-Line Interface (CLI)
+
+PrivatizeWin includes a headless, scriptable command-line interface. Passing any command-line argument automatically runs in CLI mode—ideal for sysadmins, enterprise deployments, logon scripts, and CI/CD environments.
+
+### Quick Reference
 
 ```bash
-# Display built-in CLI help
+# View all available CLI options
 PrivatizeWin.exe --help
 
-# List all available built-in presets and detected templates
-PrivatizeWin.exe --list-templates
-
-# Check current privacy status in human-readable table or machine JSON
+# Audit current privacy status across all 350+ settings
 PrivatizeWin.exe --status
+
+# Output audit in JSON format for automated pipelines
 PrivatizeWin.exe --status --output json
 
-# Apply a built-in template profile
+# Apply the recommended privacy preset
 PrivatizeWin.exe --apply-template recommended
-PrivatizeWin.exe --apply-template strict
-PrivatizeWin.exe --apply-template minimal
 
-# Test template changes without modifying registry or services
+# Test a configuration safely without making changes
 PrivatizeWin.exe --apply-template strict --dry-run
 
-# Apply custom enterprise JSON template silently
-PrivatizeWin.exe --apply-template C:\corp\custom_policy.json --quiet
+# Apply a custom enterprise JSON policy silently
+PrivatizeWin.exe --apply-template C:\corp\hardened.json --quiet
 
-# Revert all tweaks back to Windows factory defaults
+# Revert all settings back to Windows factory defaults
 PrivatizeWin.exe --revert
+
+# Schedule automatic daily re-enforcement (combats Windows Update resets)
+PrivatizeWin.exe --install-task daily --task-template recommended
 ```
 
-### Automated Reapplication (Combating Windows Updates)
+---
 
-Windows Feature Updates and cumulative patches often re-enable telemetry services like `DiagTrack`. PrivatizeWin can install and manage its own recurring background scheduled task:
+### Command & Option Reference
+
+| Option | Argument | Description |
+| :--- | :--- | :--- |
+| `--status` | *None* | Audits all catalog settings and displays their current state (`Applied`, `Not applied`, or `Not applicable`). |
+| `--output` | `text` \| `json` | Sets status output format. `text` displays a formatted console table; `json` outputs structured JSON for scripting. |
+| `--apply-template` | `<name\|path>` | Applies a privacy profile. Accepts built-in presets (`recommended`, `strict`, `minimal`) or a file path to a `.json` profile. |
+| `--list-templates` | *None* | Lists all built-in presets and auto-detected JSON profiles in the current directory. |
+| `--revert` | *None* | Reverts all managed privacy tweaks back to standard Windows factory defaults. |
+| `--dry-run` | *None* | Simulates execution without making any actual changes to the Windows Registry or services. |
+| `--quiet`, `-q`, `--silent` | *None* | Suppresses console output and message boxes. Preserves error exit codes for headless automation. |
+| `--users` | `all` \| `current` \| `none` \| `<list>` | Controls user profile targeting (see below). Defaults to `all`. |
+| `--install-task` | `daily` \| `logon` \| `weekly` | Registers a recurring background task in Windows Task Scheduler (default trigger: daily at 12:00 PM). |
+| `--task-template` | `<name\|path>` | Specifies which template the background scheduled task enforces (default: `recommended`). |
+| `--uninstall-task` | *None* | Removes the PrivatizeWin scheduled background task. |
+| `--create-restore-point` | *None* | Forces creation of a Windows System Restore Point before applying changes. |
+| `--no-restore-point` | *None* | Skips System Restore Point creation (useful in virtual machines or scripted environments). |
+| `--help`, `-h`, `/?` | *None* | Prints CLI usage documentation. |
+
+---
+
+### Multi-User Hive Targeting (`--users`)
+
+Unlike basic batch scripts that only touch the current user account, PrivatizeWin can inspect and configure all user profiles across the operating system:
 
 ```bash
-# Schedule daily reapplication of 'recommended' profile at 12:00 PM
+# Apply to all user profiles (including unloaded profiles and the Default User template)
+PrivatizeWin.exe --apply-template recommended --users all
+
+# Apply only to the currently logged-in user session
+PrivatizeWin.exe --apply-template recommended --users current
+
+# Skip user settings entirely and apply only machine-wide policies (HKLM & services)
+PrivatizeWin.exe --apply-template strict --users none
+
+# Target specific user accounts by username or SID
+PrivatizeWin.exe --apply-template recommended --users alice,bob
+```
+
+---
+
+### Automated Background Reapplication
+
+Windows Updates frequently restore disabled telemetry services and telemetry keys. PrivatizeWin solves this with built-in Task Scheduler COM integration:
+
+```bash
+# Enforce the recommended preset daily at noon
 PrivatizeWin.exe --install-task daily --task-template recommended
 
-# Schedule reapplication at user logon for strict privacy
+# Enforce strict privacy every time any user logs on
 PrivatizeWin.exe --install-task logon --task-template strict
 
-# Remove the background scheduled task
+# Remove the scheduled task when no longer needed
 PrivatizeWin.exe --uninstall-task
 ```
 
-### User Hive Targeting (`--users`)
+### Exit Codes
 
-| Flag | Behavior |
-| :--- | :--- |
-| `--users all` *(Default)* | Iterates all mounted profiles in `HKEY_USERS` + mounts unloaded user `NTUSER.DAT` files + mounts Default User profile. |
-| `--users current` | Modifies only the active user's `HKEY_CURRENT_USER`. |
-| `--users none` | Skips per-user tweaks; enforces only system-wide machine policies (`HKLM`). |
-| `--users alice,bob` | Targets only the specified usernames or account SIDs. |
+| Exit Code | Meaning |
+| :---: | :--- |
+| `0` | Success. All requested operations succeeded. |
+| `1` | Error occurred (invalid arguments, elevation required, or setting failed to apply). |
 
 ---
 
-## 📑 Configurable Template Format
+## 📑 Custom Profile JSON Format
 
-Templates are saved as standard, human-readable JSON files:
+Export and import custom configuration profiles directly in the GUI or CLI using standard JSON:
 
 ```json
 {
-  "name": "strict",
-  "description": "Strict privacy configuration.",
+  "name": "enterprise-hardened",
+  "description": "Hardened privacy baseline for corporate workstations.",
   "tweaks": {
     "TEL_DIAGTRACK": true,
-    "TEL_DMWAP": true,
     "TEL_DIAGDATA": true,
-    "TEL_AIT": true,
-    "TEL_CEIP": true,
-    "TEL_FEEDBACK": true,
-    "TEL_CRASHDUMP": true,
     "AI_COPILOT": true,
     "AI_RECALL": true,
-    "AI_SEARCH_HIGHLIGHTS": true,
     "SRCH_BING_START": true,
-    "SRCH_CORTANA": true,
-    "SRCH_CLOUD": true,
     "PRIV_AD_ID": true,
     "PRIV_TAILORED": true,
-    "PRIV_KEYSTROKES": true,
-    "PRIV_TIMELINE": true,
-    "OUT_HIDE_TOGGLE": true,
-    "OUT_BLOCK_MIGRATE": true,
-    "OFFICE_TELEMETRY": true,
-    "EDGE_METRICS": true,
-    "EDGE_SHOPPING": true,
-    "EDGE_SEARCH_SUGGEST": true,
-    "WU_DELIVERY_OPT": true,
-    "WU_AUTO_REBOOT": true,
     "LOCK_SPOTLIGHT_ADS": true,
-    "SHELL_PROMOTED_APPS": true
+    "SHELL_PROMOTED_APPS": true,
+    "EDGE_SHOPPING": true,
+    "WU_DELIVERY_OPT": true
   }
 }
 ```
 
+* Setting keys to `true` applies the privacy protection.
+* Setting keys to `false` restores the setting back to the Windows default.
+* Profiles are sparse: settings not listed in the file are left untouched.
+
 ---
 
-## 🛡️ ISO C++ Core Guidelines Compliance
+## ⚡ Lightweight, Native Architecture
 
-PrivatizeWin is designed from the ground up adhering strictly to the [C++ Core Guidelines](https://github.com/isocpp/CppCoreGuidelines):
-
-* **R.1 & R.10 (RAII Handle Management):** All Win32 handles (`HANDLE`, `HKEY`, `SC_HANDLE`, `HMODULE`) are wrapped in move-only RAII smart classes (`UniqueHandle`, `UniqueHKey`, `UniqueScHandle`, `UniqueHModule`) in `src/core/SmartHandle.h`. Resource leaks are mathematically impossible.
-* **R.11 (No Explicit Raw Allocation):** Zero manual calls to `new` or `delete`. The main window instance is held via `std::unique_ptr<MainWindow>`.
-* **F.16 (String Views for Parameter Passing):** Read-only string parameters across all helper and registry functions use `std::string_view` and `std::wstring_view`.
-* **I.10 & F.21 (Clear Interfaces):** Critical inspection and status methods are decorated with `[[nodiscard]]` and `noexcept`.
-* **ES.48 & ES.49 (No C-Style Casts):** All Win32 casts strictly use `static_cast` and `reinterpret_cast`.
-* **Static Analysis:** Pre-configured with `.clang-tidy` (`cppcoreguidelines-*`) and MSVC `/W4 /permissive- /utf-8`.
+PrivatizeWin is built with pure native Win32 controls and modern **C++20** (`/std:c++20`, `/permissive-`, `/W4`):
+* **No Dependencies:** Compiled as a single static binary (< 1 MB) without .NET, webviews, Electron, or external runtimes.
+* **Instant Startup:** Launches in under 50 milliseconds with minimal memory usage (~10 MB RAM).
+* **RAII Resource Safety:** Strict adherence to modern C++ resource management with type-safe smart wrappers for all Win32 handles, registry keys, and service handles.
 
 ---
 
 ## 🛠️ Building from Source
 
 ### Prerequisites
-* Windows 10 / 11 (x64 or ARM64)
-* Visual Studio 2022 (or VS Build Tools) with C++20 support
+* Windows 10 or 11 (x64 or ARM64)
+* Visual Studio 2022 (Community or Build Tools) with C++20 support
 * CMake 3.20+ and Ninja
 
 ### Build Instructions
@@ -200,43 +208,13 @@ PrivatizeWin is designed from the ground up adhering strictly to the [C++ Core G
 git clone https://github.com/saverchenkov/PrivatizeWin.git
 cd PrivatizeWin
 
-# 2. Configure build environment (MSVC x64 Developer Prompt)
+# 2. Configure build environment (from an x64 Developer Command Prompt)
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
 # 3. Compile standalone single executable
 cmake --build build --config Release
 
-# 4. Binary output located at:
-# .\build\PrivatizeWin.exe  (< 1 MB standalone single executable)
-```
-
----
-
-## 🧪 Automated Testing
-
-PrivatizeWin includes a comprehensive automated test suite consisting of **24 Unit and Integration Tests** with zero external test dependencies:
-
-* **Unit Tests (`tests/unit/`):**
-  * `SimpleJson`: Verifies parsing of primitives, nested arrays/objects, string escaping, and round-trip serialization.
-  * `SmartHandle`: Verifies move semantics, RAII cleanup, and handle transfer for `UniqueHandle`, `UniqueHKey`, and `UniqueScHandle`.
-  * `CliParser`: Verifies CLI flags, scheduled task syntax, multi-user targeting (`--users`), and dry-run execution.
-  * `TemplateManager`: Verifies embedded presets (`recommended`, `strict`, `minimal`, `defaults`) and JSON file export/import.
-  * `TweakRegistry`: Verifies catalog integrity, category grouping, and JSON dynamic extensions.
-
-* **Integration Tests (`tests/integration/`):**
-  * `RegistryHelperLive`: Safely exercises live Windows Registry read/write/audit/delete routines within an isolated test key (`HKCU\Software\PrivatizeWin_Test_Sandbox`).
-  * `ServiceHelperLive`: Verifies service discovery and startup type queries against running Windows services (`RpcSs`).
-  * `UserHiveDiscovery`: Validates multi-user profile discovery and SID resolution on the active operating system.
-  * `CliEndToEnd`: Spawns child `PrivatizeWin.exe` processes via Win32 pipes to assert exit codes and parse live `--status --output json` output.
-
-### Running Tests
-
-```powershell
-# Run via CMake CTest
-ctest --test-dir build --output-on-failure
-
-# Or execute the test binary directly for detailed test reports:
-.\build\tests\PrivatizeWin_Tests.exe
+# Output binary located at: .\build\PrivatizeWin.exe
 ```
 
 ---

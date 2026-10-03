@@ -81,6 +81,8 @@ HWND MainWindow::Create(HINSTANCE hInstance, std::wstring_view resumePendingFile
     );
 }
 
+static bool s_isSplitterHovered = false;
+
 LRESULT CALLBACK MainWindow::SplitterWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_PAINT: {
@@ -90,13 +92,77 @@ LRESULT CALLBACK MainWindow::SplitterWndProc(HWND hWnd, UINT uMsg, WPARAM wParam
         GetClientRect(hWnd, &rc);
         FillRect(hdc, &rc, GetSysColorBrush(COLOR_BTNFACE));
 
-        // Draw a clean separator line in the center of the splitter bar
-        const int midY = (rc.bottom - rc.top) / 2;
-        RECT rcLine = { 0, midY, rc.right, midY + 1 };
-        FillRect(hdc, &rcLine, GetSysColorBrush(COLOR_3DSHADOW));
+        UINT dpi = 96;
+        if (hWnd) {
+            dpi = GetDpiForWindow(hWnd);
+            if (dpi == 0) dpi = 96;
+        }
+
+        const int midX = (rc.left + rc.right) / 2;
+        const int midY = (rc.top + rc.bottom) / 2;
+
+        // 1. Subtle horizontal divider line across the bar
+        HPEN hPenLine = CreatePen(PS_SOLID, 1, RGB(214, 216, 220));
+        HGDIOBJ hOldPen = SelectObject(hdc, hPenLine);
+        MoveToEx(hdc, rc.left, midY, nullptr);
+        LineTo(hdc, rc.right, midY);
+
+        // 2. Centered draggable grip handle (rounded pill)
+        const int handleW = MulDiv(46, dpi, 96);
+        const int handleH = MulDiv(4, dpi, 96);
+        const int halfH = handleH / 2;
+        RECT rcHandle = {
+            midX - handleW / 2,
+            midY - halfH,
+            midX + handleW / 2,
+            midY + halfH + (handleH % 2 == 0 ? 0 : 1)
+        };
+
+        COLORREF fillColor = s_isSplitterHovered ? RGB(90, 95, 105) : RGB(165, 170, 178);
+        HBRUSH hHandleBrush = CreateSolidBrush(fillColor);
+        HPEN hHandlePen = CreatePen(PS_SOLID, 1, fillColor);
+
+        SelectObject(hdc, hHandleBrush);
+        SelectObject(hdc, hHandlePen);
+        const int cornerR = MulDiv(4, dpi, 96);
+        RoundRect(hdc, rcHandle.left, rcHandle.top, rcHandle.right, rcHandle.bottom, cornerR, cornerR);
+
+        // 3. Inner grip ribs for instant "draggable" recognition:
+        COLORREF ribColor = s_isSplitterHovered ? RGB(255, 255, 255) : RGB(236, 238, 242);
+        HPEN hRibPen = CreatePen(PS_SOLID, 1, ribColor);
+        SelectObject(hdc, hRibPen);
+
+        const int ribSpacing = MulDiv(7, dpi, 96);
+        const int ribHalfH = std::max(1, MulDiv(1, dpi, 96));
+        for (int i = -1; i <= 1; ++i) {
+            int ribX = midX + i * ribSpacing;
+            MoveToEx(hdc, ribX, midY - ribHalfH, nullptr);
+            LineTo(hdc, ribX, midY + ribHalfH + 1);
+        }
+
+        // Clean up GDI objects
+        SelectObject(hdc, hOldPen);
+        DeleteObject(hRibPen);
+        DeleteObject(hHandlePen);
+        DeleteObject(hHandleBrush);
+        DeleteObject(hPenLine);
 
         EndPaint(hWnd, &ps);
         return 0;
+    }
+    case WM_MOUSEMOVE: {
+        if (!s_isSplitterHovered) {
+            s_isSplitterHovered = true;
+            TRACKMOUSEEVENT tme{ sizeof(tme), TME_LEAVE, hWnd, 0 };
+            TrackMouseEvent(&tme);
+            InvalidateRect(hWnd, nullptr, FALSE);
+        }
+        break;
+    }
+    case WM_MOUSELEAVE: {
+        s_isSplitterHovered = false;
+        InvalidateRect(hWnd, nullptr, FALSE);
+        break;
     }
     case WM_ERASEBKGND:
         return 1;
@@ -172,11 +238,17 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
                 return TRUE;
             }
             HWND hTarget = reinterpret_cast<HWND>(wParam);
-            if (hTarget == hWnd) {
+            if (hTarget == hWnd && pThis) {
                 POINT pt{};
                 GetCursorPos(&pt);
                 ScreenToClient(hWnd, &pt);
-                if (pt.y >= pThis->m_splitterY - 4 && pt.y <= pThis->m_splitterY + 10) {
+                UINT dpi = 96;
+                if (pThis->m_hWnd) {
+                    dpi = GetDpiForWindow(pThis->m_hWnd);
+                    if (dpi == 0) dpi = 96;
+                }
+                const int splitterH = MulDiv(8, dpi, 96);
+                if (pt.y >= pThis->m_splitterY - 2 && pt.y <= pThis->m_splitterY + splitterH + 2) {
                     SetCursor(LoadCursor(nullptr, IDC_SIZENS));
                     return TRUE;
                 }
@@ -566,13 +638,19 @@ void MainWindow::InitializeControls() {
     InitializeHeaderTooltips();
 
     // 8. Adjustable Splitter Bar (Item 13)
+    UINT dpi = 96;
+    if (m_hWnd) {
+        dpi = GetDpiForWindow(m_hWnd);
+        if (dpi == 0) dpi = 96;
+    }
+    const int splitterH = MulDiv(8, dpi, 96);
 
     m_hSplitterBar = CreateWindowExW(
         0,
         L"PrivatizeWin_Splitter",
         L"",
         WS_CHILD | WS_VISIBLE,
-        10, m_splitterY, 1040, 6,
+        10, m_splitterY, 1040, splitterH,
         m_hWnd,
         reinterpret_cast<HMENU>(IDC_SPLITTER_BAR),
         hInst,
@@ -585,7 +663,7 @@ void MainWindow::InitializeControls() {
         MSFTEDIT_CLASS,
         L"",
         WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
-        10, 440, 1040, 200,
+        10, m_splitterY + splitterH, 1040, 200,
         m_hWnd,
         reinterpret_cast<HMENU>(IDC_EDIT_DETAILS),
         hInst,
@@ -593,17 +671,6 @@ void MainWindow::InitializeControls() {
     );
     SendMessage(m_hDetailsEdit, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
     SendMessage(m_hDetailsEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELONG(8, 8));
-
-    // Per-Setting Actions (Item 11: Apply Setting / Restore Setting)
-    m_hBtnToggleTweak = CreateWindowW(WC_BUTTONW, L"Apply Setting",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        10, 412, 130, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_DETAILS_BTN_TOGGLE), hInst, nullptr);
-    SendMessage(m_hBtnToggleTweak, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontBold), TRUE);
-
-    m_hBtnCopyTweak = CreateWindowW(WC_BUTTONW, L"Copy Technical Details",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
-        146, 412, 160, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_DETAILS_BTN_COPY), hInst, nullptr);
-    SendMessage(m_hBtnCopyTweak, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
     // 9. Status Bar (Item 14: Factual counts)
     m_hStatusBar = CreateWindowExW(0, STATUSCLASSNAMEW, nullptr,
@@ -880,28 +947,35 @@ void MainWindow::UpdateSplitterLayout() {
     const int height = rc.bottom - rc.top;
 
     RECT rcStatus{};
-    GetWindowRect(m_hStatusBar, &rcStatus);
+    if (m_hStatusBar) {
+        GetWindowRect(m_hStatusBar, &rcStatus);
+    }
     const int statusH = rcStatus.bottom - rcStatus.top;
 
     const int topH = 34;
     const int minListH = 180;
-    const int minDetailsH = 120;
+    const int minDetailsH = 80;
+
+    UINT dpi = 96;
+    if (m_hWnd) {
+        dpi = GetDpiForWindow(m_hWnd);
+        if (dpi == 0) dpi = 96;
+    }
+    const int splitterH = MulDiv(8, dpi, 96);
 
     if (m_splitterY < minListH + topH) {
         m_splitterY = minListH + topH;
-    } else if (m_splitterY > height - statusH - minDetailsH - 40) {
-        m_splitterY = height - statusH - minDetailsH - 40;
+    } else if (m_splitterY > height - statusH - minDetailsH - splitterH - 6) {
+        m_splitterY = height - statusH - minDetailsH - splitterH - 6;
     }
 
     const int listTop = topH + 12;
     const int listH = std::max(minListH, m_splitterY - listTop);
 
-    const int splitterH = 6;
-    const int detailsBtnsTop = m_splitterY + splitterH + 4;
-    const int editTop = detailsBtnsTop + 34;
+    const int editTop = m_splitterY + splitterH;
     const int editH = std::max(minDetailsH, height - statusH - editTop - 6);
 
-    HDWP hdwp = BeginDeferWindowPos(5);
+    HDWP hdwp = BeginDeferWindowPos(3);
     if (hdwp) {
         hdwp = DeferWindowPos(hdwp, m_hListView, nullptr, 10, listTop, width - 20, listH,
             SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
@@ -909,10 +983,6 @@ void MainWindow::UpdateSplitterLayout() {
             hdwp = DeferWindowPos(hdwp, m_hSplitterBar, nullptr, 10, m_splitterY, width - 20, splitterH,
                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
         }
-        hdwp = DeferWindowPos(hdwp, m_hBtnToggleTweak, nullptr, 10, detailsBtnsTop, 130, 26,
-            SWP_NOZORDER | SWP_NOACTIVATE);
-        hdwp = DeferWindowPos(hdwp, m_hBtnCopyTweak, nullptr, 148, detailsBtnsTop, 165, 26,
-            SWP_NOZORDER | SWP_NOACTIVATE);
         hdwp = DeferWindowPos(hdwp, m_hDetailsEdit, nullptr, 10, editTop, width - 20, editH,
             SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
         if (hdwp) {
@@ -921,7 +991,7 @@ void MainWindow::UpdateSplitterLayout() {
     }
 
     // Completely erase and repaint any exposed parent window band around the splitter
-    RECT rcBand = { 0, m_splitterY - 8, width, editTop + 2 };
+    RECT rcBand = { 0, m_splitterY - 4, width, editTop + 4 };
     RedrawWindow(m_hWnd, &rcBand, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW);
     if (m_hSplitterBar) {
         RedrawWindow(m_hSplitterBar, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW);
@@ -929,7 +999,13 @@ void MainWindow::UpdateSplitterLayout() {
 }
 
 void MainWindow::OnLButtonDown(int /*x*/, int y) {
-    if (y >= m_splitterY - 4 && y <= m_splitterY + 10) {
+    UINT dpi = 96;
+    if (m_hWnd) {
+        dpi = GetDpiForWindow(m_hWnd);
+        if (dpi == 0) dpi = 96;
+    }
+    const int splitterH = MulDiv(8, dpi, 96);
+    if (y >= m_splitterY - 3 && y <= m_splitterY + splitterH + 3) {
         m_isDraggingSplitter = true;
         SetCapture(m_hWnd);
     }
@@ -938,6 +1014,10 @@ void MainWindow::OnLButtonDown(int /*x*/, int y) {
 void MainWindow::OnLButtonUp() {
     if (m_isDraggingSplitter) {
         m_isDraggingSplitter = false;
+        s_isSplitterHovered = false;
+        if (m_hSplitterBar) {
+            InvalidateRect(m_hSplitterBar, nullptr, FALSE);
+        }
         ReleaseCapture();
         SavePreferences();
 
@@ -951,8 +1031,13 @@ void MainWindow::OnMouseMove(int /*x*/, int y) {
     if (m_isDraggingSplitter) {
         RECT rc;
         GetClientRect(m_hWnd, &rc);
+        RECT rcStatus{};
+        if (m_hStatusBar) {
+            GetWindowRect(m_hStatusBar, &rcStatus);
+        }
+        const int statusH = rcStatus.bottom - rcStatus.top;
         const int minTop = 220;
-        const int maxBottom = rc.bottom - 180;
+        const int maxBottom = rc.bottom - statusH - 90;
         if (y >= minTop && y <= maxBottom && y != m_splitterY) {
             m_splitterY = y;
             UpdateSplitterLayout();
@@ -1213,8 +1298,6 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
         UpdateDetailsPane(0);
     } else {
         SetWindowTextW(m_hDetailsEdit, L"No settings match the current filter.");
-        EnableWindow(m_hBtnToggleTweak, FALSE);
-        EnableWindow(m_hBtnCopyTweak, FALSE);
     }
 
     UpdateSelectionCounts();
@@ -1322,28 +1405,11 @@ void MainWindow::UpdateActionButtonsLayout(int clientWidth) {
 void MainWindow::UpdateDetailsPane(int selectedIndex) {
     if (selectedIndex < 0 || selectedIndex >= static_cast<int>(m_displayedTweaks.size())) {
         SetWindowTextW(m_hDetailsEdit, L"");
-        EnableWindow(m_hBtnToggleTweak, FALSE);
-        EnableWindow(m_hBtnCopyTweak, FALSE);
         return;
     }
 
-    EnableWindow(m_hBtnToggleTweak, TRUE);
-    EnableWindow(m_hBtnCopyTweak, TRUE);
-
     const auto& t = m_displayedTweaks[selectedIndex];
     const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
-
-    // Item 11: Consistent per-setting action labels
-    if (st == SettingStatus::NotApplicable || m_notApplicableIds.count(t.id) > 0) {
-        SetWindowTextW(m_hBtnToggleTweak, L"Not Applicable");
-        EnableWindow(m_hBtnToggleTweak, FALSE);
-    } else if (st == SettingStatus::Applied) {
-        SetWindowTextW(m_hBtnToggleTweak, L"Restore Setting");
-        EnableWindow(m_hBtnToggleTweak, TRUE);
-    } else {
-        SetWindowTextW(m_hBtnToggleTweak, L"Apply Setting");
-        EnableWindow(m_hBtnToggleTweak, TRUE);
-    }
 
     // Item 10: Reordered and shortened details content in sentence-case
     std::wstringstream ss;
@@ -1416,68 +1482,6 @@ void MainWindow::UpdateDetailsPane(int selectedIndex) {
     }
 
     SetWindowTextW(m_hDetailsEdit, ss.str().c_str());
-}
-
-void MainWindow::ToggleSelectedTweakFromDetails() {
-    const int sel = ListView_GetNextItem(m_hListView, -1, LVNI_SELECTED);
-    if (sel < 0 || sel >= static_cast<int>(m_displayedTweaks.size())) return;
-
-    const auto& t = m_displayedTweaks[sel];
-    if (m_notApplicableIds.count(t.id) > 0) return;
-    const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
-    if (st == SettingStatus::NotApplicable) return;
-
-    if (!IsRunningAsAdmin() && t.scope != TargetScope::User) {
-        const int res = MessageBoxW(m_hWnd,
-            L"Administrator privileges are required to modify system-wide machine settings.\n\n"
-            L"Would you like to restart PrivatizeWin as Administrator now?",
-            L"PrivatizeWin \u2014 Elevation Required",
-            MB_YESNO | MB_ICONWARNING);
-        if (res == IDYES) {
-            RelaunchAsAdminWithPendingState();
-        }
-        return;
-    }
-
-    const bool shouldApply = (st != SettingStatus::Applied);
-
-    const bool ok = TweakRegistry::Instance().ApplyTweak(t.id, shouldApply, UserSelectionMode::CurrentUser, {});
-    if (ok) {
-        // Re-audit setting and update UI
-        const SettingStatus newSt = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
-        std::wstring stStr;
-        switch (newSt) {
-        case SettingStatus::Applied:       stStr = L"\u25CF Applied"; break;
-        case SettingStatus::NotApplied:    stStr = L"\u25CB Not applied"; break;
-        case SettingStatus::Unknown:       stStr = L"? Unknown"; break;
-        case SettingStatus::NotApplicable: stStr = L"\u2014 Not applicable"; break;
-        default:                           stStr = L"\u25CB Not applied"; break;
-        }
-
-        ListView_SetItemText(m_hListView, sel, 1, const_cast<LPWSTR>(stStr.c_str()));
-
-        // Keep the checkbox in sync with the applied state (Item 3 & Item 10)
-        m_pendingEnableIds.erase(t.id);
-        m_pendingRevertIds.erase(t.id);
-        CheckboxState cbState = CheckboxState::Unchecked;
-        if (newSt == SettingStatus::NotApplicable) {
-            cbState = CheckboxState::Disabled;
-        } else if (newSt == SettingStatus::Applied) {
-            cbState = CheckboxState::AlreadyEnabled;
-        }
-        SetRowCheckboxState(sel, cbState);
-
-        if (st != SettingStatus::Applied && newSt == SettingStatus::Applied) {
-            m_appliedCount++;
-        } else if (st == SettingStatus::Applied && newSt != SettingStatus::Applied) {
-            m_appliedCount = std::max(0, m_appliedCount - 1);
-        }
-        UpdateDetailsPane(sel);
-        UpdateStatusBar();
-        UpdateSelectionCounts();
-    } else {
-        MessageBoxW(m_hWnd, (L"Failed to change setting: " + t.title).c_str(), L"PrivatizeWin Error", MB_OK | MB_ICONERROR);
-    }
 }
 
 void MainWindow::UpdateStatusBar() {
@@ -2075,12 +2079,6 @@ void MainWindow::OnCommand(int id, int notifyCode, HWND /*hCtrl*/) {
         break;
     case IDM_HELP_GITHUB:
         ShellExecuteW(nullptr, L"open", L"https://github.com/saverchenkov/PrivatizeWin", nullptr, nullptr, SW_SHOWNORMAL);
-        break;
-    case IDC_DETAILS_BTN_TOGGLE:
-        ToggleSelectedTweakFromDetails();
-        break;
-    case IDC_DETAILS_BTN_COPY:
-        CopySelectedTweakDetails();
         break;
     case IDM_CTX_PROTECT_SELECTED: {
         int i = -1;
