@@ -7,6 +7,9 @@
 #include <functional>
 #include <chrono>
 #include <sstream>
+#include <windows.h>
+#include <filesystem>
+#include <atomic>
 
 namespace PrivatizeWin::Test {
 
@@ -160,6 +163,63 @@ void AssertNe(const T1& a, const T2& b, std::string_view exprA, std::string_view
         throw TestAssertionException(ss.str());
     }
 }
+
+class TestTempDirectory {
+public:
+    TestTempDirectory() {
+        wchar_t tempBase[MAX_PATH];
+        DWORD len = GetTempPathW(MAX_PATH, tempBase);
+        if (len == 0 || len > MAX_PATH) {
+            wcscpy_s(tempBase, L"C:\\Windows\\Temp");
+        }
+        static std::atomic<uint64_t> s_counter{ 0 };
+        const auto counterVal = ++s_counter;
+        const auto pid = GetCurrentProcessId();
+        const auto tick = GetTickCount64();
+
+        m_path = std::wstring(tempBase);
+        if (!m_path.empty() && m_path.back() != L'\\') {
+            m_path += L'\\';
+        }
+        m_path += L"privatizewin_test_" + std::to_wstring(pid) + L"_" + std::to_wstring(tick) + L"_" + std::to_wstring(counterVal);
+
+        CreateDirectoryW(m_path.c_str(), nullptr);
+    }
+
+    ~TestTempDirectory() {
+        Cleanup();
+    }
+
+    TestTempDirectory(const TestTempDirectory&) = delete;
+    TestTempDirectory& operator=(const TestTempDirectory&) = delete;
+    TestTempDirectory(TestTempDirectory&& other) noexcept : m_path(std::move(other.m_path)) {
+        other.m_path.clear();
+    }
+    TestTempDirectory& operator=(TestTempDirectory&& other) noexcept {
+        if (this != &other) {
+            Cleanup();
+            m_path = std::move(other.m_path);
+            other.m_path.clear();
+        }
+        return *this;
+    }
+
+    [[nodiscard]] const std::wstring& GetPath() const noexcept { return m_path; }
+    [[nodiscard]] std::wstring GetFilePath(const std::wstring& filename) const {
+        return m_path + L"\\" + filename;
+    }
+
+    void Cleanup() {
+        if (!m_path.empty()) {
+            std::error_code ec;
+            std::filesystem::remove_all(m_path, ec);
+            m_path.clear();
+        }
+    }
+
+private:
+    std::wstring m_path;
+};
 
 } // namespace PrivatizeWin::Test
 

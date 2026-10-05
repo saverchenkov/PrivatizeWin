@@ -21,14 +21,14 @@ public:
 
     // Saves pending plan to a unique, securely created temporary file.
     // Returns full file path, or empty string on any failure.
-    [[nodiscard]] static std::wstring SaveHandoff(const PendingStatePlan& plan);
+    [[nodiscard]] static std::wstring SaveHandoff(const PendingStatePlan& plan, std::wstring* outToken = nullptr);
 
-    // Validates format, magic header, JSON structure, and checks for overlapping IDs.
+    // Validates format, magic header, JSON structure, reparse point, version, and checks for overlapping IDs.
     // Does NOT delete the file.
-    [[nodiscard]] static bool ValidateAndLoadHandoff(const std::wstring& filePath, PendingStatePlan& outPlan);
+    [[nodiscard]] static bool ValidateAndLoadHandoff(const std::wstring& filePath, PendingStatePlan& outPlan, const std::wstring& expectedToken = L"");
 
     // Consumes handoff: validates and loads plan, and ONLY deletes the file if it was a valid, verified handoff.
-    [[nodiscard]] static bool ConsumeHandoff(const std::wstring& filePath, PendingStatePlan& outPlan);
+    [[nodiscard]] static bool ConsumeHandoff(const std::wstring& filePath, PendingStatePlan& outPlan, const std::wstring& expectedToken = L"");
 };
 
 } // namespace PrivatizeWin

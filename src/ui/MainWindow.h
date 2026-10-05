@@ -32,7 +32,7 @@ enum class CheckboxState : UINT {
 class MainWindow {
 public:
     static bool RegisterClass(HINSTANCE hInstance);
-    [[nodiscard]] static HWND Create(HINSTANCE hInstance, std::wstring_view resumePendingFile = L"");
+    [[nodiscard]] static HWND Create(HINSTANCE hInstance, std::wstring_view resumePendingFile = L"", std::wstring_view resumePendingToken = L"");
 
     static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK SplitterWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -98,9 +98,10 @@ private:
     void SavePreferences();
 
     bool RelaunchAsAdminWithPendingState();
-    [[nodiscard]] std::wstring SavePendingStateToTempFile() const;
-    bool RestorePendingStateFromFile(const std::wstring& filePath);
+    [[nodiscard]] std::wstring SavePendingStateToTempFile(std::wstring* outToken = nullptr) const;
+    bool RestorePendingStateFromFile(const std::wstring& filePath, const std::wstring& token = L"");
     inline static std::wstring s_resumePendingFile;
+    inline static std::wstring s_resumePendingToken;
 
     HWND m_hWnd{ nullptr };
     HWND m_hSearchEdit{ nullptr };

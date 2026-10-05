@@ -9,6 +9,7 @@
 using namespace PrivatizeWin;
 
 TEST_CASE(Unit_PendingState, RoundTripSerializationAndParsing) {
+    Test::TestTempDirectory tempDir;
     std::unordered_set<std::string> pendingEnable = { "A001_USER", "A002_USER", "TEL_DIAG" };
     std::unordered_set<std::string> pendingRevert = { "TEL_CEIP" };
 
@@ -29,10 +30,8 @@ TEST_CASE(Unit_PendingState, RoundTripSerializationAndParsing) {
     ASSERT_TRUE(jsonStr.find("A001_USER") != std::string::npos);
     ASSERT_TRUE(jsonStr.find("TEL_CEIP") != std::string::npos);
 
-    // 2. Write to temporary file
-    wchar_t tempPath[MAX_PATH]{};
-    ASSERT_TRUE(GetTempPathW(MAX_PATH, tempPath) > 0);
-    const std::wstring testFile = std::wstring(tempPath) + L"PrivatizeWin_Test_Pending.json";
+    // 2. Write to temporary file in isolated directory
+    const std::wstring testFile = tempDir.GetFilePath(L"PrivatizeWin_Test_Pending.json");
 
     HANDLE hFile = CreateFileW(testFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     ASSERT_NE(hFile, INVALID_HANDLE_VALUE);
@@ -50,9 +49,6 @@ TEST_CASE(Unit_PendingState, RoundTripSerializationAndParsing) {
     DWORD bytesRead = 0;
     ReadFile(hRead, &readContent[0], fileSize, &bytesRead, nullptr);
     CloseHandle(hRead);
-
-    // Clean up temporary file
-    DeleteFileW(testFile.c_str());
 
     const JsonValue parsedRoot = JsonValue::parse(readContent);
     ASSERT_TRUE(parsedRoot.isObject());
@@ -88,12 +84,21 @@ TEST_CASE(Unit_PendingState, PendingHandoff_RoundTripAndCleanDeletion) {
     plan.pendingEnable = { "TEL_DIAGTRACK", "AI_RECALL" };
     plan.pendingRevert = { "PRIV_AD_ID_USER" };
 
-    const std::wstring outPath = PendingHandoff::SaveHandoff(plan);
+    std::wstring token;
+    const std::wstring outPath = PendingHandoff::SaveHandoff(plan, &token);
     ASSERT_FALSE(outPath.empty());
+    ASSERT_FALSE(token.empty());
     ASSERT_NE(GetFileAttributesW(outPath.c_str()), INVALID_FILE_ATTRIBUTES);
 
+    // Wrong token must be rejected and must NOT delete the file
+    PendingStatePlan dummyPlan;
+    const bool wrongTokenOk = PendingHandoff::ConsumeHandoff(outPath, dummyPlan, L"invalid_token_12345");
+    ASSERT_FALSE(wrongTokenOk);
+    ASSERT_NE(GetFileAttributesW(outPath.c_str()), INVALID_FILE_ATTRIBUTES);
+
+    // Correct token succeeds
     PendingStatePlan loadedPlan;
-    const bool loadOk = PendingHandoff::ConsumeHandoff(outPath, loadedPlan);
+    const bool loadOk = PendingHandoff::ConsumeHandoff(outPath, loadedPlan, token);
     ASSERT_TRUE(loadOk);
     ASSERT_EQ(loadedPlan.pendingEnable.size(), plan.pendingEnable.size());
     ASSERT_EQ(loadedPlan.pendingRevert.size(), plan.pendingRevert.size());
@@ -103,9 +108,8 @@ TEST_CASE(Unit_PendingState, PendingHandoff_RoundTripAndCleanDeletion) {
 }
 
 TEST_CASE(Unit_PendingState, PendingHandoff_UnrelatedFileSurvivesRejection) {
-    wchar_t tempPath[MAX_PATH]{};
-    ASSERT_TRUE(GetTempPathW(MAX_PATH, tempPath) > 0);
-    const std::wstring unrelatedFile = std::wstring(tempPath) + L"unrelated_user_document.txt";
+    Test::TestTempDirectory tempDir;
+    const std::wstring unrelatedFile = tempDir.GetFilePath(L"unrelated_user_document.txt");
 
     // Create an unrelated file
     HANDLE hFile = CreateFileW(unrelatedFile.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -122,17 +126,14 @@ TEST_CASE(Unit_PendingState, PendingHandoff_UnrelatedFileSurvivesRejection) {
 
     // CRITICAL: Unrelated file MUST survive and NOT be deleted
     ASSERT_NE(GetFileAttributesW(unrelatedFile.c_str()), INVALID_FILE_ATTRIBUTES);
-
-    DeleteFileW(unrelatedFile.c_str());
 }
 
 TEST_CASE(Unit_PendingState, PendingHandoff_MalformedAndOverlappingRejected) {
-    wchar_t tempPath[MAX_PATH]{};
-    ASSERT_TRUE(GetTempPathW(MAX_PATH, tempPath) > 0);
-    const std::wstring testHandoff = std::wstring(tempPath) + L"privatizewin_test_malformed.tmp";
+    Test::TestTempDirectory tempDir;
+    const std::wstring testHandoff = tempDir.GetFilePath(L"privatizewin_test_malformed.tmp");
 
     // Construct a payload with overlapping IDs
-    std::string badPayload = "PRIVATIZEWIN_HANDOFF_V1\n{\"pendingEnable\": [\"OVERLAP_01\"], \"pendingRevert\": [\"OVERLAP_01\"]}";
+    std::string badPayload = "PRIVATIZEWIN_HANDOFF_V1\n{\"version\":1,\"pendingEnable\": [\"OVERLAP_01\"], \"pendingRevert\": [\"OVERLAP_01\"]}";
 
     HANDLE hFile = CreateFileW(testHandoff.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     ASSERT_NE(hFile, INVALID_HANDLE_VALUE);
@@ -146,6 +147,4 @@ TEST_CASE(Unit_PendingState, PendingHandoff_MalformedAndOverlappingRejected) {
 
     // File with malformed schema / overlapping IDs must NOT be deleted by reader
     ASSERT_NE(GetFileAttributesW(testHandoff.c_str()), INVALID_FILE_ATTRIBUTES);
-
-    DeleteFileW(testHandoff.c_str());
 }

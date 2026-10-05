@@ -34,6 +34,8 @@ inline const LocEntry g_uiStrings[] = {
     { "col_scope", { L"Scope", L"Bereich", L"Область", L"Portée", L"Ámbito", L"Ambito", L"Escopo", L"范围", L"スコープ", L"Zakres", L"Kapsam", L"Область" } },
     { "status_raw_applied", { L"Applied", L"Angewendet", L"Применено", L"Appliqué", L"Aplicado", L"Applicato", L"Aplicado", L"已应用", L"適用済み", L"Zastosowano", L"Uygulandı", L"Застосовано" } },
     { "status_raw_not_applied", { L"Not applied", L"Nicht angewendet", L"Не применено", L"Non appliqué", L"No aplicado", L"Non applicato", L"Não aplicado", L"未应用", L"未適用", L"Niezastosowano", L"Uygulanmadı", L"Не застосовано" } },
+    { "status_raw_partial", { L"Partially applied", L"Teilweise angewendet", L"Частично применено", L"Partiellement appliqué", L"Parcialmente aplicado", L"Parzialmente applicato", L"Parcialmente aplicado", L"部分应用", L"一部適用済み", L"Częściowo zastosowano", L"Kısmen uygulandı", L"Частково застосовано" } },
+    { "status_raw_custom", { L"Custom", L"Benutzerdefiniert", L"Особое", L"Personnalisé", L"Personalizado", L"Personalizzato", L"Personalizado", L"自定义", L"カスタム", L"Niestandardowy", L"Özel", L"Нестандартне" } },
     { "status_raw_unknown", { L"Unknown", L"Unbekannt", L"Неизвестно", L"Inconnu", L"Desconocido", L"Sconosciuto", L"Desconhecido", L"未知", L"不明", L"Nieznany", L"Bilinmiyor", L"Невідомо" } },
     { "status_raw_not_applicable", { L"Not applicable", L"Nicht verfügbar", L"Не применимо", L"Non applicable", L"No aplicable", L"Non applicabile", L"Não aplicável", L"不适用", L"該当なし", L"Nie dotyczy", L"Uygulanamaz", L"Не застосовується" } },
     { "impact_low", { L"Low", L"Niedrig", L"Низкое", L"Faible", L"Bajo", L"Basso", L"Baixo", L"低", L"低", L"Niski", L"Düşük", L"Низький" } },

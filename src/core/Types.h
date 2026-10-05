@@ -22,13 +22,14 @@ using SafetyLevel = ImpactLevel;
 // Current audit state on the machine (Item 4)
 enum class SettingStatus {
     Applied,        // Setting active / applied on the machine (Already Enabled)
-    NotApplied,     // Setting not applied (Windows default)
+    Default,        // Setting matches exact Windows default / restored target
+    Custom,         // Value exists but matches neither protected nor default, or wrong type
     Partial,        // Partially applied across different keys or services (Partially Enabled)
     Unknown,        // Inaccessible or detection failed
     NotApplicable,  // Not applicable to this Windows version
     // Aliases for backwards compatibility
     Protected = Applied,
-    Default = NotApplied,
+    NotApplied = Default,
     Mixed = Partial,
     NotSupported = NotApplicable
 };
@@ -134,6 +135,7 @@ struct CliOptions {
     std::vector<std::wstring> specificUsernames;
 
     std::wstring resumePendingFile;
+    std::wstring resumePendingToken;
 
     bool hasError{ false };
     std::string errorMessage;

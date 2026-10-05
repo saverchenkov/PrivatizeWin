@@ -137,6 +137,13 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
                 opts.hasError = true;
                 opts.errorMessage = "Missing file path for --resume-pending";
             }
+        } else if (arg == L"--resume-token") {
+            if (i + 1 < argc && argv[i + 1][0] != L'-') {
+                opts.resumePendingToken = argv[++i];
+            } else {
+                opts.hasError = true;
+                opts.errorMessage = "Missing token for --resume-token";
+            }
         } else {
             opts.hasError = true;
             opts.errorMessage = "Unrecognized command-line option: " + WStringToUtf8(arg);
@@ -154,6 +161,12 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
             continue;
         }
         if (wcscmp(argv[j], L"--resume-pending") == 0) {
+            if (j + 1 < argc && argv[j + 1][0] != L'-') {
+                j++;
+            }
+            continue;
+        }
+        if (wcscmp(argv[j], L"--resume-token") == 0) {
             if (j + 1 < argc && argv[j + 1][0] != L'-') {
                 j++;
             }
@@ -292,7 +305,8 @@ int CliRunner::Execute(const CliOptions& opts) {
                 obj["id"] = t.id;
                 switch (st) {
                 case SettingStatus::Applied: obj["status"] = "applied"; break;
-                case SettingStatus::NotApplied: obj["status"] = "not_applied"; break;
+                case SettingStatus::Default: obj["status"] = "not_applied"; break;
+                case SettingStatus::Custom: obj["status"] = "custom"; break;
                 case SettingStatus::Partial: obj["status"] = "partial"; break;
                 case SettingStatus::Unknown: obj["status"] = "unknown"; break;
                 case SettingStatus::NotApplicable: obj["status"] = "not_applicable"; break;
@@ -309,7 +323,8 @@ int CliRunner::Execute(const CliOptions& opts) {
                 std::cout << std::left << std::setw(25) << t.id;
                 switch (st) {
                 case SettingStatus::Applied: std::cout << std::setw(16) << "[APPLIED]"; break;
-                case SettingStatus::NotApplied: std::cout << std::setw(16) << "[NOT APPLIED]"; break;
+                case SettingStatus::Default: std::cout << std::setw(16) << "[NOT APPLIED]"; break;
+                case SettingStatus::Custom: std::cout << std::setw(16) << "[CUSTOM]"; break;
                 case SettingStatus::Partial: std::cout << std::setw(16) << "[PARTIAL]"; break;
                 case SettingStatus::Unknown: std::cout << std::setw(16) << "[UNKNOWN]"; break;
                 case SettingStatus::NotApplicable: std::cout << std::setw(16) << "[NOT APPLICABLE]"; break;
@@ -329,13 +344,6 @@ int CliRunner::Execute(const CliOptions& opts) {
     }
 
     if (!templateToApply.empty()) {
-        if (!opts.dryRun && !IsRunningAsAdmin()) {
-            InitializeConsoleOutput();
-            std::cerr << "[ERROR] Administrator privileges are required to modify system privacy settings.\n"
-                      << "        Please run Command Prompt or PowerShell as Administrator.\n" << std::flush;
-            return 5;
-        }
-
         TemplateProfile profile;
         const auto builtin = TemplateManager::Instance().GetTemplate(templateToApply);
         if (builtin.has_value()) {
@@ -350,19 +358,11 @@ int CliRunner::Execute(const CliOptions& opts) {
             }
         }
 
-        // Adaptive Safety Restore Point
-        if (opts.forceRestorePoint) {
-            if (opts.dryRun) {
-                if (!opts.quiet) std::cout << "[DRY RUN] Would create System Restore Point: 'PrivatizeWin - Pre-Apply Configuration'\n" << std::flush;
-            } else {
-                int64_t seq = 0;
-                if (!opts.quiet) std::cout << "[*] Creating System Restore Point...\n" << std::flush;
-                const bool rpOk = RestorePoint::Create(L"PrivatizeWin - Pre-Apply Configuration", seq);
-                if (!opts.quiet) {
-                    if (rpOk) std::cout << "[+] System Restore Point created successfully.\n" << std::flush;
-                    else std::cout << "[!] Warning: Could not create restore point (System Protection may be disabled).\n" << std::flush;
-                }
-            }
+        std::string conflictErr;
+        if (!TweakRegistry::Instance().ValidatePlanConflicts(profile.tweakStates, conflictErr)) {
+            InitializeConsoleOutput();
+            std::cerr << "[ERROR] Template contains conflicting settings: " << conflictErr << "\n" << std::flush;
+            return 4;
         }
 
         if (!opts.quiet) {
@@ -373,45 +373,121 @@ int CliRunner::Execute(const CliOptions& opts) {
             std::cout << std::flush;
         }
 
-        int appliedCount = 0;
-        int failedCount = 0;
-        int skippedCount = 0;
+        struct PlannedItem {
+            std::string id;
+            bool shouldEnable;
+        };
+        std::vector<PlannedItem> plan;
+        std::map<std::string, bool> canonicalSeen;
+        int skippedNotApplicableCount = 0;
+        int skippedUnknownCount = 0;
+
         for (const auto& [tweakId, shouldEnable] : profile.tweakStates) {
-            const Tweak* t = TweakRegistry::Instance().GetTweakById(tweakId);
-            if (!t) {
-                skippedCount++;
+            std::string canonId = TweakRegistry::Instance().GetCanonicalTweakId(tweakId);
+            if (canonicalSeen.count(canonId) > 0) {
+                // Deduplicate identical alias request in same plan
+                continue;
+            }
+            canonicalSeen[canonId] = shouldEnable;
+
+            const auto applicability = TweakRegistry::Instance().GetTweakApplicability(tweakId, opts.userMode);
+            if (applicability == TweakRegistry::TweakApplicability::UnknownTweak) {
+                skippedUnknownCount++;
                 if (!opts.quiet) {
                     std::cerr << "    [!] Warning: Unknown tweak ID '" << tweakId << "'\n" << std::flush;
                 }
                 continue;
             }
 
-            if (opts.dryRun) {
-                if (!opts.quiet) {
-                    std::cout << "    -> Would set " << tweakId << " to " << (shouldEnable ? "PROTECTED" : "DEFAULT") << "\n" << std::flush;
+            if (applicability != TweakRegistry::TweakApplicability::Applicable) {
+                skippedNotApplicableCount++;
+                if (opts.dryRun && !opts.quiet) {
+                    std::cout << "    -> [SKIPPED] " << tweakId << " (not applicable in current user scope or OS build)\n" << std::flush;
                 }
-            } else {
-                const bool ok = TweakRegistry::Instance().ApplyTweak(tweakId, shouldEnable, opts.userMode, opts.specificUsernames);
-                if (ok) {
-                    appliedCount++;
-                } else {
-                    failedCount++;
-                    InitializeConsoleOutput();
-                    std::cerr << "    [!] Failed to configure " << tweakId << "\n" << std::flush;
-                }
+                continue;
             }
+
+            plan.push_back({ tweakId, shouldEnable });
         }
 
         if (opts.dryRun) {
             if (!opts.quiet) {
-                std::cout << "[SUCCESS] Dry run completed without making any changes. (" << profile.tweakStates.size() << " operations planned)\n" << std::flush;
+                for (const auto& item : plan) {
+                    std::cout << "    -> Would set " << item.id << " to " << (item.shouldEnable ? "PROTECTED" : "DEFAULT") << "\n";
+                }
+                std::cout << "[SUCCESS] Dry run completed without making any changes. (" << plan.size() << " operations planned";
+                if (skippedNotApplicableCount > 0) {
+                    std::cout << ", " << skippedNotApplicableCount << " skipped as not applicable";
+                }
+                std::cout << ")\n" << std::flush;
             }
             return 0;
         }
 
+        if (plan.empty()) {
+            if (!opts.quiet) {
+                std::cout << "[INFO] No applicable operations to perform.\n" << std::flush;
+            }
+            return 0;
+        }
+
+        if (!IsRunningAsAdmin()) {
+            bool needsAdmin = false;
+            if (opts.userMode == UserSelectionMode::AllUsers) {
+                needsAdmin = true;
+            } else {
+                for (const auto& item : plan) {
+                    const auto* t = TweakRegistry::Instance().GetTweakById(item.id);
+                    if (t && (t->scope == TargetScope::Machine || t->scope == TargetScope::Service)) {
+                        needsAdmin = true;
+                        break;
+                    }
+                }
+            }
+
+            if (needsAdmin) {
+                InitializeConsoleOutput();
+                std::cerr << "[ERROR] Administrator privileges are required to modify system privacy settings.\n"
+                          << "        Please run Command Prompt or PowerShell as Administrator.\n" << std::flush;
+                return 5;
+            }
+        }
+
+        // Adaptive Safety Restore Point
+        if (opts.forceRestorePoint) {
+            int64_t seq = 0;
+            if (!opts.quiet) std::cout << "[*] Creating System Restore Point...\n" << std::flush;
+            const bool rpOk = RestorePoint::Create(L"PrivatizeWin - Pre-Apply Configuration", seq);
+            if (!opts.quiet) {
+                if (rpOk) std::cout << "[+] System Restore Point created successfully.\n" << std::flush;
+                else std::cout << "[!] Warning: Could not create restore point (System Protection may be disabled).\n" << std::flush;
+            }
+        }
+
+        int appliedCount = 0;
+        int failedCount = 0;
+        for (const auto& item : plan) {
+            const auto res = TweakRegistry::Instance().ApplyTweakEx(item.id, item.shouldEnable, opts.userMode, opts.specificUsernames);
+            if (res == TweakRegistry::ApplyResult::Success) {
+                appliedCount++;
+            } else if (res == TweakRegistry::ApplyResult::NotApplicable) {
+                skippedNotApplicableCount++;
+            } else {
+                failedCount++;
+                InitializeConsoleOutput();
+                std::cerr << "    [!] Failed to configure " << item.id << "\n" << std::flush;
+            }
+        }
+
+        const int totalSkipped = skippedNotApplicableCount + skippedUnknownCount;
         if (!opts.quiet) {
             std::cout << "[SUMMARY] Applied: " << appliedCount << ", Failed: " << failedCount;
-            if (skippedCount > 0) std::cout << ", Skipped: " << skippedCount;
+            if (totalSkipped > 0) {
+                std::cout << ", Skipped: " << totalSkipped;
+                if (skippedNotApplicableCount > 0) {
+                    std::cout << " (" << skippedNotApplicableCount << " not applicable)";
+                }
+            }
             std::cout << "\n" << std::flush;
         }
 

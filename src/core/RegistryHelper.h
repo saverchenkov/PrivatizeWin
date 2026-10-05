@@ -31,6 +31,7 @@ public:
     static bool DeleteKeyIfEmpty(HKEY hRoot, std::wstring_view subKey);
 
     [[nodiscard]] static SettingStatus AuditAction(HKEY hRoot, const RegistryAction& action);
+    [[nodiscard]] static bool MatchesTarget(HKEY hRoot, const RegistryAction& action, bool targetProtected) noexcept;
     static bool ApplyAction(HKEY hRoot, const RegistryAction& action, bool enableProtection);
 };
 

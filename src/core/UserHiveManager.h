@@ -47,6 +47,13 @@ public:
         const std::vector<std::wstring>& specificUsers
     );
 
+    [[nodiscard]] static bool MatchesUserActionTarget(
+        const RegistryAction& action,
+        bool targetProtected,
+        UserSelectionMode mode,
+        const std::vector<std::wstring>& specificUsers
+    );
+
     static bool ApplyUserAction(
         const RegistryAction& action,
         bool enableProtection,

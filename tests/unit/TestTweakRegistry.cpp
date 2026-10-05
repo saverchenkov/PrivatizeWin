@@ -1,5 +1,6 @@
 #include "../TestFramework.h"
 #include "../../src/core/TweakRegistry.h"
+#include "../../src/core/RegistryHelper.h"
 #include <set>
 
 using namespace PrivatizeWin;
@@ -83,7 +84,7 @@ TEST_CASE(Unit_TweakRegistry, SplitUserMachineAndNoPartialState) {
         const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
         ASSERT_TRUE(st == SettingStatus::Applied || st == SettingStatus::NotApplied ||
                     st == SettingStatus::Partial || st == SettingStatus::Unknown ||
-                    st == SettingStatus::NotApplicable);
+                    st == SettingStatus::NotApplicable || st == SettingStatus::Custom);
 
         if (t.id.ends_with("_USER")) {
             ASSERT_TRUE(t.scope == TargetScope::User);
@@ -195,5 +196,110 @@ TEST_CASE(Unit_TweakRegistry, NotApplicableEvaluation) {
               SettingStatus::NotApplicable);
     ASSERT_FALSE(TweakRegistry::Instance().ApplyTweak("ZERO_ACTION_TEST", true, UserSelectionMode::CurrentUser, {}));
 }
+
+TEST_CASE(Unit_TweakRegistry, TargetMatchingCustomAndWrongType) {
+    const wchar_t* subKey = L"Software\\PrivatizeWin\\Test_TargetMatching";
+    // Ensure clean key
+    RegDeleteTreeW(HKEY_CURRENT_USER, subKey);
+
+    RegistryAction action;
+    action.subKey = subKey;
+    action.valueName = L"SettingVal";
+    action.type = RegType::Dword;
+    action.dwordProtected = 1;
+    action.dwordDefault = 0;
+    action.deleteOnDefault = false;
+
+    // 1. Initial absent state: when deleteOnDefault is false, missing value does NOT match default
+    ASSERT_FALSE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, false));
+    ASSERT_FALSE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, true));
+    ASSERT_EQ(RegistryHelper::AuditAction(HKEY_CURRENT_USER, action), SettingStatus::Custom);
+
+    // 1b. Apply default (0)
+    ASSERT_TRUE(RegistryHelper::ApplyAction(HKEY_CURRENT_USER, action, false));
+    ASSERT_TRUE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, false));
+    ASSERT_FALSE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, true));
+    ASSERT_EQ(RegistryHelper::AuditAction(HKEY_CURRENT_USER, action), SettingStatus::NotApplied);
+
+    // 2. Set to protected value 1
+    ASSERT_TRUE(RegistryHelper::ApplyAction(HKEY_CURRENT_USER, action, true));
+    ASSERT_TRUE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, true));
+    ASSERT_FALSE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, false));
+    ASSERT_EQ(RegistryHelper::AuditAction(HKEY_CURRENT_USER, action), SettingStatus::Applied);
+
+    // 3. Set to custom value 2 (neither protected 1 nor default 0)
+    HKEY hKey = nullptr;
+    ASSERT_EQ(RegOpenKeyExW(HKEY_CURRENT_USER, subKey, 0, KEY_WRITE, &hKey), ERROR_SUCCESS);
+    DWORD customVal = 2;
+    RegSetValueExW(hKey, action.valueName.c_str(), 0, REG_DWORD, reinterpret_cast<const BYTE*>(&customVal), sizeof(customVal));
+    RegCloseKey(hKey);
+
+    // Custom value must NOT match protected AND must NOT match default
+    ASSERT_FALSE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, true));
+    ASSERT_FALSE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, false));
+    ASSERT_EQ(RegistryHelper::AuditAction(HKEY_CURRENT_USER, action), SettingStatus::Custom);
+
+    // 4. Set to wrong type (REG_SZ instead of REG_DWORD)
+    ASSERT_EQ(RegOpenKeyExW(HKEY_CURRENT_USER, subKey, 0, KEY_WRITE, &hKey), ERROR_SUCCESS);
+    const wchar_t szVal[] = L"1";
+    RegSetValueExW(hKey, action.valueName.c_str(), 0, REG_SZ, reinterpret_cast<const BYTE*>(szVal), sizeof(szVal));
+    RegCloseKey(hKey);
+
+    ASSERT_FALSE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, true));
+    ASSERT_FALSE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, false));
+    ASSERT_EQ(RegistryHelper::AuditAction(HKEY_CURRENT_USER, action), SettingStatus::Custom);
+
+    // 5. Test deleteOnDefault = true
+    action.deleteOnDefault = true;
+    // With value still present, it does NOT match default
+    ASSERT_FALSE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, false));
+    // Apply default (which deletes the value)
+    ASSERT_TRUE(RegistryHelper::ApplyAction(HKEY_CURRENT_USER, action, false));
+    // Now absent, matches default
+    ASSERT_TRUE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, false));
+    ASSERT_FALSE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, true));
+
+    // Clean up test key
+    RegDeleteTreeW(HKEY_CURRENT_USER, subKey);
+}
+
+TEST_CASE(Unit_TweakRegistry, PlanConflictDetection) {
+    TweakRegistry::Instance().InitializeDefaultTweaks();
+
+    // 1. Contradictory requests for aliases (TEL_CEIP and P027)
+    std::map<std::string, bool> conflictingPlan = {
+        { "TEL_CEIP", true },
+        { "P027", false }
+    };
+    std::string conflictErr;
+    ASSERT_FALSE(TweakRegistry::Instance().ValidatePlanConflicts(conflictingPlan, conflictErr));
+    ASSERT_FALSE(conflictErr.empty());
+
+    // 2. Consistent requests for aliases
+    std::map<std::string, bool> consistentPlan = {
+        { "TEL_CEIP", true },
+        { "P027", true }
+    };
+    conflictErr.clear();
+    ASSERT_TRUE(TweakRegistry::Instance().ValidatePlanConflicts(consistentPlan, conflictErr));
+    ASSERT_TRUE(conflictErr.empty());
+}
+
+TEST_CASE(Unit_TweakRegistry, UsersNoneApplicabilityAndExecution) {
+    TweakRegistry::Instance().InitializeDefaultTweaks();
+
+    // User tweak with UserSelectionMode::NoUsers
+    const auto appUser = TweakRegistry::Instance().GetTweakApplicability("PRIV_AD_ID_USER", UserSelectionMode::NoUsers);
+    ASSERT_EQ(appUser, TweakRegistry::TweakApplicability::NotApplicableUserScope);
+
+    // Machine tweak with UserSelectionMode::NoUsers
+    const auto appMachine = TweakRegistry::Instance().GetTweakApplicability("TEL_DIAGTRACK", UserSelectionMode::NoUsers);
+    ASSERT_EQ(appMachine, TweakRegistry::TweakApplicability::Applicable);
+
+    // ApplyTweakEx with UserSelectionMode::NoUsers returns NotApplicable for user-only tweak
+    const auto res = TweakRegistry::Instance().ApplyTweakEx("PRIV_AD_ID_USER", true, UserSelectionMode::NoUsers, {});
+    ASSERT_EQ(res, TweakRegistry::ApplyResult::NotApplicable);
+}
+
 
 

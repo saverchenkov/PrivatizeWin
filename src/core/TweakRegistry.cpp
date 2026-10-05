@@ -7,9 +7,29 @@
 
 namespace PrivatizeWin {
 
+TweakRegistry::TweakRegistry() {
+    m_aliasMap = {
+        { "P027", "TEL_CEIP" },
+        { "EDGE_SHOPPING_MACHINE", "E123_MACHINE" },
+        { "EDGE_SHOPPING_USER", "E123_USER" },
+        { "S007", "S006" },
+        { "P069", "TEL_CRASHDUMP" },
+        { "P065", "M006" },
+        { "L007", "P090_MACHINE" }
+    };
+}
+
 TweakRegistry& TweakRegistry::Instance() {
     static TweakRegistry registry;
     return registry;
+}
+
+std::string TweakRegistry::GetCanonicalTweakId(std::string_view id) const {
+    auto it = m_aliasMap.find(std::string(id));
+    if (it != m_aliasMap.end()) {
+        return it->second;
+    }
+    return std::string(id);
 }
 
 void TweakRegistry::AddTweak(Tweak tweak) {
@@ -151,6 +171,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"The Windows Copilot is based on ChatGPT from OpenAI and is an extension to the AI in the Microsoft search engine Bing. In order for this AI to provide answers, further system information is transmitted in addition to the user queries. To prevent this, Copilot can be disabled.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
+        t.minWindowsBuild = "22621";
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot", L"TurnOffWindowsCopilot", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -163,6 +184,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"The Windows Copilot is based on ChatGPT from OpenAI and is an extension to the AI in the Microsoft search engine Bing. In order for this AI to provide answers, further system information is transmitted in addition to the user queries. To prevent this, Copilot can be disabled.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
+        t.minWindowsBuild = "22621";
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot", L"TurnOffWindowsCopilot", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -175,6 +197,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
+        t.minWindowsBuild = "26100";
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", L"AllowRecallEnablement", RegType::Dword, 0, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -199,6 +222,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::User;
+        t.minWindowsBuild = "22621";
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", L"ShowCopilotButton", RegType::Dword, 0, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -211,6 +235,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::User;
+        t.minWindowsBuild = "22621";
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\Shell\\Copilot\\BingChat", L"IsUserEligible", RegType::Dword, 0, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -223,6 +248,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"This setting deactivates the new Windows Copilot+ Recall feature. This is a component that constantly creates screenshots, evaluates their content and makes the data available via an application. Both to the user himself and to other applications that have the corresponding authorizations. Disabling the Recall feature is strongly recommended.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
+        t.minWindowsBuild = "26100";
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", L"DisableAIDataAnalysis", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -235,6 +261,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"This setting deactivates the new Windows Copilot+ Recall feature. This is a component that constantly creates screenshots, evaluates their content and makes the data available via an application. Both to the user himself and to other applications that have the corresponding authorizations. Disabling the Recall feature is strongly recommended.";
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
+        t.minWindowsBuild = "26100";
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", L"DisableAIDataAnalysis", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -271,6 +298,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
+        t.minWindowsBuild = "26100";
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", L"DisableClickToDo", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -2935,6 +2963,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
+        t.requiresSignOut = true;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", L"SilentInstalledAppsEnabled", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -2947,6 +2976,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
+        t.requiresSignOut = true;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", L"SoftLandingEnabled", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -3850,6 +3880,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
         t.scope = TargetScope::Machine;
+        t.requiresReboot = true;
         t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\SEMgrSvc", L"Start", RegType::Dword, 4, 3, L"", L"", false });
         t.serviceActions.push_back({ L"SEMgrSvc", 4, 2, true });
         AddTweak(std::move(t));
@@ -3887,6 +3918,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
         t.scope = TargetScope::Machine;
+        t.requiresReboot = true;
         t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\WFDSConMgrSvc", L"Start", RegType::Dword, 4, 3, L"", L"", false });
         t.serviceActions.push_back({ L"WFDSConMgrSvc", 4, 2, true });
         AddTweak(std::move(t));
@@ -4125,6 +4157,8 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
+        t.minWindowsBuild = "22000";
+        t.requiresSignOut = true;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", L"TaskbarDa", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -4219,6 +4253,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
+        t.requiresSignOut = true;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", L"SystemPaneSuggestionsEnabled", RegType::Dword, 0, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -4231,6 +4266,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
         t.scope = TargetScope::Machine;
+        t.requiresSignOut = true;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", L"Start_TrackDocs", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -4243,6 +4279,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
         t.scope = TargetScope::Machine;
+        t.requiresSignOut = true;
         t.regActions.push_back({ TargetScope::User, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", L"ShowSyncProviderNotifications", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
@@ -4295,6 +4332,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"Deactivating is not recommended! With this you deactivate the automatic installation of Windows Updates. Security leaks will not be tackled automatically.";
         t.impact = L"Disabling stops the Windows Update service (wuauserv), preventing automatic security patches.";
         t.safety = SafetyLevel::Advanced;
+        t.requiresReboot = true;
         t.serviceActions.push_back({ L"wuauserv", 4, 3, true });
         AddTweak(std::move(t));
     }
@@ -4434,17 +4472,17 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
         t.scope = TargetScope::Machine;
+        t.requiresReboot = true;
         t.regActions.push_back({ TargetScope::Machine, L"SOFTWARE\\Microsoft\\PolicyManager\\current\\device\\System", L"AllowExperimentation", RegType::Dword, 1, 0, L"", L"", true });
         AddTweak(std::move(t));
     }
 
 }
 
-SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode mode, const std::vector<std::wstring>& users) const {
+TweakRegistry::TweakApplicability TweakRegistry::GetTweakApplicability(std::string_view id, UserSelectionMode mode) const {
     const Tweak* t = GetTweakById(id);
-    if (!t) return SettingStatus::NotApplicable;
+    if (!t) return TweakApplicability::UnknownTweak;
 
-    // Check minWindowsBuild if specified
     if (!t->minWindowsBuild.empty()) {
         static DWORD s_buildNumber = 0;
         if (s_buildNumber == 0) {
@@ -4463,20 +4501,118 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
         try {
             DWORD minBuild = std::stoul(t->minWindowsBuild);
             if (s_buildNumber < minBuild) {
-                return SettingStatus::NotApplicable;
+                return TweakApplicability::NotApplicableBuild;
             }
         } catch (...) {}
     }
 
-    // Check if mode is NoUsers and the tweak only has user actions
     if (mode == UserSelectionMode::NoUsers && t->serviceActions.empty()) {
         bool hasMachine = false;
         for (const auto& ra : t->regActions) {
-            if (ra.scope == TargetScope::Machine) { hasMachine = true; break; }
+            if (ra.scope == TargetScope::Machine) {
+                hasMachine = true;
+                break;
+            }
         }
         if (!hasMachine) {
-            return SettingStatus::NotApplicable;
+            return TweakApplicability::NotApplicableUserScope;
         }
+    }
+
+    return TweakApplicability::Applicable;
+}
+
+bool TweakRegistry::ValidatePlanConflicts(const std::map<std::string, bool>& tweakRequests, std::string& outErrorMessage) const {
+    std::map<std::string, std::pair<std::string, bool>> canonicalMap;
+    std::map<std::wstring, std::pair<std::string, bool>> targetMap;
+
+    for (const auto& [reqId, shouldEnable] : tweakRequests) {
+        std::string canonId = GetCanonicalTweakId(reqId);
+        auto itCanon = canonicalMap.find(canonId);
+        if (itCanon != canonicalMap.end()) {
+            if (itCanon->second.second != shouldEnable) {
+                outErrorMessage = "Conflicting settings detected: '" + itCanon->second.first +
+                    "' and '" + reqId + "' request contradictory states for setting '" + canonId + "'.";
+                return false;
+            }
+        } else {
+            canonicalMap[canonId] = { reqId, shouldEnable };
+        }
+
+        const Tweak* t = GetTweakById(reqId);
+        if (!t) continue;
+
+        for (const auto& ra : t->regActions) {
+            std::wstring key = L"REG:" + std::to_wstring(static_cast<int>(ra.scope)) + L":" + ra.subKey + L":" + ra.valueName;
+            std::transform(key.begin(), key.end(), key.begin(), ::towlower);
+            auto itTgt = targetMap.find(key);
+            if (itTgt != targetMap.end()) {
+                if (itTgt->second.second != shouldEnable) {
+                    outErrorMessage = "Conflicting settings detected: '" + itTgt->second.first +
+                        "' and '" + reqId + "' attempt contradictory modifications to the same registry target.";
+                    return false;
+                }
+            } else {
+                targetMap[key] = { reqId, shouldEnable };
+            }
+        }
+
+        for (const auto& sa : t->serviceActions) {
+            std::wstring key = L"SVC:" + sa.serviceName;
+            std::transform(key.begin(), key.end(), key.begin(), ::towlower);
+            auto itTgt = targetMap.find(key);
+            if (itTgt != targetMap.end()) {
+                if (itTgt->second.second != shouldEnable) {
+                    outErrorMessage = "Conflicting settings detected: '" + itTgt->second.first +
+                        "' and '" + reqId + "' attempt contradictory states for service.";
+                    return false;
+                }
+            } else {
+                targetMap[key] = { reqId, shouldEnable };
+            }
+        }
+    }
+
+    return true;
+}
+
+bool TweakRegistry::MatchesTargetState(std::string_view id, bool targetProtected, UserSelectionMode mode, const std::vector<std::wstring>& users) const {
+    const Tweak* t = GetTweakById(id);
+    if (!t) return false;
+
+    // Check service actions
+    for (const auto& sa : t->serviceActions) {
+        if (!ServiceHelper::MatchesTarget(sa, targetProtected)) {
+            return false;
+        }
+    }
+
+    // Check registry actions
+    for (const auto& ra : t->regActions) {
+        if (mode == UserSelectionMode::NoUsers && ra.scope == TargetScope::User) {
+            continue;
+        }
+        if (ra.scope == TargetScope::Machine) {
+            if (!RegistryHelper::MatchesTarget(HKEY_LOCAL_MACHINE, ra, targetProtected)) {
+                return false;
+            }
+        } else if (ra.scope == TargetScope::User) {
+            if (!UserHiveManager::MatchesUserActionTarget(ra, targetProtected, mode, users)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode mode, const std::vector<std::wstring>& users) const {
+    const Tweak* t = GetTweakById(id);
+    if (!t) return SettingStatus::NotApplicable;
+
+    const auto applicability = GetTweakApplicability(id, mode);
+    if (applicability != TweakApplicability::Applicable) {
+        return SettingStatus::NotApplicable;
     }
 
     const size_t totalChecks = t->serviceActions.size() + t->regActions.size();
@@ -4484,18 +4620,20 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
 
     size_t appliedCount = 0;
     size_t defaultCount = 0;
+    size_t customCount = 0;
     size_t unknownCount = 0;
     size_t notApplicableCount = 0;
-    size_t otherCount = 0;
 
     // Check services
     for (const auto& sa : t->serviceActions) {
         const SettingStatus st = ServiceHelper::AuditAction(sa);
         if (st == SettingStatus::Applied) appliedCount++;
-        else if (st == SettingStatus::NotApplied) defaultCount++;
+        else if (st == SettingStatus::Default) defaultCount++;
+        else if (st == SettingStatus::Partial) customCount++;
+        else if (st == SettingStatus::Custom) customCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
         else if (st == SettingStatus::NotApplicable) notApplicableCount++;
-        else otherCount++;
+        else customCount++;
     }
 
     // Check registry actions
@@ -4505,7 +4643,7 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
             continue;
         }
 
-        SettingStatus st = SettingStatus::NotApplied;
+        SettingStatus st = SettingStatus::Default;
         if (ra.scope == TargetScope::Machine) {
             st = RegistryHelper::AuditAction(HKEY_LOCAL_MACHINE, ra);
         } else {
@@ -4513,29 +4651,36 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
         }
 
         if (st == SettingStatus::Applied) appliedCount++;
-        else if (st == SettingStatus::NotApplied) defaultCount++;
+        else if (st == SettingStatus::Default) defaultCount++;
+        else if (st == SettingStatus::Custom) customCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
         else if (st == SettingStatus::NotApplicable) notApplicableCount++;
-        else otherCount++;
+        else customCount++;
     }
 
     const size_t activeChecks = totalChecks - notApplicableCount;
     if (activeChecks == 0) return SettingStatus::NotApplicable;
     if (unknownCount == activeChecks) return SettingStatus::Unknown;
     if (appliedCount == activeChecks) return SettingStatus::Applied;
-    if (defaultCount == activeChecks) return SettingStatus::NotApplied;
+    if (defaultCount == activeChecks) return SettingStatus::Default;
     if (appliedCount > 0) return SettingStatus::Partial;
+    if (customCount > 0) return SettingStatus::Custom;
     if (unknownCount > 0) return SettingStatus::Unknown;
-    return SettingStatus::NotApplied;
+    return SettingStatus::Default;
 }
 
-bool TweakRegistry::ApplyTweak(std::string_view id, bool enableProtection, UserSelectionMode mode, const std::vector<std::wstring>& users) {
+TweakRegistry::ApplyResult TweakRegistry::ApplyTweakEx(std::string_view id, bool enableProtection, UserSelectionMode mode, const std::vector<std::wstring>& users) {
     const Tweak* t = GetTweakById(id);
-    if (!t) return false;
+    if (!t) return ApplyResult::Failed;
 
     const size_t totalActions = t->serviceActions.size() + t->regActions.size();
     if (totalActions == 0) {
-        return false; // Zero executable actions
+        return ApplyResult::Failed;
+    }
+
+    const auto applicability = GetTweakApplicability(id, mode);
+    if (applicability != TweakApplicability::Applicable) {
+        return ApplyResult::NotApplicable;
     }
 
     bool allOk = true;
@@ -4568,10 +4713,15 @@ bool TweakRegistry::ApplyTweak(std::string_view id, bool enableProtection, UserS
     }
 
     if (executedCount == 0) {
-        return false;
+        return ApplyResult::NotApplicable;
     }
 
-    return allOk;
+    return allOk ? ApplyResult::Success : ApplyResult::Failed;
+}
+
+bool TweakRegistry::ApplyTweak(std::string_view id, bool enableProtection, UserSelectionMode mode, const std::vector<std::wstring>& users) {
+    const auto res = ApplyTweakEx(id, enableProtection, mode, users);
+    return (res != ApplyResult::Failed);
 }
 
 bool TweakRegistry::LoadExternalTweaks(std::string_view jsonContent) {

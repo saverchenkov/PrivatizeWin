@@ -351,7 +351,7 @@ SettingStatus UserHiveManager::AuditUserAction(
     }
 
     if (notAppliedUsers > 0) {
-        return SettingStatus::NotApplied;
+        return SettingStatus::Default;
     }
 
     if (appliedUsers == res.requestedUsers && unknownUsers == 0) {
@@ -359,6 +359,35 @@ SettingStatus UserHiveManager::AuditUserAction(
     }
 
     return SettingStatus::Unknown;
+}
+
+bool UserHiveManager::MatchesUserActionTarget(
+    const RegistryAction& action,
+    bool targetProtected,
+    UserSelectionMode mode,
+    const std::vector<std::wstring>& specificUsers
+) {
+    if (mode == UserSelectionMode::NoUsers) {
+        return true;
+    }
+
+    if (mode == UserSelectionMode::CurrentUser) {
+        return RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, targetProtected);
+    }
+
+    bool allMatch = true;
+    const auto res = ForEachTargetUser(mode, specificUsers, [&](HKEY hUserRoot, const UserProfile&) -> bool {
+        if (!RegistryHelper::MatchesTarget(hUserRoot, action, targetProtected)) {
+            allMatch = false;
+        }
+        return true;
+    });
+
+    if (res.requestedUsers == 0 || res.failedUsers > 0 || res.mountedUsers == 0) {
+        return false;
+    }
+
+    return allMatch;
 }
 
 bool UserHiveManager::ApplyUserAction(

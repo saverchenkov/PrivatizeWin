@@ -52,7 +52,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*l
         return 1;
     }
 
-    HWND hWnd = PrivatizeWin::MainWindow::Create(hInstance, cliOpts.resumePendingFile);
+    HWND hWnd = PrivatizeWin::MainWindow::Create(hInstance, cliOpts.resumePendingFile, cliOpts.resumePendingToken);
     if (!hWnd) {
         MessageBoxW(nullptr, L"Failed to create application window.", L"PrivatizeWin Error", MB_OK | MB_ICONERROR);
         return 1;

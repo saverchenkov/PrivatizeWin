@@ -20,17 +20,22 @@ static std::wstring NormalizePath(const std::wstring& path) {
 bool PendingHandoff::IsValidHandoffPath(const std::wstring& filePath) {
     if (filePath.empty()) return false;
 
+    // Reject relative traversal
+    if (filePath.find(L"..") != std::wstring::npos) return false;
+
     const std::wstring normTarget = NormalizePath(filePath);
     if (normTarget.empty()) return false;
 
-    // Check directory: must be inside %TEMP% or %LOCALAPPDATA%
+    // Check directory: must be inside %TEMP% or %LOCALAPPDATA% directory
     wchar_t tempDirBuf[MAX_PATH]{};
     GetTempPathW(MAX_PATH, tempDirBuf);
     std::wstring normTemp = NormalizePath(tempDirBuf);
+    if (!normTemp.empty() && normTemp.back() != L'\\') normTemp += L'\\';
 
     wchar_t localAppBuf[MAX_PATH]{};
     GetEnvironmentVariableW(L"LOCALAPPDATA", localAppBuf, MAX_PATH);
     std::wstring normLocalApp = NormalizePath(localAppBuf);
+    if (!normLocalApp.empty() && normLocalApp.back() != L'\\') normLocalApp += L'\\';
 
     bool insideTemp = (!normTemp.empty() && normTarget.rfind(normTemp, 0) == 0);
     bool insideLocalApp = (!normLocalApp.empty() && normTarget.rfind(normLocalApp, 0) == 0);
@@ -39,17 +44,20 @@ bool PendingHandoff::IsValidHandoffPath(const std::wstring& filePath) {
         return false;
     }
 
-    // Check filename pattern: must start with privatizewin_
+    // Check filename pattern: must start with privatizewin_ and end with .tmp
     size_t lastSlash = normTarget.find_last_of(L"\\/");
     std::wstring filename = (lastSlash != std::wstring::npos) ? normTarget.substr(lastSlash + 1) : normTarget;
     if (filename.rfind(L"privatizewin_", 0) != 0) {
+        return false;
+    }
+    if (filename.size() < 4 || filename.substr(filename.size() - 4) != L".tmp") {
         return false;
     }
 
     return true;
 }
 
-std::wstring PendingHandoff::SaveHandoff(const PendingStatePlan& plan) {
+std::wstring PendingHandoff::SaveHandoff(const PendingStatePlan& plan, std::wstring* outToken) {
     if (plan.pendingEnable.empty() && plan.pendingRevert.empty()) {
         return L"";
     }
@@ -67,7 +75,7 @@ std::wstring PendingHandoff::SaveHandoff(const PendingStatePlan& plan) {
         return L"";
     }
 
-    // Generate unique GUID filename
+    // Generate unique GUID filename and authentication token
     GUID guid{};
     if (FAILED(CoCreateGuid(&guid))) {
         return L"";
@@ -79,11 +87,22 @@ std::wstring PendingHandoff::SaveHandoff(const PendingStatePlan& plan) {
         guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
         guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
 
+    GUID tokenGuid{};
+    if (FAILED(CoCreateGuid(&tokenGuid))) {
+        return L"";
+    }
+    wchar_t tokenStr[64]{};
+    swprintf_s(tokenStr, L"%08x%04x%04x%02x%02x%02x%02x%02x%02x%02x%02x",
+        tokenGuid.Data1, tokenGuid.Data2, tokenGuid.Data3,
+        tokenGuid.Data4[0], tokenGuid.Data4[1], tokenGuid.Data4[2], tokenGuid.Data4[3],
+        tokenGuid.Data4[4], tokenGuid.Data4[5], tokenGuid.Data4[6], tokenGuid.Data4[7]);
+
     std::wstring filePath = std::wstring(tempDir) + L"PrivatizeWin_Handoff_" + guidStr + L".tmp";
 
     // Build payload
     JsonValue root;
     root["version"] = JsonValue(1.0);
+    root["token"] = JsonValue(std::string(tokenStr, tokenStr + wcslen(tokenStr)));
     root["pendingEnable"] = JsonValue(JsonType::Array);
     for (const auto& id : plan.pendingEnable) {
         root["pendingEnable"].arrayValue.push_back(JsonValue(id));
@@ -110,17 +129,30 @@ std::wstring PendingHandoff::SaveHandoff(const PendingStatePlan& plan) {
         return L"";
     }
 
+    if (outToken) {
+        *outToken = tokenStr;
+    }
+
     return filePath;
 }
 
-bool PendingHandoff::ValidateAndLoadHandoff(const std::wstring& filePath, PendingStatePlan& outPlan) {
+bool PendingHandoff::ValidateAndLoadHandoff(const std::wstring& filePath, PendingStatePlan& outPlan, const std::wstring& expectedToken) {
     if (!IsValidHandoffPath(filePath)) {
         return false;
     }
 
-    HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    // Open with FILE_FLAG_OPEN_REPARSE_POINT to detect and reject symlinks / junctions
+    HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
     if (hFile == INVALID_HANDLE_VALUE) {
         return false;
+    }
+
+    BY_HANDLE_FILE_INFORMATION fi{};
+    if (GetFileInformationByHandle(hFile, &fi)) {
+        if ((fi.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
+            CloseHandle(hFile);
+            return false; // Reject reparse point
+        }
     }
 
     DWORD fileSize = GetFileSize(hFile, nullptr);
@@ -149,6 +181,19 @@ bool PendingHandoff::ValidateAndLoadHandoff(const std::wstring& filePath, Pendin
         JsonValue root = JsonValue::parse(jsonPart);
         if (!root.isObject()) {
             return false;
+        }
+
+        // Verify version == 1
+        if (!root["version"].isNumber() || static_cast<int>(root["version"].numberValue) != 1) {
+            return false;
+        }
+
+        // Verify token if expected
+        if (!expectedToken.empty()) {
+            std::string expectedTokenStr(expectedToken.begin(), expectedToken.end());
+            if (!root["token"].isString() || root["token"].stringValue != expectedTokenStr) {
+                return false;
+            }
         }
 
         if (!root["pendingEnable"].isArray() || !root["pendingRevert"].isArray()) {
@@ -185,8 +230,8 @@ bool PendingHandoff::ValidateAndLoadHandoff(const std::wstring& filePath, Pendin
     }
 }
 
-bool PendingHandoff::ConsumeHandoff(const std::wstring& filePath, PendingStatePlan& outPlan) {
-    if (!ValidateAndLoadHandoff(filePath, outPlan)) {
+bool PendingHandoff::ConsumeHandoff(const std::wstring& filePath, PendingStatePlan& outPlan, const std::wstring& expectedToken) {
+    if (!ValidateAndLoadHandoff(filePath, outPlan, expectedToken)) {
         // Do NOT delete the file if validation failed or if it's unrelated
         return false;
     }

@@ -139,6 +139,70 @@ bool RegistryHelper::DeleteKeyIfEmpty(HKEY hRoot, std::wstring_view subKey) {
     return false;
 }
 
+bool RegistryHelper::MatchesTarget(HKEY hRoot, const RegistryAction& action, bool targetProtected) noexcept {
+    UniqueHKey key;
+    std::wstring subKeyStr = ToNullTerminated(action.subKey);
+    std::wstring valNameStr = ToNullTerminated(action.valueName);
+
+    LSTATUS status = RegOpenKeyExW(hRoot, subKeyStr.c_str(), 0, KEY_READ, key.put());
+    if (status != ERROR_SUCCESS) {
+        if (status == ERROR_FILE_NOT_FOUND) {
+            return (!targetProtected && action.deleteOnDefault);
+        }
+        return false;
+    }
+
+    DWORD dwType = 0;
+    if (action.type == RegType::Dword) {
+        DWORD dwData = 0;
+        DWORD cbData = sizeof(dwData);
+        status = RegQueryValueExW(key.get(), valNameStr.c_str(), nullptr, &dwType, reinterpret_cast<LPBYTE>(&dwData), &cbData);
+        if (status != ERROR_SUCCESS) {
+            if (status == ERROR_FILE_NOT_FOUND) {
+                return (!targetProtected && action.deleteOnDefault);
+            }
+            return false;
+        }
+        if (dwType != REG_DWORD) {
+            return false;
+        }
+        if (targetProtected) {
+            return (dwData == action.dwordProtected);
+        } else {
+            if (action.deleteOnDefault) {
+                return false;
+            }
+            return (dwData == action.dwordDefault);
+        }
+    } else {
+        DWORD cbData = 0;
+        status = RegQueryValueExW(key.get(), valNameStr.c_str(), nullptr, &dwType, nullptr, &cbData);
+        if (status != ERROR_SUCCESS) {
+            if (status == ERROR_FILE_NOT_FOUND) {
+                return (!targetProtected && action.deleteOnDefault);
+            }
+            return false;
+        }
+        if (dwType != REG_SZ && dwType != REG_EXPAND_SZ) {
+            return false;
+        }
+        std::vector<wchar_t> strBuf(cbData / sizeof(wchar_t) + 1, 0);
+        status = RegQueryValueExW(key.get(), valNameStr.c_str(), nullptr, &dwType, reinterpret_cast<LPBYTE>(strBuf.data()), &cbData);
+        if (status != ERROR_SUCCESS) {
+            return false;
+        }
+        std::wstring strVal(strBuf.data());
+        if (targetProtected) {
+            return (strVal == action.strProtected);
+        } else {
+            if (action.deleteOnDefault) {
+                return false;
+            }
+            return (strVal == action.strDefault);
+        }
+    }
+}
+
 SettingStatus RegistryHelper::AuditAction(HKEY hRoot, const RegistryAction& action) {
     UniqueHKey key;
     std::wstring subKeyStr = ToNullTerminated(action.subKey);
@@ -150,7 +214,7 @@ SettingStatus RegistryHelper::AuditAction(HKEY hRoot, const RegistryAction& acti
             return SettingStatus::Unknown;
         }
         if (status == ERROR_FILE_NOT_FOUND) {
-            return action.deleteOnDefault ? SettingStatus::Default : SettingStatus::NotApplied;
+            return action.deleteOnDefault ? SettingStatus::Default : SettingStatus::Custom;
         }
         return SettingStatus::Unknown;
     }
@@ -162,11 +226,11 @@ SettingStatus RegistryHelper::AuditAction(HKEY hRoot, const RegistryAction& acti
         status = RegQueryValueExW(key.get(), valNameStr.c_str(), nullptr, &dwType, reinterpret_cast<LPBYTE>(&dwData), &cbData);
         if (status != ERROR_SUCCESS) {
             if (status == ERROR_ACCESS_DENIED) return SettingStatus::Unknown;
-            if (status == ERROR_FILE_NOT_FOUND) return action.deleteOnDefault ? SettingStatus::Default : SettingStatus::NotApplied;
+            if (status == ERROR_FILE_NOT_FOUND) return action.deleteOnDefault ? SettingStatus::Default : SettingStatus::Custom;
             return SettingStatus::Unknown;
         }
         if (dwType != REG_DWORD) {
-            return SettingStatus::NotApplied;
+            return SettingStatus::Custom;
         }
         if (dwData == action.dwordProtected) {
             return SettingStatus::Protected;
@@ -174,17 +238,17 @@ SettingStatus RegistryHelper::AuditAction(HKEY hRoot, const RegistryAction& acti
         if (!action.deleteOnDefault && dwData == action.dwordDefault) {
             return SettingStatus::Default;
         }
-        return action.deleteOnDefault ? SettingStatus::NotApplied : SettingStatus::Default;
+        return SettingStatus::Custom;
     } else {
         DWORD cbData = 0;
         status = RegQueryValueExW(key.get(), valNameStr.c_str(), nullptr, &dwType, nullptr, &cbData);
         if (status != ERROR_SUCCESS) {
             if (status == ERROR_ACCESS_DENIED) return SettingStatus::Unknown;
-            if (status == ERROR_FILE_NOT_FOUND) return action.deleteOnDefault ? SettingStatus::Default : SettingStatus::NotApplied;
+            if (status == ERROR_FILE_NOT_FOUND) return action.deleteOnDefault ? SettingStatus::Default : SettingStatus::Custom;
             return SettingStatus::Unknown;
         }
         if (dwType != REG_SZ && dwType != REG_EXPAND_SZ) {
-            return SettingStatus::NotApplied;
+            return SettingStatus::Custom;
         }
         std::vector<wchar_t> strBuf(cbData / sizeof(wchar_t) + 1, 0);
         status = RegQueryValueExW(key.get(), valNameStr.c_str(), nullptr, &dwType, reinterpret_cast<LPBYTE>(strBuf.data()), &cbData);
@@ -197,7 +261,7 @@ SettingStatus RegistryHelper::AuditAction(HKEY hRoot, const RegistryAction& acti
                 return SettingStatus::Default;
             }
         }
-        return action.deleteOnDefault ? SettingStatus::NotApplied : SettingStatus::Default;
+        return SettingStatus::Custom;
     }
 }
 

@@ -217,7 +217,32 @@ private:
                     }
                     idx += 4;
                     unsigned int codePoint = static_cast<unsigned int>(std::stoul(hexStr, nullptr, 16));
-                    if (codePoint <= 0x7F) {
+
+                    // Check for UTF-16 surrogate pairs (RFC 8259)
+                    if (codePoint >= 0xD800 && codePoint <= 0xDBFF) {
+                        // High surrogate: must be followed by \uDC00..\uDFFF
+                        if (idx + 6 > s.size() || s[idx] != '\\' || s[idx + 1] != 'u') {
+                            throw std::runtime_error("Unpaired high surrogate in Unicode escape");
+                        }
+                        std::string lowHexStr = s.substr(idx + 2, 4);
+                        for (char hc : lowHexStr) {
+                            if (!std::isxdigit(static_cast<unsigned char>(hc))) {
+                                throw std::runtime_error("Invalid hex digit in low surrogate \\uXXXX sequence");
+                            }
+                        }
+                        unsigned int lowCodePoint = static_cast<unsigned int>(std::stoul(lowHexStr, nullptr, 16));
+                        if (lowCodePoint < 0xDC00 || lowCodePoint > 0xDFFF) {
+                            throw std::runtime_error("Invalid low surrogate in Unicode escape sequence");
+                        }
+                        idx += 6;
+                        uint32_t fullCodePoint = 0x10000 + ((codePoint - 0xD800) << 10) + (lowCodePoint - 0xDC00);
+                        res += static_cast<char>(0xF0 | ((fullCodePoint >> 18) & 0x07));
+                        res += static_cast<char>(0x80 | ((fullCodePoint >> 12) & 0x3F));
+                        res += static_cast<char>(0x80 | ((fullCodePoint >> 6) & 0x3F));
+                        res += static_cast<char>(0x80 | (fullCodePoint & 0x3F));
+                    } else if (codePoint >= 0xDC00 && codePoint <= 0xDFFF) {
+                        throw std::runtime_error("Unexpected low surrogate without preceding high surrogate");
+                    } else if (codePoint <= 0x7F) {
                         res += static_cast<char>(codePoint);
                     } else if (codePoint <= 0x7FF) {
                         res += static_cast<char>(0xC0 | ((codePoint >> 6) & 0x1F));
@@ -318,13 +343,22 @@ private:
 
     static void escapeAndWrite(std::ostringstream& ss, const std::string& str) {
         ss << '"';
-        for (char c : str) {
+        for (char ch : str) {
+            unsigned char c = static_cast<unsigned char>(ch);
             if (c == '"') ss << "\\\"";
             else if (c == '\\') ss << "\\\\";
+            else if (c == '\b') ss << "\\b";
+            else if (c == '\f') ss << "\\f";
             else if (c == '\n') ss << "\\n";
             else if (c == '\r') ss << "\\r";
             else if (c == '\t') ss << "\\t";
-            else ss << c;
+            else if (c < 0x20) {
+                char hexBuf[8];
+                snprintf(hexBuf, sizeof(hexBuf), "\\u%04x", c);
+                ss << hexBuf;
+            } else {
+                ss << ch;
+            }
         }
         ss << '"';
     }

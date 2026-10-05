@@ -172,3 +172,63 @@ TEST_CASE(Integration_CliEndToEnd, DryRunTemplateExecution) {
     ASSERT_TRUE(output.find("[DRY RUN]") != std::string::npos);
     ASSERT_TRUE(output.find("Dry run completed without making any changes.") != std::string::npos);
 }
+
+TEST_CASE(Integration_CliEndToEnd, UsersNoneOnUserOnlyProfile) {
+    Test::TestTempDirectory tempDir;
+    const std::wstring profPath = tempDir.GetFilePath(L"user_only_profile.json");
+
+    const std::string jsonContent = R"({
+        "name": "User Only Profile",
+        "tweaks": {
+            "PRIV_AD_ID_USER": true
+        }
+    })";
+
+    HANDLE hFile = CreateFileW(profPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    ASSERT_NE(hFile, INVALID_HANDLE_VALUE);
+    DWORD written = 0;
+    WriteFile(hFile, jsonContent.data(), static_cast<DWORD>(jsonContent.size()), &written, nullptr);
+    CloseHandle(hFile);
+
+    const std::wstring appExe = GetPrivatizeWinExePath();
+
+    // 1. Dry run with --users none: should report 0 operations planned and succeed
+    const std::wstring cmdDry = L"\"" + appExe + L"\" --apply-template \"" + profPath + L"\" --users none --dry-run";
+    const auto [dryExit, dryOut] = RunSubprocess(cmdDry);
+    ASSERT_EQ(dryExit, 0);
+    ASSERT_TRUE(dryOut.find("0 operations planned") != std::string::npos || dryOut.find("No applicable operations") != std::string::npos || dryOut.find("[DRY RUN]") != std::string::npos);
+
+    // 2. Execution with --users none: should NOT fail with exit code 1 or 2
+    const std::wstring cmdExec = L"\"" + appExe + L"\" --apply-template \"" + profPath + L"\" --users none";
+    const auto [execExit, execOut] = RunSubprocess(cmdExec);
+    ASSERT_EQ(execExit, 0);
+    ASSERT_TRUE(execOut.find("No applicable operations") != std::string::npos || execOut.find("Applied: 0") != std::string::npos);
+}
+
+TEST_CASE(Integration_CliEndToEnd, ConflictingProfileExitsWithCode4) {
+    Test::TestTempDirectory tempDir;
+    const std::wstring profPath = tempDir.GetFilePath(L"conflicting_profile.json");
+
+    const std::string jsonContent = R"({
+        "name": "Conflicting CEIP Profile",
+        "tweaks": {
+            "TEL_CEIP": true,
+            "P027": false
+        }
+    })";
+
+    HANDLE hFile = CreateFileW(profPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    ASSERT_NE(hFile, INVALID_HANDLE_VALUE);
+    DWORD written = 0;
+    WriteFile(hFile, jsonContent.data(), static_cast<DWORD>(jsonContent.size()), &written, nullptr);
+    CloseHandle(hFile);
+
+    const std::wstring appExe = GetPrivatizeWinExePath();
+    const std::wstring cmd = L"\"" + appExe + L"\" --apply-template \"" + profPath + L"\"";
+    const auto [exitCode, output] = RunSubprocess(cmd);
+
+    // Conflict detection must return exit code 4 and report the contradictory tweaks
+    ASSERT_EQ(exitCode, 4);
+    ASSERT_TRUE(output.find("Conflict detected") != std::string::npos || output.find("contradictory") != std::string::npos);
+}
+

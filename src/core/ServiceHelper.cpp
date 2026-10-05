@@ -87,9 +87,33 @@ bool ServiceHelper::StopService(std::wstring_view serviceName) {
         return false;
     }
 
+    SERVICE_STATUS_PROCESS ssp{};
+    DWORD bytesNeeded = 0;
+    if (QueryServiceStatusEx(hService.get(), SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&ssp), sizeof(ssp), &bytesNeeded)) {
+        if (ssp.dwCurrentState == SERVICE_STOPPED) {
+            return true;
+        }
+    }
+
     SERVICE_STATUS status{};
-    const BOOL success = ControlService(hService.get(), SERVICE_CONTROL_STOP, &status);
-    return (success == TRUE);
+    if (!ControlService(hService.get(), SERVICE_CONTROL_STOP, &status)) {
+        DWORD err = GetLastError();
+        if (err != ERROR_SERVICE_NOT_ACTIVE) {
+            return false;
+        }
+    }
+
+    // Wait for the service to actually stop (poll up to 3 seconds)
+    for (int i = 0; i < 30; ++i) {
+        if (QueryServiceStatusEx(hService.get(), SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&ssp), sizeof(ssp), &bytesNeeded)) {
+            if (ssp.dwCurrentState == SERVICE_STOPPED) {
+                return true;
+            }
+        }
+        Sleep(100);
+    }
+
+    return false;
 }
 
 bool ServiceHelper::StartService(std::wstring_view serviceName) {
@@ -106,6 +130,45 @@ bool ServiceHelper::StartService(std::wstring_view serviceName) {
     return (success == TRUE);
 }
 
+bool ServiceHelper::MatchesTarget(const ServiceAction& action, bool targetProtected) noexcept {
+    UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
+    if (!hSCM) return false;
+
+    std::wstring svcNameStr = ToNullTerminated(action.serviceName);
+    UniqueScHandle hService(OpenServiceW(hSCM.get(), svcNameStr.c_str(), SERVICE_QUERY_CONFIG | SERVICE_QUERY_STATUS));
+    if (!hService) {
+        return false;
+    }
+
+    DWORD bytesNeeded = 0;
+    QueryServiceConfigW(hService.get(), nullptr, 0, &bytesNeeded);
+    if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+        return false;
+    }
+
+    std::vector<BYTE> buffer(bytesNeeded);
+    auto pConfig = reinterpret_cast<LPQUERY_SERVICE_CONFIGW>(buffer.data());
+    if (!QueryServiceConfigW(hService.get(), pConfig, bytesNeeded, &bytesNeeded)) {
+        return false;
+    }
+
+    if (targetProtected) {
+        if (pConfig->dwStartType != action.startupTypeProtected) {
+            return false;
+        }
+        if (action.stopService) {
+            SERVICE_STATUS_PROCESS ssp{};
+            if (QueryServiceStatusEx(hService.get(), SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&ssp), sizeof(ssp), &bytesNeeded)) {
+                return (ssp.dwCurrentState == SERVICE_STOPPED);
+            }
+            return false;
+        }
+        return true;
+    } else {
+        return (pConfig->dwStartType == action.startupTypeDefault);
+    }
+}
+
 SettingStatus ServiceHelper::AuditAction(const ServiceAction& action) {
     UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
     if (!hSCM) {
@@ -113,7 +176,7 @@ SettingStatus ServiceHelper::AuditAction(const ServiceAction& action) {
     }
 
     std::wstring svcNameStr = ToNullTerminated(action.serviceName);
-    UniqueScHandle hService(OpenServiceW(hSCM.get(), svcNameStr.c_str(), SERVICE_QUERY_CONFIG));
+    UniqueScHandle hService(OpenServiceW(hSCM.get(), svcNameStr.c_str(), SERVICE_QUERY_CONFIG | SERVICE_QUERY_STATUS));
     if (!hService) {
         const DWORD err = GetLastError();
         if (err == ERROR_SERVICE_DOES_NOT_EXIST) {
@@ -135,12 +198,20 @@ SettingStatus ServiceHelper::AuditAction(const ServiceAction& action) {
     }
 
     if (pConfig->dwStartType == action.startupTypeProtected) {
+        if (action.stopService) {
+            SERVICE_STATUS_PROCESS ssp{};
+            if (QueryServiceStatusEx(hService.get(), SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&ssp), sizeof(ssp), &bytesNeeded)) {
+                if (ssp.dwCurrentState != SERVICE_STOPPED) {
+                    return SettingStatus::Partial;
+                }
+            }
+        }
         return SettingStatus::Protected;
     }
     if (pConfig->dwStartType == action.startupTypeDefault) {
         return SettingStatus::Default;
     }
-    return SettingStatus::Default;
+    return SettingStatus::Custom;
 }
 
 bool ServiceHelper::ApplyAction(const ServiceAction& action, bool enableProtection) {
@@ -150,10 +221,7 @@ bool ServiceHelper::ApplyAction(const ServiceAction& action, bool enableProtecti
     std::wstring svcNameStr = ToNullTerminated(action.serviceName);
     UniqueScHandle hService(OpenServiceW(hSCM.get(), svcNameStr.c_str(), SERVICE_QUERY_CONFIG));
     if (!hService) {
-        if (GetLastError() == ERROR_SERVICE_DOES_NOT_EXIST) {
-            return true; // Missing service is safely skipped
-        }
-        return false; // Access denied
+        return false;
     }
     hService.reset();
 
@@ -164,7 +232,9 @@ bool ServiceHelper::ApplyAction(const ServiceAction& action, bool enableProtecti
     }
 
     if (enableProtection && action.stopService) {
-        StopService(action.serviceName);
+        if (!StopService(action.serviceName)) {
+            return false;
+        }
     }
     return true;
 }

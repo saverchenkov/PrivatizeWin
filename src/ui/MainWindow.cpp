@@ -90,8 +90,9 @@ bool MainWindow::RegisterClass(HINSTANCE hInstance) {
     return (RegisterClassExW(&sc) != 0);
 }
 
-HWND MainWindow::Create(HINSTANCE hInstance, std::wstring_view resumePendingFile) {
+HWND MainWindow::Create(HINSTANCE hInstance, std::wstring_view resumePendingFile, std::wstring_view resumePendingToken) {
     s_resumePendingFile = std::wstring(resumePendingFile);
+    s_resumePendingToken = std::wstring(resumePendingToken);
     return CreateWindowExW(
         WS_EX_WINDOWEDGE,
         L"PrivatizeWin_MainWindow",
@@ -393,16 +394,16 @@ void MainWindow::SavePreferences() {
     }
 }
 
-std::wstring MainWindow::SavePendingStateToTempFile() const {
+std::wstring MainWindow::SavePendingStateToTempFile(std::wstring* outToken) const {
     PendingStatePlan plan;
     plan.pendingEnable.assign(m_pendingEnableIds.begin(), m_pendingEnableIds.end());
     plan.pendingRevert.assign(m_pendingRevertIds.begin(), m_pendingRevertIds.end());
-    return PendingHandoff::SaveHandoff(plan);
+    return PendingHandoff::SaveHandoff(plan, outToken);
 }
 
-bool MainWindow::RestorePendingStateFromFile(const std::wstring& filePath) {
+bool MainWindow::RestorePendingStateFromFile(const std::wstring& filePath, const std::wstring& token) {
     PendingStatePlan plan;
-    if (!PendingHandoff::ConsumeHandoff(filePath, plan)) {
+    if (!PendingHandoff::ConsumeHandoff(filePath, plan, token)) {
         return false;
     }
 
@@ -425,8 +426,9 @@ bool MainWindow::RestorePendingStateFromFile(const std::wstring& filePath) {
 bool MainWindow::RelaunchAsAdminWithPendingState() {
     const bool hasPending = (!m_pendingEnableIds.empty() || !m_pendingRevertIds.empty());
     std::wstring pendingFile;
+    std::wstring token;
     if (hasPending) {
-        pendingFile = SavePendingStateToTempFile();
+        pendingFile = SavePendingStateToTempFile(&token);
         if (pendingFile.empty()) {
             // Abort relaunch if saving non-empty plan failed so user selections are preserved
             MessageBoxW(m_hWnd, L"Failed to securely save pending selections for elevated restart. Relaunch aborted to prevent losing your pending changes.", L"PrivatizeWin", MB_OK | MB_ICONERROR);
@@ -436,7 +438,7 @@ bool MainWindow::RelaunchAsAdminWithPendingState() {
 
     std::wstring extraArgs;
     if (!pendingFile.empty()) {
-        extraArgs = L"--resume-pending \"" + pendingFile + L"\"";
+        extraArgs = L"--resume-pending \"" + pendingFile + L"\" --resume-token \"" + token + L"\"";
     }
 
     if (RelaunchElevated(m_hWnd, extraArgs)) {
@@ -469,8 +471,9 @@ void MainWindow::OnCreate() {
 
     bool restoredPending = false;
     if (!s_resumePendingFile.empty()) {
-        restoredPending = RestorePendingStateFromFile(s_resumePendingFile);
+        restoredPending = RestorePendingStateFromFile(s_resumePendingFile, s_resumePendingToken);
         s_resumePendingFile.clear();
+        s_resumePendingToken.clear();
     }
 
     UpdateLocalization();
@@ -1179,6 +1182,8 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
         switch (st) {
         case SettingStatus::Applied:       stStr = L"\u25CF " + Loc("status_raw_applied"); break;
         case SettingStatus::NotApplied:    stStr = L"\u25CB " + Loc("status_raw_not_applied"); break;
+        case SettingStatus::Partial:       stStr = L"\u25D0 " + Loc("status_raw_partial"); break;
+        case SettingStatus::Custom:        stStr = L"\u25C6 " + Loc("status_raw_custom"); break;
         case SettingStatus::Unknown:       stStr = L"? " + Loc("status_raw_unknown"); break;
         case SettingStatus::NotApplicable: stStr = L"\u2014 " + Loc("status_raw_not_applicable"); break;
         default:                           stStr = L"\u25CB " + Loc("status_raw_not_applied"); break;
@@ -1638,6 +1643,8 @@ void MainWindow::UpdateDetailsPane(int selectedIndex) {
     switch (st) {
     case SettingStatus::Applied:       stStr = Loc("status_raw_applied"); break;
     case SettingStatus::NotApplied:    stStr = Loc("status_raw_not_applied"); break;
+    case SettingStatus::Partial:       stStr = Loc("status_raw_partial"); break;
+    case SettingStatus::Custom:        stStr = Loc("status_raw_custom"); break;
     case SettingStatus::Unknown:       stStr = Loc("status_raw_unknown"); break;
     case SettingStatus::NotApplicable: stStr = Loc("status_raw_not_applicable"); break;
     default:                           stStr = Loc("status_raw_not_applied"); break;
@@ -1741,13 +1748,16 @@ void MainWindow::SelectPreset(std::string_view templateName) {
     m_pendingRevertIds.clear();
 
     for (const auto& [id, shouldEnable] : tpl->tweakStates) {
+        if (m_notApplicableIds.count(id) > 0) {
+            continue;
+        }
         if (shouldEnable) {
-            if (m_notApplicableIds.count(id) > 0) {
-                continue;
-            }
-            const SettingStatus st = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
-            if (st != SettingStatus::Applied && st != SettingStatus::NotApplicable) {
+            if (!TweakRegistry::Instance().MatchesTargetState(id, true, UserSelectionMode::CurrentUser, {})) {
                 m_pendingEnableIds.insert(id);
+            }
+        } else {
+            if (!TweakRegistry::Instance().MatchesTargetState(id, false, UserSelectionMode::CurrentUser, {})) {
+                m_pendingRevertIds.insert(id);
             }
         }
     }
@@ -1944,13 +1954,13 @@ void MainWindow::ApplySelectedTweaks() {
     int progress = 0;
 
     for (const auto& id : m_pendingEnableIds) {
-        const SettingStatus before = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
-        if (before == SettingStatus::Applied) {
+        const bool beforeMatches = TweakRegistry::Instance().MatchesTargetState(id, true, UserSelectionMode::CurrentUser, {});
+        if (beforeMatches) {
             unchangedCount++;
         } else {
             const bool ok = TweakRegistry::Instance().ApplyTweak(id, true, UserSelectionMode::CurrentUser, {});
-            const SettingStatus after = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
-            if (ok && after == SettingStatus::Applied) {
+            const bool afterMatches = TweakRegistry::Instance().MatchesTargetState(id, true, UserSelectionMode::CurrentUser, {});
+            if (ok && afterMatches) {
                 appliedCount++;
             } else {
                 failedCount++;
@@ -1962,13 +1972,13 @@ void MainWindow::ApplySelectedTweaks() {
     }
 
     for (const auto& id : m_pendingRevertIds) {
-        const SettingStatus before = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
-        if (before == SettingStatus::NotApplied) {
+        const bool beforeMatches = TweakRegistry::Instance().MatchesTargetState(id, false, UserSelectionMode::CurrentUser, {});
+        if (beforeMatches) {
             unchangedCount++;
         } else {
             const bool ok = TweakRegistry::Instance().ApplyTweak(id, false, UserSelectionMode::CurrentUser, {});
-            const SettingStatus after = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
-            if (ok && after == SettingStatus::NotApplied) {
+            const bool afterMatches = TweakRegistry::Instance().MatchesTargetState(id, false, UserSelectionMode::CurrentUser, {});
+            if (ok && afterMatches) {
                 restoredCount++;
             } else {
                 failedCount++;
@@ -2012,8 +2022,7 @@ void MainWindow::RestoreSelectedDefaults() {
         for (int idx = 0; idx < static_cast<int>(m_displayedTweaks.size()); ++idx) {
             const auto& t = m_displayedTweaks[idx];
             if (m_notApplicableIds.count(t.id) > 0) continue;
-            const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
-            if (st != SettingStatus::NotApplied) {
+            if (!TweakRegistry::Instance().MatchesTargetState(t.id, false, UserSelectionMode::CurrentUser, {})) {
                 m_pendingEnableIds.erase(t.id);
                 m_pendingRevertIds.insert(t.id);
                 SetRowCheckboxState(idx, CheckboxState::PendingRevert);
@@ -2038,8 +2047,7 @@ void MainWindow::RestoreAllDefaults() {
     const auto& catalog = TweakRegistry::Instance().GetAllTweaks();
     for (const auto& t : catalog) {
         if (m_notApplicableIds.count(t.id) > 0) continue;
-        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
-        if (st != SettingStatus::NotApplied) {
+        if (!TweakRegistry::Instance().MatchesTargetState(t.id, false, UserSelectionMode::CurrentUser, {})) {
             m_pendingRevertIds.insert(t.id);
         }
     }
@@ -2093,6 +2101,8 @@ void MainWindow::RefreshAuditState() {
         switch (st) {
         case SettingStatus::Applied:       stStr = L"\u25CF " + Loc("status_raw_applied"); break;
         case SettingStatus::NotApplied:    stStr = L"\u25CB " + Loc("status_raw_not_applied"); break;
+        case SettingStatus::Partial:       stStr = L"\u25D0 " + Loc("status_raw_partial"); break;
+        case SettingStatus::Custom:        stStr = L"\u25C6 " + Loc("status_raw_custom"); break;
         case SettingStatus::Unknown:       stStr = L"? " + Loc("status_raw_unknown"); break;
         case SettingStatus::NotApplicable: stStr = L"\u2014 " + Loc("status_raw_not_applicable"); break;
         default:                           stStr = L"\u25CB " + Loc("status_raw_not_applied"); break;
@@ -2514,17 +2524,23 @@ void MainWindow::ImportConfiguration() {
         TemplateProfile p{};
         std::string loadErr;
         if (TemplateManager::Instance().LoadTemplateFromFile(szFile, p, &loadErr)) {
+            std::string conflictErr;
+            if (!TweakRegistry::Instance().ValidatePlanConflicts(p.tweakStates, conflictErr)) {
+                std::wstring wErr(conflictErr.begin(), conflictErr.end());
+                MessageBoxW(m_hWnd, wErr.c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONERROR);
+                return;
+            }
+
             m_pendingEnableIds.clear();
             m_pendingRevertIds.clear();
 
             for (const auto& [id, shouldEnable] : p.tweakStates) {
-                const SettingStatus st = TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
                 if (shouldEnable) {
-                    if (st != SettingStatus::Applied) {
+                    if (!TweakRegistry::Instance().MatchesTargetState(id, true, UserSelectionMode::CurrentUser, {})) {
                         m_pendingEnableIds.insert(id);
                     }
                 } else {
-                    if (st == SettingStatus::Applied) {
+                    if (!TweakRegistry::Instance().MatchesTargetState(id, false, UserSelectionMode::CurrentUser, {})) {
                         m_pendingRevertIds.insert(id);
                     }
                 }
@@ -2552,8 +2568,7 @@ void MainWindow::ImportConfiguration() {
                 UpdateDetailsPane(cur);
             }
 
-            const size_t totalStaged = m_pendingEnableIds.size() + m_pendingRevertIds.size();
-            std::wstring msg = LocFmt("import_success", totalStaged, m_pendingEnableIds.size(), m_pendingRevertIds.size());
+            std::wstring msg = LocFmt("import_success", m_pendingEnableIds.size(), m_pendingRevertIds.size());
             MessageBoxW(m_hWnd, msg.c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONINFORMATION);
         } else {
             MessageBoxW(m_hWnd, Loc("import_fail").c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONERROR);

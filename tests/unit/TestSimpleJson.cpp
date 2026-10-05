@@ -180,3 +180,49 @@ TEST_CASE(Unit_SimpleJson, RejectDeepNesting) {
     }
     ASSERT_TRUE(caught);
 }
+
+TEST_CASE(Unit_SimpleJson, UnicodeSurrogatePairs) {
+    // Emoji \uD83D\uDE00 -> 😀 (U+1F600) -> UTF-8 \xF0\x9F\x98\x80
+    const std::string json = R"({"emoji": "Hello \uD83D\uDE00 World!"})";
+    const JsonValue root = JsonValue::parse(json);
+    ASSERT_TRUE(root.isObject());
+    ASSERT_EQ(root["emoji"].stringValue, "Hello \xF0\x9F\x98\x80 World!");
+}
+
+TEST_CASE(Unit_SimpleJson, RejectUnpairedSurrogates) {
+    // Unpaired high surrogate followed by regular char
+    bool caught1 = false;
+    try {
+        JsonValue::parse(R"({"bad": "\uD83D abc"})");
+    } catch (const std::exception&) {
+        caught1 = true;
+    }
+    ASSERT_TRUE(caught1);
+
+    // Unpaired low surrogate
+    bool caught2 = false;
+    try {
+        JsonValue::parse(R"({"bad": "\uDE00"})");
+    } catch (const std::exception&) {
+        caught2 = true;
+    }
+    ASSERT_TRUE(caught2);
+}
+
+TEST_CASE(Unit_SimpleJson, EscapeAndSerializeControlChars) {
+    JsonValue root(JsonType::Object);
+    std::string specialChars = "Quote: \", Backslash: \\, Backspace: \b, Formfeed: \f, Newline: \n, Return: \r, Tab: \t, Ctrl: \x01\x1F";
+    root["special"] = specialChars;
+
+    const std::string serialized = root.toString(0);
+    // Verify that \b, \f, and \u0001 are properly escaped in the JSON output
+    ASSERT_TRUE(serialized.find("\\b") != std::string::npos);
+    ASSERT_TRUE(serialized.find("\\f") != std::string::npos);
+    ASSERT_TRUE(serialized.find("\\u0001") != std::string::npos);
+    ASSERT_TRUE(serialized.find("\\u001f") != std::string::npos || serialized.find("\\u001F") != std::string::npos);
+
+    // Round-trip parse
+    const JsonValue roundTrip = JsonValue::parse(serialized);
+    ASSERT_TRUE(roundTrip.isObject());
+    ASSERT_EQ(roundTrip["special"].stringValue, specialChars);
+}

@@ -23,6 +23,7 @@ public:
     static bool StartService(std::wstring_view serviceName);
 
     [[nodiscard]] static SettingStatus AuditAction(const ServiceAction& action);
+    [[nodiscard]] static bool MatchesTarget(const ServiceAction& action, bool targetProtected) noexcept;
     static bool ApplyAction(const ServiceAction& action, bool enableProtection);
 };
 
