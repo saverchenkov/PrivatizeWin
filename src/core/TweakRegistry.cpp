@@ -13,9 +13,7 @@ TweakRegistry::TweakRegistry() {
         { "EDGE_SHOPPING_MACHINE", "E123_MACHINE" },
         { "EDGE_SHOPPING_USER", "E123_USER" },
         { "S007", "S006" },
-        { "P069", "TEL_CRASHDUMP" },
-        { "P065", "M006" },
-        { "L007", "P090_MACHINE" }
+        { "P069", "TEL_CRASHDUMP" }
     };
 }
 
@@ -1623,8 +1621,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.description = L"The geolocation service in Windows manages the current location of the system and defines geographical boundaries (so-called “geofencing“). Deactivating it means applications can no longer access the geographical location through this service.";
         t.impact = L"Disabling may impact convenience or specific hardware features.";
         t.safety = SafetyLevel::Normal;
-        t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\lfsvc", L"Start", RegType::Dword, 4, 3, L"", L"", false });
-        t.serviceActions.push_back({ L"lfsvc", 4, 2, true });
+        t.serviceActions.push_back({ L"lfsvc", 4, 3, true });
         AddTweak(std::move(t));
     }
     {
@@ -3792,11 +3789,9 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.impact = L"Disabling improves privacy with zero functional side effects.";
         t.safety = SafetyLevel::Safe;
         t.scope = TargetScope::Machine;
-        t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\DiagTrack", L"Start", RegType::Dword, 4, 2, L"", L"", false });
-        t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\dmwappushservice", L"Start", RegType::Dword, 4, 3, L"", L"", false });
         t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Control\\WMI\\AutoLogger\\AutoLogger-Diagtrack-Listener", L"Start", RegType::Dword, 1, 0, L"", L"", true });
         t.serviceActions.push_back({ L"DiagTrack", 4, 2, true });
-        t.serviceActions.push_back({ L"dmwappushservice", 4, 2, true });
+        t.serviceActions.push_back({ L"dmwappushservice", 4, 3, true });
         AddTweak(std::move(t));
     }
     {
@@ -3881,8 +3876,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.safety = SafetyLevel::Normal;
         t.scope = TargetScope::Machine;
         t.requiresReboot = true;
-        t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\SEMgrSvc", L"Start", RegType::Dword, 4, 3, L"", L"", false });
-        t.serviceActions.push_back({ L"SEMgrSvc", 4, 2, true });
+        t.serviceActions.push_back({ L"SEMgrSvc", 4, 3, true });
         AddTweak(std::move(t));
     }
     {
@@ -3919,8 +3913,7 @@ void TweakRegistry::InitializeDefaultTweaks() {
         t.safety = SafetyLevel::Normal;
         t.scope = TargetScope::Machine;
         t.requiresReboot = true;
-        t.regActions.push_back({ TargetScope::Machine, L"SYSTEM\\CurrentControlSet\\Services\\WFDSConMgrSvc", L"Start", RegType::Dword, 4, 3, L"", L"", false });
-        t.serviceActions.push_back({ L"WFDSConMgrSvc", 4, 2, true });
+        t.serviceActions.push_back({ L"WFDSConMgrSvc", 4, 3, true });
         AddTweak(std::move(t));
     }
     {
@@ -4506,6 +4499,28 @@ TweakRegistry::TweakApplicability TweakRegistry::GetTweakApplicability(std::stri
         } catch (...) {}
     }
 
+    if (!t->serviceActions.empty()) {
+        bool anyServiceExists = false;
+        for (const auto& sa : t->serviceActions) {
+            if (ServiceHelper::ServiceExists(sa.serviceName)) {
+                anyServiceExists = true;
+                break;
+            }
+        }
+        if (!anyServiceExists) {
+            bool hasApplicableReg = false;
+            for (const auto& ra : t->regActions) {
+                if (ra.scope == TargetScope::Machine || mode != UserSelectionMode::NoUsers) {
+                    hasApplicableReg = true;
+                    break;
+                }
+            }
+            if (!hasApplicableReg) {
+                return TweakApplicability::NotApplicableService;
+            }
+        }
+    }
+
     if (mode == UserSelectionMode::NoUsers && t->serviceActions.empty()) {
         bool hasMachine = false;
         for (const auto& ra : t->regActions) {
@@ -4576,6 +4591,31 @@ bool TweakRegistry::ValidatePlanConflicts(const std::map<std::string, bool>& twe
     return true;
 }
 
+bool TweakRegistry::ValidatePendingPlan(const std::unordered_set<std::string>& enables,
+                                       const std::unordered_set<std::string>& reverts,
+                                       std::string& outErrorMessage) const {
+    std::map<std::string, bool> stagedPlan;
+    for (const auto& id : enables) {
+        if (reverts.count(id) > 0) {
+            outErrorMessage = "Conflicting settings detected: '" + id + "' is selected for both apply and restore.";
+            return false;
+        }
+        stagedPlan[id] = true;
+    }
+    for (const auto& id : reverts) {
+        stagedPlan[id] = false;
+    }
+    return ValidatePlanConflicts(stagedPlan, outErrorMessage);
+}
+
+bool TweakRegistry::ValidatePendingPlan(const std::vector<std::string>& enables,
+                                       const std::vector<std::string>& reverts,
+                                       std::string& outErrorMessage) const {
+    std::unordered_set<std::string> enableSet(enables.begin(), enables.end());
+    std::unordered_set<std::string> revertSet(reverts.begin(), reverts.end());
+    return ValidatePendingPlan(enableSet, revertSet, outErrorMessage);
+}
+
 bool TweakRegistry::MatchesTargetState(std::string_view id, bool targetProtected, UserSelectionMode mode, const std::vector<std::wstring>& users) const {
     const Tweak* t = GetTweakById(id);
     if (!t) return false;
@@ -4620,6 +4660,7 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
 
     size_t appliedCount = 0;
     size_t defaultCount = 0;
+    size_t partialCount = 0;
     size_t customCount = 0;
     size_t unknownCount = 0;
     size_t notApplicableCount = 0;
@@ -4629,7 +4670,7 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
         const SettingStatus st = ServiceHelper::AuditAction(sa);
         if (st == SettingStatus::Applied) appliedCount++;
         else if (st == SettingStatus::Default) defaultCount++;
-        else if (st == SettingStatus::Partial) customCount++;
+        else if (st == SettingStatus::Partial) partialCount++;
         else if (st == SettingStatus::Custom) customCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
         else if (st == SettingStatus::NotApplicable) notApplicableCount++;
@@ -4652,6 +4693,7 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
 
         if (st == SettingStatus::Applied) appliedCount++;
         else if (st == SettingStatus::Default) defaultCount++;
+        else if (st == SettingStatus::Partial) partialCount++;
         else if (st == SettingStatus::Custom) customCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
         else if (st == SettingStatus::NotApplicable) notApplicableCount++;
@@ -4663,6 +4705,7 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
     if (unknownCount == activeChecks) return SettingStatus::Unknown;
     if (appliedCount == activeChecks) return SettingStatus::Applied;
     if (defaultCount == activeChecks) return SettingStatus::Default;
+    if (partialCount > 0 || (appliedCount > 0 && defaultCount > 0)) return SettingStatus::Partial;
     if (appliedCount > 0) return SettingStatus::Partial;
     if (customCount > 0) return SettingStatus::Custom;
     if (unknownCount > 0) return SettingStatus::Unknown;

@@ -329,15 +329,18 @@ SettingStatus UserHiveManager::AuditUserAction(
     }
 
     size_t appliedUsers = 0;
-    size_t notAppliedUsers = 0;
+    size_t defaultUsers = 0;
+    size_t customUsers = 0;
     size_t unknownUsers = 0;
 
     const auto res = ForEachTargetUser(mode, specificUsers, [&](HKEY hUserRoot, const UserProfile&) -> bool {
         const SettingStatus status = RegistryHelper::AuditAction(hUserRoot, action);
         if (status == SettingStatus::Applied) {
             appliedUsers++;
-        } else if (status == SettingStatus::NotApplied) {
-            notAppliedUsers++;
+        } else if (status == SettingStatus::Default || status == SettingStatus::NotApplied) {
+            defaultUsers++;
+        } else if (status == SettingStatus::Custom) {
+            customUsers++;
         } else {
             unknownUsers++;
         }
@@ -346,19 +349,35 @@ SettingStatus UserHiveManager::AuditUserAction(
 
     unknownUsers += res.failedUsers;
 
-    if (res.requestedUsers == 0 || (appliedUsers == 0 && notAppliedUsers == 0 && unknownUsers > 0)) {
+    if (res.requestedUsers == 0) {
         return SettingStatus::Unknown;
-    }
-
-    if (notAppliedUsers > 0) {
-        return SettingStatus::Default;
     }
 
     if (appliedUsers == res.requestedUsers && unknownUsers == 0) {
         return SettingStatus::Applied;
     }
 
-    return SettingStatus::Unknown;
+    if (defaultUsers == res.requestedUsers && unknownUsers == 0) {
+        return SettingStatus::Default;
+    }
+
+    if (appliedUsers > 0 && defaultUsers > 0) {
+        return SettingStatus::Partial;
+    }
+
+    if (appliedUsers > 0) {
+        return SettingStatus::Partial;
+    }
+
+    if (customUsers > 0) {
+        return SettingStatus::Custom;
+    }
+
+    if (unknownUsers > 0) {
+        return SettingStatus::Unknown;
+    }
+
+    return SettingStatus::Default;
 }
 
 bool UserHiveManager::MatchesUserActionTarget(

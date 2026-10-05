@@ -183,7 +183,9 @@ public:
         }
         m_path += L"privatizewin_test_" + std::to_wstring(pid) + L"_" + std::to_wstring(tick) + L"_" + std::to_wstring(counterVal);
 
-        CreateDirectoryW(m_path.c_str(), nullptr);
+        if (!CreateDirectoryW(m_path.c_str(), nullptr)) {
+            m_path.clear();
+        }
     }
 
     ~TestTempDirectory() {
@@ -204,6 +206,7 @@ public:
         return *this;
     }
 
+    [[nodiscard]] bool IsValid() const noexcept { return !m_path.empty(); }
     [[nodiscard]] const std::wstring& GetPath() const noexcept { return m_path; }
     [[nodiscard]] std::wstring GetFilePath(const std::wstring& filename) const {
         return m_path + L"\\" + filename;

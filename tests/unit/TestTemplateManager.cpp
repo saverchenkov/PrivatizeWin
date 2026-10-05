@@ -36,9 +36,8 @@ TEST_CASE(Unit_TemplateManager, FileSaveAndLoadRoundTrip) {
     p.tweakStates["TEL_DIAGTRACK"] = true;
     p.tweakStates["AI_COPILOT_USER"] = false;
 
-    wchar_t tempPath[MAX_PATH]{};
-    GetTempPathW(MAX_PATH, tempPath);
-    const std::wstring testFile = std::wstring(tempPath) + L"privatizewin_test_roundtrip.json";
+    Test::TestTempDirectory tempDir;
+    const std::wstring testFile = tempDir.GetFilePath(L"privatizewin_test_roundtrip.json");
 
     const bool saveOk = TemplateManager::Instance().SaveTemplateToFile(testFile, p);
     ASSERT_TRUE(saveOk);
@@ -53,8 +52,6 @@ TEST_CASE(Unit_TemplateManager, FileSaveAndLoadRoundTrip) {
     ASSERT_EQ(loaded.tweakStates.size(), 2);
     ASSERT_TRUE(loaded.tweakStates["TEL_DIAGTRACK"]);
     ASSERT_FALSE(loaded.tweakStates["AI_COPILOT_USER"]);
-
-    DeleteFileW(testFile.c_str());
 }
 
 TEST_CASE(Unit_TemplateManager, PresetsAreSparseAndSafe) {
@@ -84,13 +81,11 @@ TEST_CASE(Unit_TemplateManager, PresetsAreSparseAndSafe) {
 
 TEST_CASE(Unit_TemplateManager, RejectInvalidProfiles) {
     TweakRegistry::Instance().InitializeDefaultTweaks();
-
-    wchar_t tempPath[MAX_PATH]{};
-    GetTempPathW(MAX_PATH, tempPath);
+    Test::TestTempDirectory tempDir;
 
     // 1. Non-boolean value
     {
-        const std::wstring testFile = std::wstring(tempPath) + L"privatizewin_test_bad_bool.json";
+        const std::wstring testFile = tempDir.GetFilePath(L"privatizewin_test_bad_bool.json");
         const std::string badJson = R"({
             "name": "bad",
             "tweaks": {
@@ -106,12 +101,11 @@ TEST_CASE(Unit_TemplateManager, RejectInvalidProfiles) {
         const bool ok = TemplateManager::Instance().LoadTemplateFromFile(testFile, p, &err);
         ASSERT_FALSE(ok);
         ASSERT_TRUE(err.find("non-boolean") != std::string::npos);
-        DeleteFileW(testFile.c_str());
     }
 
     // 2. Unknown tweak ID
     {
-        const std::wstring testFile = std::wstring(tempPath) + L"privatizewin_test_unknown_id.json";
+        const std::wstring testFile = tempDir.GetFilePath(L"privatizewin_test_unknown_id.json");
         const std::string badJson = R"({
             "name": "bad",
             "tweaks": {
@@ -127,6 +121,5 @@ TEST_CASE(Unit_TemplateManager, RejectInvalidProfiles) {
         const bool ok = TemplateManager::Instance().LoadTemplateFromFile(testFile, p, &err);
         ASSERT_FALSE(ok);
         ASSERT_TRUE(err.find("Unknown tweak ID") != std::string::npos);
-        DeleteFileW(testFile.c_str());
     }
 }

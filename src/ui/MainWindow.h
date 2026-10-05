@@ -100,6 +100,10 @@ private:
     bool RelaunchAsAdminWithPendingState();
     [[nodiscard]] std::wstring SavePendingStateToTempFile(std::wstring* outToken = nullptr) const;
     bool RestorePendingStateFromFile(const std::wstring& filePath, const std::wstring& token = L"");
+    [[nodiscard]] bool ValidateStagedPlan(std::string* outError = nullptr) const;
+    void StageTweakState(std::string_view id, bool enable);
+    [[nodiscard]] const std::unordered_set<std::string>& GetPendingEnableIds() const noexcept { return m_pendingEnableIds; }
+    [[nodiscard]] const std::unordered_set<std::string>& GetPendingRevertIds() const noexcept { return m_pendingRevertIds; }
     inline static std::wstring s_resumePendingFile;
     inline static std::wstring s_resumePendingToken;
 

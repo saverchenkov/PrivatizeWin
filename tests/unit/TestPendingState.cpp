@@ -90,13 +90,18 @@ TEST_CASE(Unit_PendingState, PendingHandoff_RoundTripAndCleanDeletion) {
     ASSERT_FALSE(token.empty());
     ASSERT_NE(GetFileAttributesW(outPath.c_str()), INVALID_FILE_ATTRIBUTES);
 
-    // Wrong token must be rejected and must NOT delete the file
+    // 1. Missing / empty token must be rejected and must NOT delete the file
     PendingStatePlan dummyPlan;
+    const bool emptyTokenOk = PendingHandoff::ConsumeHandoff(outPath, dummyPlan, L"");
+    ASSERT_FALSE(emptyTokenOk);
+    ASSERT_NE(GetFileAttributesW(outPath.c_str()), INVALID_FILE_ATTRIBUTES);
+
+    // 2. Wrong token must be rejected and must NOT delete the file
     const bool wrongTokenOk = PendingHandoff::ConsumeHandoff(outPath, dummyPlan, L"invalid_token_12345");
     ASSERT_FALSE(wrongTokenOk);
     ASSERT_NE(GetFileAttributesW(outPath.c_str()), INVALID_FILE_ATTRIBUTES);
 
-    // Correct token succeeds
+    // 3. Correct token succeeds
     PendingStatePlan loadedPlan;
     const bool loadOk = PendingHandoff::ConsumeHandoff(outPath, loadedPlan, token);
     ASSERT_TRUE(loadOk);
@@ -121,30 +126,51 @@ TEST_CASE(Unit_PendingState, PendingHandoff_UnrelatedFileSurvivesRejection) {
 
     // Attempt to consume via handoff mechanism
     PendingStatePlan dummyPlan;
-    const bool loadOk = PendingHandoff::ConsumeHandoff(unrelatedFile, dummyPlan);
+    const bool loadOk = PendingHandoff::ConsumeHandoff(unrelatedFile, dummyPlan, L"some_token");
     ASSERT_FALSE(loadOk);
 
     // CRITICAL: Unrelated file MUST survive and NOT be deleted
     ASSERT_NE(GetFileAttributesW(unrelatedFile.c_str()), INVALID_FILE_ATTRIBUTES);
 }
 
-TEST_CASE(Unit_PendingState, PendingHandoff_MalformedAndOverlappingRejected) {
+TEST_CASE(Unit_PendingState, PendingHandoff_MalformedAndFractionalVersionRejected) {
     Test::TestTempDirectory tempDir;
-    const std::wstring testHandoff = tempDir.GetFilePath(L"privatizewin_test_malformed.tmp");
 
-    // Construct a payload with overlapping IDs
-    std::string badPayload = "PRIVATIZEWIN_HANDOFF_V1\n{\"version\":1,\"pendingEnable\": [\"OVERLAP_01\"], \"pendingRevert\": [\"OVERLAP_01\"]}";
+    // 1. Construct a payload with fractional version (1.5)
+    {
+        const std::wstring testHandoff = tempDir.GetFilePath(L"privatizewin_test_fractional.tmp");
+        std::string badPayload = "PRIVATIZEWIN_HANDOFF_V1\n{\"version\":1.5,\"token\":\"mytoken\",\"pendingEnable\": [\"A001_USER\"], \"pendingRevert\": []}";
 
-    HANDLE hFile = CreateFileW(testHandoff.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    ASSERT_NE(hFile, INVALID_HANDLE_VALUE);
-    DWORD written = 0;
-    WriteFile(hFile, badPayload.data(), static_cast<DWORD>(badPayload.size()), &written, nullptr);
-    CloseHandle(hFile);
+        HANDLE hFile = CreateFileW(testHandoff.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        ASSERT_NE(hFile, INVALID_HANDLE_VALUE);
+        DWORD written = 0;
+        WriteFile(hFile, badPayload.data(), static_cast<DWORD>(badPayload.size()), &written, nullptr);
+        CloseHandle(hFile);
 
-    PendingStatePlan dummyPlan;
-    const bool loadOk = PendingHandoff::ConsumeHandoff(testHandoff, dummyPlan);
-    ASSERT_FALSE(loadOk);
+        PendingStatePlan dummyPlan;
+        const bool loadOk = PendingHandoff::ConsumeHandoff(testHandoff, dummyPlan, L"mytoken");
+        ASSERT_FALSE(loadOk);
 
-    // File with malformed schema / overlapping IDs must NOT be deleted by reader
-    ASSERT_NE(GetFileAttributesW(testHandoff.c_str()), INVALID_FILE_ATTRIBUTES);
+        // File with fractional version must NOT be deleted
+        ASSERT_NE(GetFileAttributesW(testHandoff.c_str()), INVALID_FILE_ATTRIBUTES);
+    }
+
+    // 2. Construct a payload with overlapping IDs
+    {
+        const std::wstring testHandoff = tempDir.GetFilePath(L"privatizewin_test_malformed.tmp");
+        std::string badPayload = "PRIVATIZEWIN_HANDOFF_V1\n{\"version\":1,\"token\":\"mytoken\",\"pendingEnable\": [\"OVERLAP_01\"], \"pendingRevert\": [\"OVERLAP_01\"]}";
+
+        HANDLE hFile = CreateFileW(testHandoff.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        ASSERT_NE(hFile, INVALID_HANDLE_VALUE);
+        DWORD written = 0;
+        WriteFile(hFile, badPayload.data(), static_cast<DWORD>(badPayload.size()), &written, nullptr);
+        CloseHandle(hFile);
+
+        PendingStatePlan dummyPlan;
+        const bool loadOk = PendingHandoff::ConsumeHandoff(testHandoff, dummyPlan, L"mytoken");
+        ASSERT_FALSE(loadOk);
+
+        // File with overlapping IDs must NOT be deleted
+        ASSERT_NE(GetFileAttributesW(testHandoff.c_str()), INVALID_FILE_ATTRIBUTES);
+    }
 }

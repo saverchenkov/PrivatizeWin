@@ -423,6 +423,26 @@ bool MainWindow::RestorePendingStateFromFile(const std::wstring& filePath, const
     return true;
 }
 
+bool MainWindow::ValidateStagedPlan(std::string* outError) const {
+    std::string err;
+    const bool ok = TweakRegistry::Instance().ValidatePendingPlan(m_pendingEnableIds, m_pendingRevertIds, err);
+    if (!ok && outError) {
+        *outError = std::move(err);
+    }
+    return ok;
+}
+
+void MainWindow::StageTweakState(std::string_view id, bool enable) {
+    std::string sId(id);
+    if (enable) {
+        m_pendingRevertIds.erase(sId);
+        m_pendingEnableIds.insert(sId);
+    } else {
+        m_pendingEnableIds.erase(sId);
+        m_pendingRevertIds.insert(sId);
+    }
+}
+
 bool MainWindow::RelaunchAsAdminWithPendingState() {
     const bool hasPending = (!m_pendingEnableIds.empty() || !m_pendingRevertIds.empty());
     std::wstring pendingFile;
@@ -1859,6 +1879,13 @@ void MainWindow::ApplySelectedTweaks() {
         return;
     }
 
+    std::string conflictErr;
+    if (!ValidateStagedPlan(&conflictErr)) {
+        std::wstring wErr(conflictErr.begin(), conflictErr.end());
+        MessageBoxW(m_hWnd, wErr.c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONERROR);
+        return;
+    }
+
     bool needAdmin = false;
     for (const auto& id : m_pendingEnableIds) {
         const auto* t = TweakRegistry::Instance().GetTweakById(id);
@@ -1945,8 +1972,8 @@ void MainWindow::ApplySelectedTweaks() {
     SendMessage(m_hProgressBar, PBM_SETRANGE32, 0, static_cast<LPARAM>(totalSelected));
     SendMessage(m_hProgressBar, PBM_SETPOS, 0, 0);
 
-    std::unordered_set<std::string> remainingEnable;
-    std::unordered_set<std::string> remainingRevert;
+    std::unordered_set<std::string> toExecuteEnables;
+    std::unordered_set<std::string> toExecuteReverts;
     int appliedCount = 0;
     int restoredCount = 0;
     int unchangedCount = 0;
@@ -1954,39 +1981,55 @@ void MainWindow::ApplySelectedTweaks() {
     int progress = 0;
 
     for (const auto& id : m_pendingEnableIds) {
-        const bool beforeMatches = TweakRegistry::Instance().MatchesTargetState(id, true, UserSelectionMode::CurrentUser, {});
-        if (beforeMatches) {
+        if (TweakRegistry::Instance().MatchesTargetState(id, true, UserSelectionMode::CurrentUser, {})) {
             unchangedCount++;
+            progress++;
+            SendMessage(m_hProgressBar, PBM_SETPOS, progress, 0);
         } else {
-            const bool ok = TweakRegistry::Instance().ApplyTweak(id, true, UserSelectionMode::CurrentUser, {});
-            const bool afterMatches = TweakRegistry::Instance().MatchesTargetState(id, true, UserSelectionMode::CurrentUser, {});
-            if (ok && afterMatches) {
-                appliedCount++;
-            } else {
-                failedCount++;
-                remainingEnable.insert(id);
-            }
+            toExecuteEnables.insert(id);
         }
+    }
+    for (const auto& id : m_pendingRevertIds) {
+        if (TweakRegistry::Instance().MatchesTargetState(id, false, UserSelectionMode::CurrentUser, {})) {
+            unchangedCount++;
+            progress++;
+            SendMessage(m_hProgressBar, PBM_SETPOS, progress, 0);
+        } else {
+            toExecuteReverts.insert(id);
+        }
+    }
+
+    // Apply entire staged plan
+    for (const auto& id : toExecuteEnables) {
+        TweakRegistry::Instance().ApplyTweak(id, true, UserSelectionMode::CurrentUser, {});
+        progress++;
+        SendMessage(m_hProgressBar, PBM_SETPOS, progress, 0);
+    }
+    for (const auto& id : toExecuteReverts) {
+        TweakRegistry::Instance().ApplyTweak(id, false, UserSelectionMode::CurrentUser, {});
         progress++;
         SendMessage(m_hProgressBar, PBM_SETPOS, progress, 0);
     }
 
-    for (const auto& id : m_pendingRevertIds) {
-        const bool beforeMatches = TweakRegistry::Instance().MatchesTargetState(id, false, UserSelectionMode::CurrentUser, {});
-        if (beforeMatches) {
-            unchangedCount++;
+    // Verify final results after the complete plan
+    std::unordered_set<std::string> remainingEnable;
+    std::unordered_set<std::string> remainingRevert;
+
+    for (const auto& id : toExecuteEnables) {
+        if (TweakRegistry::Instance().MatchesTargetState(id, true, UserSelectionMode::CurrentUser, {})) {
+            appliedCount++;
         } else {
-            const bool ok = TweakRegistry::Instance().ApplyTweak(id, false, UserSelectionMode::CurrentUser, {});
-            const bool afterMatches = TweakRegistry::Instance().MatchesTargetState(id, false, UserSelectionMode::CurrentUser, {});
-            if (ok && afterMatches) {
-                restoredCount++;
-            } else {
-                failedCount++;
-                remainingRevert.insert(id);
-            }
+            failedCount++;
+            remainingEnable.insert(id);
         }
-        progress++;
-        SendMessage(m_hProgressBar, PBM_SETPOS, progress, 0);
+    }
+    for (const auto& id : toExecuteReverts) {
+        if (TweakRegistry::Instance().MatchesTargetState(id, false, UserSelectionMode::CurrentUser, {})) {
+            restoredCount++;
+        } else {
+            failedCount++;
+            remainingRevert.insert(id);
+        }
     }
 
     ShowWindow(m_hProgressBar, SW_HIDE);

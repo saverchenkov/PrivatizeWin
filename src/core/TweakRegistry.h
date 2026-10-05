@@ -4,6 +4,7 @@
 #include <string_view>
 #include <vector>
 #include <map>
+#include <unordered_set>
 #include "Types.h"
 
 namespace PrivatizeWin {
@@ -29,6 +30,7 @@ public:
         Applicable,
         NotApplicableBuild,
         NotApplicableUserScope,
+        NotApplicableService,
         UnknownTweak
     };
 
@@ -43,6 +45,8 @@ public:
     [[nodiscard]] std::string GetCanonicalTweakId(std::string_view id) const;
     [[nodiscard]] TweakApplicability GetTweakApplicability(std::string_view id, UserSelectionMode mode) const;
     [[nodiscard]] bool ValidatePlanConflicts(const std::map<std::string, bool>& tweakRequests, std::string& outErrorMessage) const;
+    [[nodiscard]] bool ValidatePendingPlan(const std::unordered_set<std::string>& enables, const std::unordered_set<std::string>& reverts, std::string& outErrorMessage) const;
+    [[nodiscard]] bool ValidatePendingPlan(const std::vector<std::string>& enables, const std::vector<std::string>& reverts, std::string& outErrorMessage) const;
 
     [[nodiscard]] ApplyResult ApplyTweakEx(std::string_view id, bool enableProtection, UserSelectionMode mode, const std::vector<std::wstring>& users);
     bool ApplyTweak(std::string_view id, bool enableProtection, UserSelectionMode mode, const std::vector<std::wstring>& users);

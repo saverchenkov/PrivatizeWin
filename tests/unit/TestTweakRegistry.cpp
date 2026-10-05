@@ -198,9 +198,16 @@ TEST_CASE(Unit_TweakRegistry, NotApplicableEvaluation) {
 }
 
 TEST_CASE(Unit_TweakRegistry, TargetMatchingCustomAndWrongType) {
-    const wchar_t* subKey = L"Software\\PrivatizeWin\\Test_TargetMatching";
+    const std::wstring subKey = L"Software\\PrivatizeWin\\Test_TargetMatching_" +
+        std::to_wstring(GetCurrentProcessId()) + L"_" + std::to_wstring(GetTickCount64());
+
+    struct KeyCleanup {
+        std::wstring key;
+        ~KeyCleanup() { RegDeleteTreeW(HKEY_CURRENT_USER, key.c_str()); }
+    } cleaner{ subKey };
+
     // Ensure clean key
-    RegDeleteTreeW(HKEY_CURRENT_USER, subKey);
+    RegDeleteTreeW(HKEY_CURRENT_USER, subKey.c_str());
 
     RegistryAction action;
     action.subKey = subKey;
@@ -229,7 +236,7 @@ TEST_CASE(Unit_TweakRegistry, TargetMatchingCustomAndWrongType) {
 
     // 3. Set to custom value 2 (neither protected 1 nor default 0)
     HKEY hKey = nullptr;
-    ASSERT_EQ(RegOpenKeyExW(HKEY_CURRENT_USER, subKey, 0, KEY_WRITE, &hKey), ERROR_SUCCESS);
+    ASSERT_EQ(RegOpenKeyExW(HKEY_CURRENT_USER, subKey.c_str(), 0, KEY_WRITE, &hKey), ERROR_SUCCESS);
     DWORD customVal = 2;
     RegSetValueExW(hKey, action.valueName.c_str(), 0, REG_DWORD, reinterpret_cast<const BYTE*>(&customVal), sizeof(customVal));
     RegCloseKey(hKey);
@@ -240,7 +247,7 @@ TEST_CASE(Unit_TweakRegistry, TargetMatchingCustomAndWrongType) {
     ASSERT_EQ(RegistryHelper::AuditAction(HKEY_CURRENT_USER, action), SettingStatus::Custom);
 
     // 4. Set to wrong type (REG_SZ instead of REG_DWORD)
-    ASSERT_EQ(RegOpenKeyExW(HKEY_CURRENT_USER, subKey, 0, KEY_WRITE, &hKey), ERROR_SUCCESS);
+    ASSERT_EQ(RegOpenKeyExW(HKEY_CURRENT_USER, subKey.c_str(), 0, KEY_WRITE, &hKey), ERROR_SUCCESS);
     const wchar_t szVal[] = L"1";
     RegSetValueExW(hKey, action.valueName.c_str(), 0, REG_SZ, reinterpret_cast<const BYTE*>(szVal), sizeof(szVal));
     RegCloseKey(hKey);
@@ -258,9 +265,6 @@ TEST_CASE(Unit_TweakRegistry, TargetMatchingCustomAndWrongType) {
     // Now absent, matches default
     ASSERT_TRUE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, false));
     ASSERT_FALSE(RegistryHelper::MatchesTarget(HKEY_CURRENT_USER, action, true));
-
-    // Clean up test key
-    RegDeleteTreeW(HKEY_CURRENT_USER, subKey);
 }
 
 TEST_CASE(Unit_TweakRegistry, PlanConflictDetection) {
@@ -299,6 +303,120 @@ TEST_CASE(Unit_TweakRegistry, UsersNoneApplicabilityAndExecution) {
     // ApplyTweakEx with UserSelectionMode::NoUsers returns NotApplicable for user-only tweak
     const auto res = TweakRegistry::Instance().ApplyTweakEx("PRIV_AD_ID_USER", true, UserSelectionMode::NoUsers, {});
     ASSERT_EQ(res, TweakRegistry::ApplyResult::NotApplicable);
+}
+
+TEST_CASE(Unit_TweakRegistry, AliasSeparationM006AndP065) {
+    TweakRegistry::Instance().InitializeDefaultTweaks();
+
+    // M006 and P065 must have distinct canonical IDs
+    ASSERT_EQ(TweakRegistry::Instance().GetCanonicalTweakId("M006"), "M006");
+    ASSERT_EQ(TweakRegistry::Instance().GetCanonicalTweakId("P065"), "P065");
+
+    // L007 and P090_MACHINE must also have distinct canonical IDs
+    ASSERT_EQ(TweakRegistry::Instance().GetCanonicalTweakId("L007"), "L007");
+    ASSERT_EQ(TweakRegistry::Instance().GetCanonicalTweakId("P090_MACHINE"), "P090_MACHINE");
+
+    // Planning both M006 and P065 with consistent targets must be valid and neither is dropped
+    std::map<std::string, bool> jointPlan = {
+        { "M006", true },
+        { "P065", true }
+    };
+    std::string err;
+    ASSERT_TRUE(TweakRegistry::Instance().ValidatePlanConflicts(jointPlan, err));
+
+    // Both tweaks exist and have their distinct full actions preserved
+    const auto* m006 = TweakRegistry::Instance().GetTweakById("M006");
+    const auto* p065 = TweakRegistry::Instance().GetTweakById("P065");
+    ASSERT_TRUE(m006 != nullptr);
+    ASSERT_TRUE(p065 != nullptr);
+    ASSERT_EQ(m006->regActions.size(), 1);
+    ASSERT_EQ(p065->regActions.size(), 2);
+
+    bool p065Has338388 = false;
+    for (const auto& ra : p065->regActions) {
+        if (ra.valueName == L"SubscribedContent-338388Enabled") {
+            p065Has338388 = true;
+        }
+    }
+    ASSERT_TRUE(p065Has338388);
+
+    // Contradictory request (M006: true, P065: false) must be rejected
+    std::map<std::string, bool> conflictPlan = {
+        { "M006", true },
+        { "P065", false }
+    };
+    err.clear();
+    ASSERT_FALSE(TweakRegistry::Instance().ValidatePlanConflicts(conflictPlan, err));
+    ASSERT_TRUE(err.find("contradictory") != std::string::npos);
+}
+
+TEST_CASE(Unit_TweakRegistry, CatalogNoRawServiceStartRegActions) {
+    TweakRegistry::Instance().InitializeDefaultTweaks();
+    const auto& tweaks = TweakRegistry::Instance().GetAllTweaks();
+
+    for (const auto& t : tweaks) {
+        for (const auto& ra : t.regActions) {
+            std::wstring subKeyLower = ra.subKey;
+            std::transform(subKeyLower.begin(), subKeyLower.end(), subKeyLower.begin(), ::towlower);
+            // Assert no raw registry write manages service Start type
+            if (subKeyLower.find(L"system\\currentcontrolset\\services\\") != std::wstring::npos) {
+                ASSERT_TRUE(ra.valueName != L"Start");
+            }
+        }
+    }
+}
+
+TEST_CASE(Unit_TweakRegistry, ServiceSettingsHaveConsistentDefaultAndProtected) {
+    TweakRegistry::Instance().InitializeDefaultTweaks();
+
+    // S116 (SEMgrSvc)
+    const auto* s116 = TweakRegistry::Instance().GetTweakById("S116");
+    ASSERT_TRUE(s116 != nullptr);
+    ASSERT_FALSE(s116->serviceActions.empty());
+    ASSERT_EQ(s116->serviceActions[0].serviceName, L"SEMgrSvc");
+    ASSERT_EQ(s116->serviceActions[0].startupTypeProtected, 4u);
+    ASSERT_EQ(s116->serviceActions[0].startupTypeDefault, 3u); // Demand start
+
+    // S119 (WFDSConMgrSvc)
+    const auto* s119 = TweakRegistry::Instance().GetTweakById("S119");
+    ASSERT_TRUE(s119 != nullptr);
+    ASSERT_FALSE(s119->serviceActions.empty());
+    ASSERT_EQ(s119->serviceActions[0].serviceName, L"WFDSConMgrSvc");
+    ASSERT_EQ(s119->serviceActions[0].startupTypeProtected, 4u);
+    ASSERT_EQ(s119->serviceActions[0].startupTypeDefault, 3u); // Demand start
+
+    // L005_MACHINE (lfsvc)
+    const auto* l005 = TweakRegistry::Instance().GetTweakById("L005_MACHINE");
+    ASSERT_TRUE(l005 != nullptr);
+    ASSERT_FALSE(l005->serviceActions.empty());
+    ASSERT_EQ(l005->serviceActions[0].serviceName, L"lfsvc");
+    ASSERT_EQ(l005->serviceActions[0].startupTypeProtected, 4u);
+    ASSERT_EQ(l005->serviceActions[0].startupTypeDefault, 3u); // Demand start
+
+    // S003 (DiagTrack + dmwappushservice)
+    const auto* s003 = TweakRegistry::Instance().GetTweakById("S003");
+    ASSERT_TRUE(s003 != nullptr);
+    ASSERT_EQ(s003->serviceActions.size(), 2);
+    ASSERT_EQ(s003->serviceActions[0].serviceName, L"DiagTrack");
+    ASSERT_EQ(s003->serviceActions[0].startupTypeProtected, 4u);
+    ASSERT_EQ(s003->serviceActions[0].startupTypeDefault, 2u); // Auto
+    ASSERT_EQ(s003->serviceActions[1].serviceName, L"dmwappushservice");
+    ASSERT_EQ(s003->serviceActions[1].startupTypeProtected, 4u);
+    ASSERT_EQ(s003->serviceActions[1].startupTypeDefault, 3u); // Demand start
+}
+
+TEST_CASE(Unit_TweakRegistry, GuiPlanConflictValidation) {
+    TweakRegistry::Instance().InitializeDefaultTweaks();
+
+    std::unordered_set<std::string> enables = { "TEL_CEIP" };
+    std::unordered_set<std::string> reverts = { "P027" };
+
+    std::string err;
+    const bool valid = TweakRegistry::Instance().ValidatePendingPlan(enables, reverts, err);
+    ASSERT_FALSE(valid);
+    ASSERT_FALSE(err.empty());
+    ASSERT_TRUE(err.find("Contradictory") != std::string::npos || err.find("contradictory") != std::string::npos ||
+                err.find("Conflicting") != std::string::npos || err.find("conflicting") != std::string::npos);
 }
 
 
