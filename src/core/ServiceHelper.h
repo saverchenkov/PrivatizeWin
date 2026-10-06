@@ -34,6 +34,7 @@ public:
     [[nodiscard]] static bool MatchesTarget(const ServiceAction& action, bool targetProtected) noexcept;
     static bool ApplyAction(const ServiceAction& action, bool enableProtection);
 
+#ifdef PRIVATIZEWIN_ENABLE_TEST_HOOKS
     // Test Hooks for deterministic unit testing without mutating system services
     using AvailabilityResolver = std::function<std::optional<ServiceAvailability>(std::wstring_view serviceName)>;
     using ApplyHook = std::function<std::optional<bool>(const ServiceAction& action, bool enableProtection)>;
@@ -44,6 +45,7 @@ public:
     inline static ApplyHook s_testApplyHook = nullptr;
     inline static MatchHook s_testMatchHook = nullptr;
     inline static AuditHook s_testAuditHook = nullptr;
+#endif
 };
 
 } // namespace PrivatizeWin

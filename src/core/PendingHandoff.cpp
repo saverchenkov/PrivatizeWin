@@ -316,17 +316,20 @@ static bool ProcessHandoff(const std::wstring& filePath, PendingStatePlan& outPl
 
         CloseHandle(hFile);
 
-        if (deleteOnSuccess && PendingHandoff::s_postCloseCallback) {
-            PendingHandoff::s_postCloseCallback(filePath);
-        }
-
         outPlan.pendingEnable = std::move(enables);
         outPlan.pendingRevert = std::move(reverts);
-        return true;
     } catch (...) {
         CloseHandle(hFile);
         return false;
     }
+
+#ifdef PRIVATIZEWIN_ENABLE_TEST_HOOKS
+    if (deleteOnSuccess && PendingHandoff::s_postCloseCallback) {
+        PendingHandoff::s_postCloseCallback(filePath);
+    }
+#endif
+
+    return true;
 }
 
 bool PendingHandoff::ValidateAndLoadHandoff(const std::wstring& filePath, PendingStatePlan& outPlan, const std::wstring& expectedToken) {

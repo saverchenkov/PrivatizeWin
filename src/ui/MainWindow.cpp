@@ -489,8 +489,9 @@ void MainWindow::OnCreate() {
 
     LoadPreferences();
 
+    const bool resumeAttempted = !s_resumePendingFile.empty();
     bool restoredPending = false;
-    if (!s_resumePendingFile.empty()) {
+    if (resumeAttempted) {
         restoredPending = RestorePendingStateFromFile(s_resumePendingFile, s_resumePendingToken);
         s_resumePendingFile.clear();
         s_resumePendingToken.clear();
@@ -504,6 +505,11 @@ void MainWindow::OnCreate() {
             std::wstring stMsg = LocFmt("restored_pending", total);
             SendMessageW(m_hStatusBar, SB_SETTEXTW, 0, reinterpret_cast<LPARAM>(stMsg.c_str()));
         }
+    } else if (resumeAttempted) {
+        MessageBoxW(m_hWnd,
+            L"Could not restore pending selections from the previous elevation handoff.\nPlease re-select the desired privacy settings.",
+            Loc("app_title").c_str(),
+            MB_OK | MB_ICONWARNING);
     }
 }
 

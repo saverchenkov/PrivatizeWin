@@ -4542,7 +4542,10 @@ TweakRegistry::TweakApplicability TweakRegistry::GetTweakApplicability(std::stri
         if (!t->serviceActions.empty()) {
             return TweakApplicability::NotApplicableService;
         }
-        return TweakApplicability::NotApplicableUserScope;
+        if (!t->regActions.empty()) {
+            return TweakApplicability::NotApplicableUserScope;
+        }
+        return TweakApplicability::UnknownTweak;
     }
 
     return TweakApplicability::Applicable;

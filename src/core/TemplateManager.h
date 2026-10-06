@@ -26,13 +26,6 @@ public:
     bool LoadTemplateFromFile(std::wstring_view filePath, TemplateProfile& outProfile, std::string* outError = nullptr);
     bool SaveTemplateToFile(std::wstring_view filePath, const TemplateProfile& profile);
 
-    bool ApplyTemplate(
-        const TemplateProfile& profile,
-        UserSelectionMode mode,
-        const std::vector<std::wstring>& users,
-        bool dryRun = false
-    );
-
 private:
     TemplateManager() = default;
     std::map<std::string, TemplateProfile> m_templates;

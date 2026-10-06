@@ -46,6 +46,7 @@ target_link_libraries(PrivatizeWin_Tests PRIVATE
 add_dependencies(PrivatizeWin_Tests PrivatizeWin)
 target_compile_definitions(PrivatizeWin_Tests PRIVATE
     PRIVATIZEWIN_EXE_PATH="$<TARGET_FILE:PrivatizeWin>"
+    PRIVATIZEWIN_ENABLE_TEST_HOOKS=1
 )
 
 # Granular suite targets for isolated CI reporting

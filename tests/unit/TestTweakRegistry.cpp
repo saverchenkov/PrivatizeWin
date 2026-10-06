@@ -428,6 +428,19 @@ TEST_CASE(Unit_TweakRegistry, CompositeTweakWithMissingServiceAppliesAndAuditsCo
     RegistryHelper::DeleteValue(HKEY_CURRENT_USER, testKey, testVal);
     RegistryHelper::DeleteKeyIfEmpty(HKEY_CURRENT_USER, testKey);
 
+    struct TestCleanupGuard {
+        std::wstring key;
+        std::wstring val;
+        ~TestCleanupGuard() {
+            ServiceHelper::s_testAvailabilityResolver = nullptr;
+            ServiceHelper::s_testApplyHook = nullptr;
+            ServiceHelper::s_testMatchHook = nullptr;
+            ServiceHelper::s_testAuditHook = nullptr;
+            RegistryHelper::DeleteValue(HKEY_CURRENT_USER, key, val);
+            RegistryHelper::DeleteKeyIfEmpty(HKEY_CURRENT_USER, key);
+        }
+    } cleanupGuard{testKey, testVal};
+
     std::vector<std::wstring> executedServices;
     std::vector<std::wstring> matchedServices;
     std::vector<std::wstring> auditedServices;

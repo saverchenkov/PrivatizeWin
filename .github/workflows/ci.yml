@@ -21,7 +21,7 @@ jobs:
             cmake_flags: "-DBUILD_TESTING=ON"
             run_tests: true
           - target_name: arm
-            arch: arm64
+            arch: amd64_arm64
             suffix: _arm
             cmake_flags: "-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DBUILD_TESTING=OFF"
             run_tests: false
@@ -62,18 +62,25 @@ jobs:
           Copy-Item README.md dist/README.md
           Copy-Item CATALOG.md dist/CATALOG.md
           if (Test-Path LICENSE) { Copy-Item LICENSE dist/LICENSE }
-          
-          # Create standalone zip
-          Compress-Archive -Path dist/* -DestinationPath PrivatizeWin-${{ matrix.target_name }}.zip
-          
-          # Calculate SHA-256 for all binaries
+
+          # Calculate SHA-256 for binaries
           Get-ChildItem dist/*.exe | ForEach-Object {
             $hash = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash
-            "$hash  $($_.Name)" | Out-File -Encoding utf8 -Append dist/checksums.txt
+            "$hash  $($_.Name)" | Out-File -Encoding utf8 -Append "checksums-${{ matrix.target_name }}.txt"
           }
+
+          Copy-Item "checksums-${{ matrix.target_name }}.txt" dist/
+
+          # Create standalone zip
+          Compress-Archive -Path dist/* -DestinationPath "PrivatizeWin-${{ matrix.target_name }}.zip"
+
           $zipHash = (Get-FileHash -Algorithm SHA256 "PrivatizeWin-${{ matrix.target_name }}.zip").Hash
-          "$zipHash  PrivatizeWin-${{ matrix.target_name }}.zip" | Out-File -Encoding utf8 -Append dist/checksums.txt
-          Get-Content dist/checksums.txt
+          "$zipHash  PrivatizeWin-${{ matrix.target_name }}.zip" | Out-File -Encoding utf8 -Append "checksums-${{ matrix.target_name }}.txt"
+
+          # Remove generic PrivatizeWin.exe from loose binaries to prevent release asset collision
+          Remove-Item dist/PrivatizeWin.exe -Force -ErrorAction SilentlyContinue
+
+          Get-Content "checksums-${{ matrix.target_name }}.txt"
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
@@ -82,7 +89,7 @@ jobs:
           path: |
             dist/*.exe
             PrivatizeWin-${{ matrix.target_name }}.zip
-            dist/checksums.txt
+            checksums-${{ matrix.target_name }}.txt
 
   release:
     name: GitHub Release
@@ -99,7 +106,7 @@ jobs:
           files: |
             PrivatizeWin-*/*.exe
             PrivatizeWin-*/*.zip
-            PrivatizeWin-*/checksums.txt
+            PrivatizeWin-*/checksums-*.txt
           draft: false
           prerelease: false
           generate_release_notes: true

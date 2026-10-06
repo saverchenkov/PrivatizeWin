@@ -185,6 +185,17 @@ TEST_CASE(Unit_PendingState, PendingHandoff_PostCloseReplacementSurvivesWithoutP
     ASSERT_FALSE(outPath.empty());
     ASSERT_FALSE(token.empty());
 
+    struct CallbackGuard {
+        std::wstring path;
+        ~CallbackGuard() {
+            PendingHandoff::s_postCloseCallback = nullptr;
+            if (!path.empty()) {
+                DeleteFileW(path.c_str());
+            }
+        }
+    } guard;
+    guard.path = outPath;
+
     const std::string replacementData = "REPLACEMENT_DATA_MUST_SURVIVE";
 
     // Set post-close callback to simulate an unrelated file or replacement at the same path immediately after handle close
@@ -218,9 +229,6 @@ TEST_CASE(Unit_PendingState, PendingHandoff_PostCloseReplacementSurvivesWithoutP
     ReadFile(hCheck, &readBuf[0], sz, &bytesRead, nullptr);
     CloseHandle(hCheck);
     ASSERT_EQ(readBuf, replacementData);
-
-    // Clean up
-    DeleteFileW(outPath.c_str());
 }
 
 TEST_CASE(Unit_PendingState, PendingHandoff_HandleDeletionFailureReportsFailureWithoutPathDeletion) {
@@ -232,6 +240,17 @@ TEST_CASE(Unit_PendingState, PendingHandoff_HandleDeletionFailureReportsFailureW
     const std::wstring outPath = PendingHandoff::SaveHandoff(plan, &token);
     ASSERT_FALSE(outPath.empty());
     ASSERT_FALSE(token.empty());
+
+    struct FileGuard {
+        std::wstring path;
+        ~FileGuard() {
+            if (!path.empty()) {
+                SetFileAttributesW(path.c_str(), FILE_ATTRIBUTE_NORMAL);
+                DeleteFileW(path.c_str());
+            }
+        }
+    } fileGuard;
+    fileGuard.path = outPath;
 
     // Mark the file as READONLY to cause SetFileInformationByHandle(FileDispositionInfo) to fail on Windows
     const BOOL attrOk = SetFileAttributesW(outPath.c_str(), FILE_ATTRIBUTE_READONLY);
@@ -245,8 +264,4 @@ TEST_CASE(Unit_PendingState, PendingHandoff_HandleDeletionFailureReportsFailureW
 
     // Verify the file still exists (not deleted by unverified pathname fallback)
     ASSERT_NE(GetFileAttributesW(outPath.c_str()), INVALID_FILE_ATTRIBUTES);
-
-    // Restore attributes and delete file
-    SetFileAttributesW(outPath.c_str(), FILE_ATTRIBUTE_NORMAL);
-    DeleteFileW(outPath.c_str());
 }

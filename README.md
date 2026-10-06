@@ -105,8 +105,8 @@ PrivatizeWin.exe --install-task daily --task-template recommended
 | `--install-task` | `daily` \| `logon` \| `weekly` | Registers a recurring background task in Windows Task Scheduler (default trigger: daily at 12:00 PM). |
 | `--task-template` | `<name\|path>` | Specifies which template the background scheduled task enforces (default: `recommended`). |
 | `--uninstall-task` | *None* | Removes the PrivatizeWin scheduled background task. |
-| `--create-restore-point` | *None* | Forces creation of a Windows System Restore Point before applying changes. |
-| `--no-restore-point` | *None* | Skips System Restore Point creation (useful in virtual machines or scripted environments). |
+| `--create-restore-point` | *None* | Creates a Windows System Restore Point before applying changes (opt-in). |
+| `--no-restore-point` | *None* | Explicitly disables System Restore Point creation. |
 | `--help`, `-h`, `/?` | *None* | Prints CLI usage documentation. |
 
 ---
@@ -128,6 +128,9 @@ PrivatizeWin.exe --apply-template strict --users none
 # Target specific user accounts by username or SID
 PrivatizeWin.exe --apply-template recommended --users alice,bob
 ```
+
+> [!NOTE]
+> **Elevation Context (UAC):** When executing from an elevated prompt or UAC Over-The-Shoulder elevation, the "current user" session corresponds to the administrator account that approved elevation. To configure settings for a standard user from an elevated context, specify the user account explicitly via `--users <username>` or use `--users all` to update all user hives.
 
 ---
 

@@ -173,20 +173,4 @@ bool TemplateManager::SaveTemplateToFile(std::wstring_view filePath, const Templ
     return true;
 }
 
-bool TemplateManager::ApplyTemplate(
-    const TemplateProfile& profile,
-    UserSelectionMode mode,
-    const std::vector<std::wstring>& users,
-    bool dryRun
-) {
-    bool allOk = true;
-    for (const auto& [tweakId, shouldEnable] : profile.tweakStates) {
-        if (!dryRun) {
-            const bool ok = TweakRegistry::Instance().ApplyTweak(tweakId, shouldEnable, mode, users);
-            if (!ok) allOk = false;
-        }
-    }
-    return allOk;
-}
-
 } // namespace PrivatizeWin

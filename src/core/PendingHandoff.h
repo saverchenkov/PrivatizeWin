@@ -31,9 +31,11 @@ public:
     // Consumes handoff: validates and loads plan, and ONLY deletes the file if it was a valid, verified handoff.
     [[nodiscard]] static bool ConsumeHandoff(const std::wstring& filePath, PendingStatePlan& outPlan, const std::wstring& expectedToken = L"");
 
+#ifdef PRIVATIZEWIN_ENABLE_TEST_HOOKS
     // Test hook: called immediately after closing the verified handle during deletion
     using PostCloseCallback = std::function<void(const std::wstring&)>;
     inline static PostCloseCallback s_postCloseCallback = nullptr;
+#endif
 };
 
 } // namespace PrivatizeWin

@@ -8,12 +8,14 @@ static std::wstring ToNullTerminated(std::wstring_view sv) {
 }
 
 ServiceAvailability ServiceHelper::GetServiceAvailability(std::wstring_view serviceName) noexcept {
+#ifdef PRIVATIZEWIN_ENABLE_TEST_HOOKS
     if (s_testAvailabilityResolver) {
         auto res = s_testAvailabilityResolver(serviceName);
         if (res.has_value()) {
             return *res;
         }
     }
+#endif
 
     UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
     if (!hSCM) return ServiceAvailability::Inaccessible;
@@ -141,10 +143,12 @@ bool ServiceHelper::StartService(std::wstring_view serviceName) {
 }
 
 bool ServiceHelper::MatchesTarget(const ServiceAction& action, bool targetProtected) noexcept {
+#ifdef PRIVATIZEWIN_ENABLE_TEST_HOOKS
     if (s_testMatchHook) {
         auto res = s_testMatchHook(action, targetProtected);
         if (res.has_value()) return *res;
     }
+#endif
 
     UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
     if (!hSCM) return false;
@@ -185,10 +189,12 @@ bool ServiceHelper::MatchesTarget(const ServiceAction& action, bool targetProtec
 }
 
 SettingStatus ServiceHelper::AuditAction(const ServiceAction& action) {
+#ifdef PRIVATIZEWIN_ENABLE_TEST_HOOKS
     if (s_testAuditHook) {
         auto res = s_testAuditHook(action);
         if (res.has_value()) return *res;
     }
+#endif
 
     UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
     if (!hSCM) {
@@ -235,10 +241,12 @@ SettingStatus ServiceHelper::AuditAction(const ServiceAction& action) {
 }
 
 bool ServiceHelper::ApplyAction(const ServiceAction& action, bool enableProtection) {
+#ifdef PRIVATIZEWIN_ENABLE_TEST_HOOKS
     if (s_testApplyHook) {
         auto res = s_testApplyHook(action, enableProtection);
         if (res.has_value()) return *res;
     }
+#endif
 
     UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
     if (!hSCM) return false;
