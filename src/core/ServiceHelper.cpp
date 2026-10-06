@@ -7,21 +7,31 @@ static std::wstring ToNullTerminated(std::wstring_view sv) {
     return std::wstring(sv);
 }
 
-bool ServiceHelper::ServiceExists(std::wstring_view serviceName) noexcept {
+ServiceAvailability ServiceHelper::GetServiceAvailability(std::wstring_view serviceName) noexcept {
+    if (s_testAvailabilityResolver) {
+        auto res = s_testAvailabilityResolver(serviceName);
+        if (res.has_value()) {
+            return *res;
+        }
+    }
+
     UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
-    if (!hSCM) return true; // Inaccessible SCM: do not assume missing
+    if (!hSCM) return ServiceAvailability::Inaccessible;
 
     std::wstring svcNameStr = ToNullTerminated(serviceName);
     UniqueScHandle hService(OpenServiceW(hSCM.get(), svcNameStr.c_str(), SERVICE_QUERY_CONFIG));
     if (hService.isValid()) {
-        return true;
+        return ServiceAvailability::Available;
     }
     const DWORD err = GetLastError();
     if (err == ERROR_SERVICE_DOES_NOT_EXIST) {
-        return false;
+        return ServiceAvailability::Missing;
     }
-    // Access denied or other query limitation means service exists
-    return true;
+    return ServiceAvailability::Inaccessible;
+}
+
+bool ServiceHelper::ServiceExists(std::wstring_view serviceName) noexcept {
+    return GetServiceAvailability(serviceName) != ServiceAvailability::Missing;
 }
 
 std::optional<uint32_t> ServiceHelper::GetServiceStartType(std::wstring_view serviceName) {
@@ -131,6 +141,11 @@ bool ServiceHelper::StartService(std::wstring_view serviceName) {
 }
 
 bool ServiceHelper::MatchesTarget(const ServiceAction& action, bool targetProtected) noexcept {
+    if (s_testMatchHook) {
+        auto res = s_testMatchHook(action, targetProtected);
+        if (res.has_value()) return *res;
+    }
+
     UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
     if (!hSCM) return false;
 
@@ -170,6 +185,11 @@ bool ServiceHelper::MatchesTarget(const ServiceAction& action, bool targetProtec
 }
 
 SettingStatus ServiceHelper::AuditAction(const ServiceAction& action) {
+    if (s_testAuditHook) {
+        auto res = s_testAuditHook(action);
+        if (res.has_value()) return *res;
+    }
+
     UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
     if (!hSCM) {
         return SettingStatus::Unknown;
@@ -215,6 +235,11 @@ SettingStatus ServiceHelper::AuditAction(const ServiceAction& action) {
 }
 
 bool ServiceHelper::ApplyAction(const ServiceAction& action, bool enableProtection) {
+    if (s_testApplyHook) {
+        auto res = s_testApplyHook(action, enableProtection);
+        if (res.has_value()) return *res;
+    }
+
     UniqueScHandle hSCM(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
     if (!hSCM) return false;
 

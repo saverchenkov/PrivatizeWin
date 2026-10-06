@@ -40,6 +40,21 @@ public:
         NotApplicable
     };
 
+    struct ResolvedTweakActions {
+        std::vector<RegistryAction> regActions;
+        std::vector<ServiceAction> serviceActions;
+        size_t missingServicesCount{ 0 };
+        size_t inaccessibleServicesCount{ 0 };
+        size_t skippedUserRegCount{ 0 };
+
+        [[nodiscard]] bool HasApplicableActions() const noexcept {
+            return !regActions.empty() || !serviceActions.empty();
+        }
+    };
+
+    [[nodiscard]] ResolvedTweakActions GetResolvedActions(const Tweak& tweak, UserSelectionMode mode) const;
+    [[nodiscard]] ResolvedTweakActions GetResolvedActions(std::string_view id, UserSelectionMode mode) const;
+
     [[nodiscard]] SettingStatus AuditTweak(std::string_view id, UserSelectionMode mode, const std::vector<std::wstring>& users) const;
     [[nodiscard]] bool MatchesTargetState(std::string_view id, bool targetProtected, UserSelectionMode mode = UserSelectionMode::CurrentUser, const std::vector<std::wstring>& users = {}) const;
     [[nodiscard]] std::string GetCanonicalTweakId(std::string_view id) const;
@@ -50,14 +65,13 @@ public:
 
     [[nodiscard]] ApplyResult ApplyTweakEx(std::string_view id, bool enableProtection, UserSelectionMode mode, const std::vector<std::wstring>& users);
     bool ApplyTweak(std::string_view id, bool enableProtection, UserSelectionMode mode, const std::vector<std::wstring>& users);
+    void AddTweak(Tweak tweak);
 
 private:
     TweakRegistry();
     std::vector<Tweak> m_tweaks;
     std::map<std::string, size_t> m_idIndexMap;
     std::map<std::string, std::string> m_aliasMap;
-
-    void AddTweak(Tweak tweak);
 };
 
 } // namespace PrivatizeWin

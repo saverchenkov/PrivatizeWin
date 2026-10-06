@@ -1,6 +1,7 @@
 #include "../TestFramework.h"
 #include "../../src/core/TweakRegistry.h"
 #include "../../src/core/RegistryHelper.h"
+#include "../../src/core/ServiceHelper.h"
 #include <set>
 
 using namespace PrivatizeWin;
@@ -418,6 +419,138 @@ TEST_CASE(Unit_TweakRegistry, GuiPlanConflictValidation) {
     ASSERT_TRUE(err.find("Contradictory") != std::string::npos || err.find("contradictory") != std::string::npos ||
                 err.find("Conflicting") != std::string::npos || err.find("conflicting") != std::string::npos);
 }
+
+TEST_CASE(Unit_TweakRegistry, CompositeTweakWithMissingServiceAppliesAndAuditsConsistently) {
+    const std::wstring testKey = L"Software\\PrivatizeWin_Test_Composite";
+    const std::wstring testVal = L"CompositeSetting";
+
+    // Clean up any old test artifacts
+    RegistryHelper::DeleteValue(HKEY_CURRENT_USER, testKey, testVal);
+    RegistryHelper::DeleteKeyIfEmpty(HKEY_CURRENT_USER, testKey);
+
+    std::vector<std::wstring> executedServices;
+    std::vector<std::wstring> matchedServices;
+    std::vector<std::wstring> auditedServices;
+    uint32_t simulatedServiceStartType = 3; // 3 = default (demand), 4 = protected (disabled)
+
+    ServiceHelper::s_testAvailabilityResolver = [](std::wstring_view svc) -> std::optional<ServiceAvailability> {
+        if (svc == L"AvailableService") return ServiceAvailability::Available;
+        if (svc == L"MissingService") return ServiceAvailability::Missing;
+        return std::nullopt;
+    };
+
+    ServiceHelper::s_testApplyHook = [&](const ServiceAction& sa, bool enable) -> std::optional<bool> {
+        executedServices.push_back(sa.serviceName);
+        simulatedServiceStartType = enable ? sa.startupTypeProtected : sa.startupTypeDefault;
+        return true;
+    };
+
+    ServiceHelper::s_testMatchHook = [&](const ServiceAction& sa, bool targetProtected) -> std::optional<bool> {
+        matchedServices.push_back(sa.serviceName);
+        const uint32_t expected = targetProtected ? sa.startupTypeProtected : sa.startupTypeDefault;
+        return (simulatedServiceStartType == expected);
+    };
+
+    ServiceHelper::s_testAuditHook = [&](const ServiceAction& sa) -> std::optional<SettingStatus> {
+        auditedServices.push_back(sa.serviceName);
+        if (simulatedServiceStartType == sa.startupTypeProtected) return SettingStatus::Applied;
+        if (simulatedServiceStartType == sa.startupTypeDefault) return SettingStatus::Default;
+        return SettingStatus::Custom;
+    };
+
+    // Construct composite tweak: 1 user reg action, 1 available service, 1 missing service
+    Tweak t;
+    t.id = "TEST_COMPOSITE_PARTIAL_SERVICES";
+    t.title = L"Composite Tweak Test";
+    t.category = L"Testing";
+    t.scope = TargetScope::User;
+    t.regActions.push_back({ TargetScope::User, testKey, testVal, RegType::Dword, 1, 0, L"", L"", false });
+    t.serviceActions.push_back({ L"AvailableService", 4, 3, false });
+    t.serviceActions.push_back({ L"MissingService", 4, 3, false });
+    TweakRegistry::Instance().AddTweak(t);
+
+    // 1. Planning phase
+    const auto app = TweakRegistry::Instance().GetTweakApplicability(t.id, UserSelectionMode::CurrentUser);
+    ASSERT_EQ(static_cast<int>(app), static_cast<int>(TweakRegistry::TweakApplicability::Applicable));
+
+    const auto resolved = TweakRegistry::Instance().GetResolvedActions(t.id, UserSelectionMode::CurrentUser);
+    ASSERT_TRUE(resolved.HasApplicableActions());
+    ASSERT_EQ(resolved.serviceActions.size(), 1);
+    ASSERT_EQ(resolved.serviceActions[0].serviceName, L"AvailableService");
+    ASSERT_EQ(resolved.missingServicesCount, 1);
+    ASSERT_EQ(resolved.regActions.size(), 1);
+
+    // Initial state: default
+    RegistryHelper::WriteDword(HKEY_CURRENT_USER, testKey, testVal, 0);
+    simulatedServiceStartType = 3;
+
+    // Initial audit must report Default
+    const auto initAudit = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+    ASSERT_EQ(static_cast<int>(initAudit), static_cast<int>(SettingStatus::Default));
+
+    // 2. Execution phase (Enable / Apply)
+    executedServices.clear();
+    const auto applyRes = TweakRegistry::Instance().ApplyTweakEx(t.id, true, UserSelectionMode::CurrentUser, {});
+    ASSERT_EQ(static_cast<int>(applyRes), static_cast<int>(TweakRegistry::ApplyResult::Success));
+
+    // Assert that execution ONLY ran the available service, never attempting the missing service
+    ASSERT_EQ(executedServices.size(), 1);
+    ASSERT_EQ(executedServices[0], L"AvailableService");
+
+    // Registry action was executed
+    const auto regVal = RegistryHelper::ReadDword(HKEY_CURRENT_USER, testKey, testVal);
+    ASSERT_TRUE(regVal.has_value());
+    ASSERT_EQ(regVal.value(), 1u);
+
+    // 3. Target verification phase
+    matchedServices.clear();
+    const bool matchesProtected = TweakRegistry::Instance().MatchesTargetState(t.id, true, UserSelectionMode::CurrentUser, {});
+    ASSERT_TRUE(matchesProtected);
+    ASSERT_EQ(matchedServices.size(), 1);
+    ASSERT_EQ(matchedServices[0], L"AvailableService");
+
+    // 4. Audit phase
+    auditedServices.clear();
+    const auto postApplyAudit = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+    ASSERT_EQ(static_cast<int>(postApplyAudit), static_cast<int>(SettingStatus::Applied));
+    ASSERT_EQ(auditedServices.size(), 1);
+    ASSERT_EQ(auditedServices[0], L"AvailableService");
+
+    // 5. Restore / Revert phase
+    executedServices.clear();
+    const auto revertRes = TweakRegistry::Instance().ApplyTweakEx(t.id, false, UserSelectionMode::CurrentUser, {});
+    ASSERT_EQ(static_cast<int>(revertRes), static_cast<int>(TweakRegistry::ApplyResult::Success));
+    ASSERT_EQ(executedServices.size(), 1);
+    ASSERT_EQ(executedServices[0], L"AvailableService");
+
+    // Revert target verification
+    const bool matchesDefault = TweakRegistry::Instance().MatchesTargetState(t.id, false, UserSelectionMode::CurrentUser, {});
+    ASSERT_TRUE(matchesDefault);
+
+    // Revert audit
+    const auto postRevertAudit = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+    ASSERT_EQ(static_cast<int>(postRevertAudit), static_cast<int>(SettingStatus::Default));
+
+    // 6. Test tweak with ONLY missing services: must report NotApplicableService
+    Tweak tOnlyMissing;
+    tOnlyMissing.id = "TEST_ONLY_MISSING_SERVICES";
+    tOnlyMissing.title = L"Only Missing Services";
+    tOnlyMissing.category = L"Testing";
+    tOnlyMissing.serviceActions.push_back({ L"MissingService", 4, 3, false });
+    TweakRegistry::Instance().AddTweak(tOnlyMissing);
+
+    const auto missingApp = TweakRegistry::Instance().GetTweakApplicability(tOnlyMissing.id, UserSelectionMode::CurrentUser);
+    ASSERT_EQ(static_cast<int>(missingApp), static_cast<int>(TweakRegistry::TweakApplicability::NotApplicableService));
+
+    // Reset test hooks and cleanup registry
+    ServiceHelper::s_testAvailabilityResolver = nullptr;
+    ServiceHelper::s_testApplyHook = nullptr;
+    ServiceHelper::s_testMatchHook = nullptr;
+    ServiceHelper::s_testAuditHook = nullptr;
+    RegistryHelper::DeleteValue(HKEY_CURRENT_USER, testKey, testVal);
+    RegistryHelper::DeleteKeyIfEmpty(HKEY_CURRENT_USER, testKey);
+}
+
 
 
 

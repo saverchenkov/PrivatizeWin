@@ -4472,6 +4472,38 @@ void TweakRegistry::InitializeDefaultTweaks() {
 
 }
 
+TweakRegistry::ResolvedTweakActions TweakRegistry::GetResolvedActions(const Tweak& tweak, UserSelectionMode mode) const {
+    ResolvedTweakActions resolved;
+
+    for (const auto& sa : tweak.serviceActions) {
+        ServiceAvailability avail = ServiceHelper::GetServiceAvailability(sa.serviceName);
+        if (avail == ServiceAvailability::Missing) {
+            resolved.missingServicesCount++;
+        } else {
+            if (avail == ServiceAvailability::Inaccessible) {
+                resolved.inaccessibleServicesCount++;
+            }
+            resolved.serviceActions.push_back(sa);
+        }
+    }
+
+    for (const auto& ra : tweak.regActions) {
+        if (mode == UserSelectionMode::NoUsers && ra.scope == TargetScope::User) {
+            resolved.skippedUserRegCount++;
+        } else {
+            resolved.regActions.push_back(ra);
+        }
+    }
+
+    return resolved;
+}
+
+TweakRegistry::ResolvedTweakActions TweakRegistry::GetResolvedActions(std::string_view id, UserSelectionMode mode) const {
+    const Tweak* t = GetTweakById(id);
+    if (!t) return ResolvedTweakActions{};
+    return GetResolvedActions(*t, mode);
+}
+
 TweakRegistry::TweakApplicability TweakRegistry::GetTweakApplicability(std::string_view id, UserSelectionMode mode) const {
     const Tweak* t = GetTweakById(id);
     if (!t) return TweakApplicability::UnknownTweak;
@@ -4499,39 +4531,18 @@ TweakRegistry::TweakApplicability TweakRegistry::GetTweakApplicability(std::stri
         } catch (...) {}
     }
 
-    if (!t->serviceActions.empty()) {
-        bool anyServiceExists = false;
-        for (const auto& sa : t->serviceActions) {
-            if (ServiceHelper::ServiceExists(sa.serviceName)) {
-                anyServiceExists = true;
-                break;
-            }
+    auto resolved = GetResolvedActions(*t, mode);
+    if (!resolved.HasApplicableActions()) {
+        if (!t->serviceActions.empty() && resolved.missingServicesCount == t->serviceActions.size()) {
+            return TweakApplicability::NotApplicableService;
         }
-        if (!anyServiceExists) {
-            bool hasApplicableReg = false;
-            for (const auto& ra : t->regActions) {
-                if (ra.scope == TargetScope::Machine || mode != UserSelectionMode::NoUsers) {
-                    hasApplicableReg = true;
-                    break;
-                }
-            }
-            if (!hasApplicableReg) {
-                return TweakApplicability::NotApplicableService;
-            }
-        }
-    }
-
-    if (mode == UserSelectionMode::NoUsers && t->serviceActions.empty()) {
-        bool hasMachine = false;
-        for (const auto& ra : t->regActions) {
-            if (ra.scope == TargetScope::Machine) {
-                hasMachine = true;
-                break;
-            }
-        }
-        if (!hasMachine) {
+        if (mode == UserSelectionMode::NoUsers && resolved.skippedUserRegCount > 0) {
             return TweakApplicability::NotApplicableUserScope;
         }
+        if (!t->serviceActions.empty()) {
+            return TweakApplicability::NotApplicableService;
+        }
+        return TweakApplicability::NotApplicableUserScope;
     }
 
     return TweakApplicability::Applicable;
@@ -4620,18 +4631,20 @@ bool TweakRegistry::MatchesTargetState(std::string_view id, bool targetProtected
     const Tweak* t = GetTweakById(id);
     if (!t) return false;
 
+    auto resolved = GetResolvedActions(*t, mode);
+    if (!resolved.HasApplicableActions()) {
+        return false;
+    }
+
     // Check service actions
-    for (const auto& sa : t->serviceActions) {
+    for (const auto& sa : resolved.serviceActions) {
         if (!ServiceHelper::MatchesTarget(sa, targetProtected)) {
             return false;
         }
     }
 
     // Check registry actions
-    for (const auto& ra : t->regActions) {
-        if (mode == UserSelectionMode::NoUsers && ra.scope == TargetScope::User) {
-            continue;
-        }
+    for (const auto& ra : resolved.regActions) {
         if (ra.scope == TargetScope::Machine) {
             if (!RegistryHelper::MatchesTarget(HKEY_LOCAL_MACHINE, ra, targetProtected)) {
                 return false;
@@ -4655,7 +4668,12 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
         return SettingStatus::NotApplicable;
     }
 
-    const size_t totalChecks = t->serviceActions.size() + t->regActions.size();
+    auto resolved = GetResolvedActions(*t, mode);
+    if (!resolved.HasApplicableActions()) {
+        return SettingStatus::NotApplicable;
+    }
+
+    const size_t totalChecks = resolved.serviceActions.size() + resolved.regActions.size();
     if (totalChecks == 0) return SettingStatus::NotApplicable;
 
     size_t appliedCount = 0;
@@ -4663,27 +4681,20 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
     size_t partialCount = 0;
     size_t customCount = 0;
     size_t unknownCount = 0;
-    size_t notApplicableCount = 0;
 
     // Check services
-    for (const auto& sa : t->serviceActions) {
+    for (const auto& sa : resolved.serviceActions) {
         const SettingStatus st = ServiceHelper::AuditAction(sa);
         if (st == SettingStatus::Applied) appliedCount++;
         else if (st == SettingStatus::Default) defaultCount++;
         else if (st == SettingStatus::Partial) partialCount++;
         else if (st == SettingStatus::Custom) customCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
-        else if (st == SettingStatus::NotApplicable) notApplicableCount++;
         else customCount++;
     }
 
     // Check registry actions
-    for (const auto& ra : t->regActions) {
-        if (mode == UserSelectionMode::NoUsers && ra.scope == TargetScope::User) {
-            notApplicableCount++;
-            continue;
-        }
-
+    for (const auto& ra : resolved.regActions) {
         SettingStatus st = SettingStatus::Default;
         if (ra.scope == TargetScope::Machine) {
             st = RegistryHelper::AuditAction(HKEY_LOCAL_MACHINE, ra);
@@ -4696,15 +4707,12 @@ SettingStatus TweakRegistry::AuditTweak(std::string_view id, UserSelectionMode m
         else if (st == SettingStatus::Partial) partialCount++;
         else if (st == SettingStatus::Custom) customCount++;
         else if (st == SettingStatus::Unknown) unknownCount++;
-        else if (st == SettingStatus::NotApplicable) notApplicableCount++;
         else customCount++;
     }
 
-    const size_t activeChecks = totalChecks - notApplicableCount;
-    if (activeChecks == 0) return SettingStatus::NotApplicable;
-    if (unknownCount == activeChecks) return SettingStatus::Unknown;
-    if (appliedCount == activeChecks) return SettingStatus::Applied;
-    if (defaultCount == activeChecks) return SettingStatus::Default;
+    if (unknownCount == totalChecks) return SettingStatus::Unknown;
+    if (appliedCount == totalChecks) return SettingStatus::Applied;
+    if (defaultCount == totalChecks) return SettingStatus::Default;
     if (partialCount > 0 || (appliedCount > 0 && defaultCount > 0)) return SettingStatus::Partial;
     if (appliedCount > 0) return SettingStatus::Partial;
     if (customCount > 0) return SettingStatus::Custom;
@@ -4716,13 +4724,13 @@ TweakRegistry::ApplyResult TweakRegistry::ApplyTweakEx(std::string_view id, bool
     const Tweak* t = GetTweakById(id);
     if (!t) return ApplyResult::Failed;
 
-    const size_t totalActions = t->serviceActions.size() + t->regActions.size();
-    if (totalActions == 0) {
-        return ApplyResult::Failed;
-    }
-
     const auto applicability = GetTweakApplicability(id, mode);
     if (applicability != TweakApplicability::Applicable) {
+        return ApplyResult::NotApplicable;
+    }
+
+    auto resolved = GetResolvedActions(*t, mode);
+    if (!resolved.HasApplicableActions()) {
         return ApplyResult::NotApplicable;
     }
 
@@ -4730,7 +4738,7 @@ TweakRegistry::ApplyResult TweakRegistry::ApplyTweakEx(std::string_view id, bool
     size_t executedCount = 0;
 
     // Apply service actions
-    for (const auto& sa : t->serviceActions) {
+    for (const auto& sa : resolved.serviceActions) {
         executedCount++;
         if (!ServiceHelper::ApplyAction(sa, enableProtection)) {
             allOk = false;
@@ -4738,11 +4746,7 @@ TweakRegistry::ApplyResult TweakRegistry::ApplyTweakEx(std::string_view id, bool
     }
 
     // Apply registry actions
-    for (const auto& ra : t->regActions) {
-        if (mode == UserSelectionMode::NoUsers && ra.scope == TargetScope::User) {
-            continue;
-        }
-
+    for (const auto& ra : resolved.regActions) {
         executedCount++;
         if (ra.scope == TargetScope::Machine) {
             if (!RegistryHelper::ApplyAction(HKEY_LOCAL_MACHINE, ra, enableProtection)) {
@@ -4764,7 +4768,7 @@ TweakRegistry::ApplyResult TweakRegistry::ApplyTweakEx(std::string_view id, bool
 
 bool TweakRegistry::ApplyTweak(std::string_view id, bool enableProtection, UserSelectionMode mode, const std::vector<std::wstring>& users) {
     const auto res = ApplyTweakEx(id, enableProtection, mode, users);
-    return (res != ApplyResult::Failed);
+    return (res == ApplyResult::Success);
 }
 
 bool TweakRegistry::LoadExternalTweaks(std::string_view jsonContent) {

@@ -166,18 +166,27 @@ void AssertNe(const T1& a, const T2& b, std::string_view exprA, std::string_view
 
 class TestTempDirectory {
 public:
-    TestTempDirectory() {
-        wchar_t tempBase[MAX_PATH];
-        DWORD len = GetTempPathW(MAX_PATH, tempBase);
-        if (len == 0 || len > MAX_PATH) {
-            wcscpy_s(tempBase, L"C:\\Windows\\Temp");
+    TestTempDirectory() : TestTempDirectory(L"") {}
+
+    explicit TestTempDirectory(std::wstring_view overrideBasePath) {
+        std::wstring tempBase;
+        if (!overrideBasePath.empty()) {
+            tempBase = std::wstring(overrideBasePath);
+        } else {
+            wchar_t buf[MAX_PATH];
+            DWORD len = GetTempPathW(MAX_PATH, buf);
+            if (len == 0 || len > MAX_PATH) {
+                wcscpy_s(buf, L"C:\\Windows\\Temp");
+            }
+            tempBase = buf;
         }
+
         static std::atomic<uint64_t> s_counter{ 0 };
         const auto counterVal = ++s_counter;
         const auto pid = GetCurrentProcessId();
         const auto tick = GetTickCount64();
 
-        m_path = std::wstring(tempBase);
+        m_path = tempBase;
         if (!m_path.empty() && m_path.back() != L'\\') {
             m_path += L'\\';
         }
@@ -185,6 +194,7 @@ public:
 
         if (!CreateDirectoryW(m_path.c_str(), nullptr)) {
             m_path.clear();
+            throw TestAssertionException("Failed to create temporary directory for test fixture: " + std::to_string(GetLastError()));
         }
     }
 
@@ -209,6 +219,9 @@ public:
     [[nodiscard]] bool IsValid() const noexcept { return !m_path.empty(); }
     [[nodiscard]] const std::wstring& GetPath() const noexcept { return m_path; }
     [[nodiscard]] std::wstring GetFilePath(const std::wstring& filename) const {
+        if (m_path.empty()) {
+            throw TestAssertionException("Attempted to construct file path from invalid or uninitialized TestTempDirectory fixture");
+        }
         return m_path + L"\\" + filename;
     }
 

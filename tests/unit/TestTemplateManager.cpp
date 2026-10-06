@@ -123,3 +123,36 @@ TEST_CASE(Unit_TemplateManager, RejectInvalidProfiles) {
         ASSERT_TRUE(err.find("Unknown tweak ID") != std::string::npos);
     }
 }
+
+TEST_CASE(Unit_TemplateManager, FixtureCreationFailureRejectsPathResolutionWithoutWritingOutsideFixture) {
+    // Attempting to construct a fixture with an invalid / non-existent drive root or share path must fail
+    bool constructorThrew = false;
+    try {
+        Test::TestTempDirectory badFixture(L"Z:\\NonExistentDrive_PrivatizeWinFixture");
+    } catch (const Test::TestAssertionException& ex) {
+        constructorThrew = true;
+        std::string msg = ex.what();
+        ASSERT_TRUE(msg.find("Failed to create temporary directory") != std::string::npos);
+    }
+    ASSERT_TRUE(constructorThrew);
+
+    // Additionally verify an invalid/moved-from fixture throws on GetFilePath() rather than producing \filename rooted on the drive
+    Test::TestTempDirectory validFixture;
+    ASSERT_TRUE(validFixture.IsValid());
+    Test::TestTempDirectory movedFixture = std::move(validFixture);
+    ASSERT_FALSE(validFixture.IsValid());
+
+    bool getFilePathThrew = false;
+    try {
+        std::wstring dangerousPath = validFixture.GetFilePath(L"unauthorized_root_file.txt");
+    } catch (const Test::TestAssertionException& ex) {
+        getFilePathThrew = true;
+        std::string msg = ex.what();
+        ASSERT_TRUE(msg.find("invalid or uninitialized") != std::string::npos);
+    }
+    ASSERT_TRUE(getFilePathThrew);
+
+    // Assert no file was written to root drive (e.g. C:\unauthorized_root_file.txt)
+    ASSERT_EQ(GetFileAttributesW(L"C:\\unauthorized_root_file.txt"), INVALID_FILE_ATTRIBUTES);
+}
+

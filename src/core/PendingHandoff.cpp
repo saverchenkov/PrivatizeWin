@@ -308,14 +308,16 @@ static bool ProcessHandoff(const std::wstring& filePath, PendingStatePlan& outPl
         if (deleteOnSuccess) {
             FILE_DISPOSITION_INFO fdi{};
             fdi.DeleteFile = TRUE;
-            SetFileInformationByHandle(hFile, FileDispositionInfo, &fdi, sizeof(fdi));
+            if (!SetFileInformationByHandle(hFile, FileDispositionInfo, &fdi, sizeof(fdi))) {
+                CloseHandle(hFile);
+                return false;
+            }
         }
 
         CloseHandle(hFile);
 
-        if (deleteOnSuccess) {
-            // Fallback deletion
-            DeleteFileW(filePath.c_str());
+        if (deleteOnSuccess && PendingHandoff::s_postCloseCallback) {
+            PendingHandoff::s_postCloseCallback(filePath);
         }
 
         outPlan.pendingEnable = std::move(enables);

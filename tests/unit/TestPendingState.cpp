@@ -174,3 +174,79 @@ TEST_CASE(Unit_PendingState, PendingHandoff_MalformedAndFractionalVersionRejecte
         ASSERT_NE(GetFileAttributesW(testHandoff.c_str()), INVALID_FILE_ATTRIBUTES);
     }
 }
+
+TEST_CASE(Unit_PendingState, PendingHandoff_PostCloseReplacementSurvivesWithoutPathFallback) {
+    PendingStatePlan plan;
+    plan.pendingEnable = { "TEL_DIAGTRACK" };
+    plan.pendingRevert = {};
+
+    std::wstring token;
+    const std::wstring outPath = PendingHandoff::SaveHandoff(plan, &token);
+    ASSERT_FALSE(outPath.empty());
+    ASSERT_FALSE(token.empty());
+
+    const std::string replacementData = "REPLACEMENT_DATA_MUST_SURVIVE";
+
+    // Set post-close callback to simulate an unrelated file or replacement at the same path immediately after handle close
+    PendingHandoff::s_postCloseCallback = [&](const std::wstring& path) {
+        HANDLE hNew = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        ASSERT_NE(hNew, INVALID_HANDLE_VALUE);
+        DWORD written = 0;
+        WriteFile(hNew, replacementData.data(), static_cast<DWORD>(replacementData.size()), &written, nullptr);
+        CloseHandle(hNew);
+    };
+
+    PendingStatePlan loadedPlan;
+    const bool consumeOk = PendingHandoff::ConsumeHandoff(outPath, loadedPlan, token);
+
+    // Reset callback immediately
+    PendingHandoff::s_postCloseCallback = nullptr;
+
+    ASSERT_TRUE(consumeOk);
+    ASSERT_EQ(loadedPlan.pendingEnable.size(), 1);
+
+    // CRITICAL: The replacement file at the pathname MUST SURVIVE and NOT be deleted by any fallback pathname deletion!
+    ASSERT_NE(GetFileAttributesW(outPath.c_str()), INVALID_FILE_ATTRIBUTES);
+
+    // Verify file contents match replacementData
+    HANDLE hCheck = CreateFileW(outPath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    ASSERT_NE(hCheck, INVALID_HANDLE_VALUE);
+    DWORD sz = GetFileSize(hCheck, nullptr);
+    ASSERT_EQ(sz, static_cast<DWORD>(replacementData.size()));
+    std::string readBuf(sz, '\0');
+    DWORD bytesRead = 0;
+    ReadFile(hCheck, &readBuf[0], sz, &bytesRead, nullptr);
+    CloseHandle(hCheck);
+    ASSERT_EQ(readBuf, replacementData);
+
+    // Clean up
+    DeleteFileW(outPath.c_str());
+}
+
+TEST_CASE(Unit_PendingState, PendingHandoff_HandleDeletionFailureReportsFailureWithoutPathDeletion) {
+    PendingStatePlan plan;
+    plan.pendingEnable = { "TEL_DIAGTRACK" };
+    plan.pendingRevert = {};
+
+    std::wstring token;
+    const std::wstring outPath = PendingHandoff::SaveHandoff(plan, &token);
+    ASSERT_FALSE(outPath.empty());
+    ASSERT_FALSE(token.empty());
+
+    // Mark the file as READONLY to cause SetFileInformationByHandle(FileDispositionInfo) to fail on Windows
+    const BOOL attrOk = SetFileAttributesW(outPath.c_str(), FILE_ATTRIBUTE_READONLY);
+    ASSERT_TRUE(attrOk == TRUE);
+
+    PendingStatePlan loadedPlan;
+    const bool consumeOk = PendingHandoff::ConsumeHandoff(outPath, loadedPlan, token);
+
+    // consumeOk MUST be false because handle-based deletion failed, reporting cleanup failure accurately
+    ASSERT_FALSE(consumeOk);
+
+    // Verify the file still exists (not deleted by unverified pathname fallback)
+    ASSERT_NE(GetFileAttributesW(outPath.c_str()), INVALID_FILE_ATTRIBUTES);
+
+    // Restore attributes and delete file
+    SetFileAttributesW(outPath.c_str(), FILE_ATTRIBUTE_NORMAL);
+    DeleteFileW(outPath.c_str());
+}
