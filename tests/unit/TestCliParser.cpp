@@ -111,4 +111,31 @@ TEST_CASE(Unit_CliParser, ResumePendingMissingFile) {
     ASSERT_TRUE(opts.errorMessage.find("Missing file path") != std::string::npos);
 }
 
+TEST_CASE(Unit_CliParser, HelpFlagsSetShowHelpWithoutExit) {
+    wchar_t* argvHelp[] = {
+        const_cast<wchar_t*>(L"PrivatizeWin.exe"),
+        const_cast<wchar_t*>(L"--help")
+    };
+    const auto optsHelp = CliRunner::ParseArguments(2, argvHelp);
+    ASSERT_TRUE(optsHelp.isCli);
+    ASSERT_FALSE(optsHelp.hasError);
+    ASSERT_TRUE(optsHelp.showHelp);
+
+    wchar_t* argvShort[] = {
+        const_cast<wchar_t*>(L"PrivatizeWin.exe"),
+        const_cast<wchar_t*>(L"-h")
+    };
+    const auto optsShort = CliRunner::ParseArguments(2, argvShort);
+    ASSERT_TRUE(optsShort.isCli);
+    ASSERT_TRUE(optsShort.showHelp);
+
+    wchar_t* argvSlash[] = {
+        const_cast<wchar_t*>(L"PrivatizeWin.exe"),
+        const_cast<wchar_t*>(L"/?")
+    };
+    const auto optsSlash = CliRunner::ParseArguments(2, argvSlash);
+    ASSERT_TRUE(optsSlash.isCli);
+    ASSERT_TRUE(optsSlash.showHelp);
+}
+
 

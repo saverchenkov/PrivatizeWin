@@ -3,6 +3,7 @@
 #include "../core/TemplateManager.h"
 #include "../core/RestorePoint.h"
 #include "../core/TaskScheduler.h"
+#include "../core/UserHiveManager.h"
 #include "../core/SimpleJson.h"
 #include "../core/ProcessHelper.h"
 #include <iostream>
@@ -56,9 +57,7 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
         const std::wstring arg = argv[i];
 
         if (arg == L"--help" || arg == L"-h" || arg == L"/?") {
-            InitializeConsoleOutput();
-            PrintHelp();
-            exit(0);
+            opts.showHelp = true;
         } else if (arg == L"--list-templates") {
             opts.listTemplates = true;
         } else if (arg == L"--apply-template") {
@@ -150,7 +149,7 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
         }
     }
 
-    if (opts.hasError) {
+    if (opts.showHelp || opts.hasError) {
         opts.isCli = true;
         return opts;
     }
@@ -180,6 +179,14 @@ CliOptions CliRunner::ParseArguments(int argc, wchar_t* argv[]) {
 }
 
 int CliRunner::Execute(const CliOptions& opts) {
+    if (opts.showHelp) {
+        if (!opts.quiet) {
+            InitializeConsoleOutput();
+            PrintHelp();
+        }
+        return 0;
+    }
+
     if (!opts.quiet) {
         InitializeConsoleOutput();
     }
@@ -295,6 +302,7 @@ int CliRunner::Execute(const CliOptions& opts) {
 
     // 4. Show Status
     if (opts.showStatus) {
+        UserHiveManager::BatchHiveSession hiveSession;
         const auto& tweaks = TweakRegistry::Instance().GetAllTweaks();
         if (opts.statusFormat == "json") {
             JsonValue root(JsonType::Object);
@@ -464,12 +472,34 @@ int CliRunner::Execute(const CliOptions& opts) {
             }
         }
 
+        UserHiveManager::BatchHiveSession hiveSession;
         int appliedCount = 0;
+        int restoredCount = 0;
+        int unchangedCount = 0;
         int failedCount = 0;
         for (const auto& item : plan) {
+            const bool matchedBefore = TweakRegistry::Instance().MatchesTargetState(
+                item.id, item.shouldEnable, opts.userMode, opts.specificUsernames);
+            if (matchedBefore) {
+                unchangedCount++;
+                continue;
+            }
+
             const auto res = TweakRegistry::Instance().ApplyTweakEx(item.id, item.shouldEnable, opts.userMode, opts.specificUsernames);
             if (res == TweakRegistry::ApplyResult::Success) {
-                appliedCount++;
+                const bool matchedAfter = TweakRegistry::Instance().MatchesTargetState(
+                    item.id, item.shouldEnable, opts.userMode, opts.specificUsernames);
+                if (matchedAfter) {
+                    if (item.shouldEnable) {
+                        appliedCount++;
+                    } else {
+                        restoredCount++;
+                    }
+                } else {
+                    failedCount++;
+                    InitializeConsoleOutput();
+                    std::cerr << "    [!] Failed to verify target state for " << item.id << "\n" << std::flush;
+                }
             } else if (res == TweakRegistry::ApplyResult::NotApplicable) {
                 skippedNotApplicableCount++;
             } else {
@@ -481,7 +511,10 @@ int CliRunner::Execute(const CliOptions& opts) {
 
         const int totalSkipped = skippedNotApplicableCount + skippedUnknownCount;
         if (!opts.quiet) {
-            std::cout << "[SUMMARY] Applied: " << appliedCount << ", Failed: " << failedCount;
+            std::cout << "[SUMMARY] Applied: " << appliedCount
+                      << ", Restored: " << restoredCount
+                      << ", Unchanged: " << unchangedCount
+                      << ", Failed: " << failedCount;
             if (totalSkipped > 0) {
                 std::cout << ", Skipped: " << totalSkipped;
                 if (skippedNotApplicableCount > 0) {

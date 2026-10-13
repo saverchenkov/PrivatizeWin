@@ -43,16 +43,18 @@ While Microsoft provides privacy toggles in the Settings app, they are deliberat
   <img src="assets/screenshot.png" alt="PrivatizeWin GUI Screenshot" width="880" />
 </p>
 
-* **Non-Destructive Staging:** Applying presets or clicking "Apply Defaults" simply stages checkboxes with color-coded intent badges. Nothing touches your system until you review your selection and click **Apply Selected**.
+* **Non-Destructive Staging:** Clicking **Select Preset** or **Stage Defaults** simply stages checkboxes with color-coded intent badges and subtle row highlights. Nothing touches your system until you review your selection and click **Apply Selected**.
   * <span style="color:#2ea043">**[✔] Solid Green:**</span> Already active and verified protected on your system.
   * <span style="color:#0969da">**[☑] Solid Blue:**</span> Pending change staged to be applied/protected.
   * <span style="color:#cf222e">**[-] Solid Red:**</span> Pending change staged to be reverted back to Windows defaults.
   * <span style="color:#6e7781">**[ ] Faint Grey:**</span> Not applicable to your current Windows edition or hardware.
+* **Semantic Status & Impact Highlighting:** Color-coded **Status** (`Applied`, `Partial`, `Custom`, `Not applied`) and **Impact** (`Low`, `Moderate`, `High`) columns make scanning 354 settings effortless.
+* **Sortable Columns & Multi-Row Selection:** Click any column header (**Setting**, **Status**, **Impact**, **Scope**) to sort ascending/descending (third click resets to catalog order). Select multiple rows with `Shift+Click` or `Ctrl+Click` and press `Space` to stage/unstage them in bulk, or right-click to expand/collapse all categories at once.
 * **Compact Draggable Inspector:** Click and drag the centered grip handle to smoothly expand or shrink the lower technical details pane.
-* **Rich Setting Inspector:** Instantly inspect why each setting matters, its functional impact (Low, Moderate, High), whether a restart is required, and the exact registry keys and services modified.
-* **Fast Filter:** Instant fuzzy search by setting title, category, or registry key (`Ctrl+F`).
-* **Presets for Every Need:** One-click presets for **Recommended** (maximum privacy with zero breakage), **Strict Privacy** (hardened privacy for power users), and **Minimal**.
-* **Safety First:** Prompts for administrator elevation on-demand only when modifying system-wide machine policies, with built-in System Restore Point creation.
+* **Rich Setting Inspector:** Formatted with hierarchical typography, `[ID]` badge, accent section headers, and `Consolas` monospace registry/service paths so you can instantly inspect what each setting does, its functional impact, restart requirements, and exact registry/service targets.
+* **Instant Cached Search:** Zero-latency fuzzy filtering by setting title, ID, description, or localized name (`Ctrl+F`).
+* **Presets for Every Need:** One-click staging for **Recommended** (maximum privacy with zero breakage), **Strict Privacy** (hardened privacy for power users), and **Minimal**.
+* **Safety First:** Validates staged plans for conflicts prior to execution, prompts for administrator elevation on-demand with secure token-verified state handoff, and supports one-click System Restore Point creation.
 
 ---
 
@@ -94,7 +96,7 @@ PrivatizeWin.exe --install-task daily --task-template recommended
 
 | Option | Argument | Description |
 | :--- | :--- | :--- |
-| `--status` | *None* | Audits all 354 settings in the [Catalog](CATALOG.md) and displays their current state (`Applied`, `Not applied`, or `Not applicable`). |
+| `--status` | *None* | Audits all 354 settings in the [Catalog](CATALOG.md) and displays their current state (`Applied`, `Partial`, `Custom`, `Not applied`, or `Not applicable`). |
 | `--output` | `text` \| `json` | Sets status output format. `text` displays a formatted console table; `json` outputs structured JSON for scripting. |
 | `--apply-template` | `<name\|path>` | Applies a privacy profile. Accepts built-in presets (`recommended`, `strict`, `minimal`) or a file path to a `.json` profile. |
 | `--list-templates` | *None* | Lists all built-in presets and auto-detected JSON profiles in the current directory. |
@@ -113,7 +115,7 @@ PrivatizeWin.exe --install-task daily --task-template recommended
 
 ### Multi-User Hive Targeting (`--users`)
 
-Unlike basic batch scripts that only touch the current user account, PrivatizeWin can inspect and configure all user profiles across the operating system:
+Unlike basic batch scripts that only touch the current user account, PrivatizeWin can inspect and configure all user profiles across the operating system using a batch-mounted hive session:
 
 ```bash
 # Apply to all user profiles (including unloaded profiles and the Default User template)
@@ -151,10 +153,14 @@ PrivatizeWin.exe --uninstall-task
 
 ### Exit Codes
 
-| Exit Code | Meaning |
-| :---: | :--- |
-| `0` | Success. All requested operations succeeded. |
-| `1` | Error occurred (invalid arguments, elevation required, or setting failed to apply). |
+| Exit Code | Constant | Meaning |
+| :---: | :--- | :--- |
+| `0` | `Success` | All requested operations succeeded (or already matched target state). |
+| `1` | `GeneralError` | One or more settings failed to apply, or a task scheduler operation failed. |
+| `2` | `InvalidArguments` | Unrecognized CLI flag, missing argument, or invalid option value. |
+| `3` | `ElevationRequired` | Administrator privileges are required for the requested operation. |
+| `4` | `TemplateNotFound` | Template file could not be loaded, failed validation, or contained conflicting actions. |
+| `5` | `UserNotFound` | One or more usernames/SIDs specified via `--users` do not exist on the system. |
 
 ---
 

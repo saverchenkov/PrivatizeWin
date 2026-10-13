@@ -111,6 +111,7 @@ enum class UserSelectionMode {
 
 struct CliOptions {
     bool isCli{ false };
+    bool showHelp{ false };
     std::string applyTemplate;
     std::wstring applyTemplateW;
     bool listTemplates{ false };

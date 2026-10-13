@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
 #include <memory>
 #include "../core/Types.h"
 
@@ -63,7 +64,10 @@ private:
     void SetRowCheckboxState(int itemIndex, CheckboxState state);
     [[nodiscard]] CheckboxState GetRowCheckboxState(int itemIndex) const;
     void ToggleRowCheckbox(int itemIndex);
+    void RefreshAuditCache();
+    [[nodiscard]] SettingStatus GetCachedAuditStatus(const std::string& id) const;
     void PopulateListView(std::wstring_view filter = L"", FilterMode mode = FilterMode::All);
+    void ExpandAllGroups(bool expand);
     void UpdateDetailsPane(int selectedIndex);
     void UpdateStatusBar();
     void UpdateSelectionCounts();
@@ -129,13 +133,17 @@ private:
     HFONT m_hFontBold{ nullptr };
     HFONT m_hFontTitle{ nullptr };
     HFONT m_hFontCode{ nullptr };
+    HBRUSH m_hDarkBgBrush{ nullptr };
 
     HIMAGELIST m_hRowImageList{ nullptr };
     HIMAGELIST m_hStateImageList{ nullptr }; // Multi-state checkbox image list (Item 10)
 
     std::wstring m_currentFilter;
     FilterMode m_filterMode{ FilterMode::All };
+    int m_sortColumn{ -1 };
+    bool m_sortAscending{ true };
     std::vector<Tweak> m_displayedTweaks;
+    std::unordered_map<std::string, SettingStatus> m_auditCache;
     std::unordered_set<std::string> m_pendingEnableIds; // Staged to apply (Item 10)
     std::unordered_set<std::string> m_pendingRevertIds; // Staged to restore (Item 10)
     std::unordered_set<std::string> m_notApplicableIds; // Evaluated as NotApplicable

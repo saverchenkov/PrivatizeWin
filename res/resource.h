@@ -59,6 +59,8 @@
 #define IDM_CTX_SELECT_ALL       40054
 #define IDM_CTX_COPY_ID          40055
 #define IDM_CTX_COPY_DETAILS     40056
+#define IDM_CTX_EXPAND_ALL       40057
+#define IDM_CTX_COLLAPSE_ALL     40058
 
 #define IDM_FOCUS_SEARCH        40070
 

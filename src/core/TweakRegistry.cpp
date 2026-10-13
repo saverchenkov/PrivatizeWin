@@ -4781,16 +4781,25 @@ bool TweakRegistry::LoadExternalTweaks(std::string_view jsonContent) {
             return false;
         }
 
+        auto utf8ToWString = [](const std::string& str) -> std::wstring {
+            if (str.empty()) return std::wstring();
+            const int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
+            if (size <= 1) return std::wstring();
+            std::wstring result(size - 1, 0);
+            MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &result[0], size);
+            return result;
+        };
+
         for (const auto& item : root["tweaks"].arrayValue) {
             if (!item.isObject()) continue;
             Tweak t;
             t.id = item["id"].stringValue;
             if (t.id.empty()) continue;
 
-            t.title = std::wstring(item["title"].stringValue.begin(), item["title"].stringValue.end());
-            t.category = std::wstring(item["category"].stringValue.begin(), item["category"].stringValue.end());
-            t.description = std::wstring(item["description"].stringValue.begin(), item["description"].stringValue.end());
-            t.impact = std::wstring(item["impact"].stringValue.begin(), item["impact"].stringValue.end());
+            t.title = utf8ToWString(item["title"].stringValue);
+            t.category = utf8ToWString(item["category"].stringValue);
+            t.description = utf8ToWString(item["description"].stringValue);
+            t.impact = utf8ToWString(item["impact"].stringValue);
 
             std::string safetyStr = item["safety"].stringValue;
             if (safetyStr == "normal") t.safety = SafetyLevel::Normal;

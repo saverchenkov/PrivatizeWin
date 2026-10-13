@@ -60,6 +60,15 @@ public:
         UserSelectionMode mode,
         const std::vector<std::wstring>& specificUsers
     );
+
+    // RAII session to keep unloaded user hives mounted across batch audit/apply operations
+    class BatchHiveSession {
+    public:
+        BatchHiveSession();
+        ~BatchHiveSession() noexcept;
+        BatchHiveSession(const BatchHiveSession&) = delete;
+        BatchHiveSession& operator=(const BatchHiveSession&) = delete;
+    };
 };
 
 } // namespace PrivatizeWin

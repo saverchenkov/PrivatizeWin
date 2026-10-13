@@ -1,5 +1,3 @@
-#pragma once
-
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -32,7 +30,14 @@
 
 namespace PrivatizeWin {
 
-static std::unique_ptr<MainWindow> s_pMainWnd = nullptr;
+static std::wstring Utf8ToWString(const std::string& str) {
+    if (str.empty()) return std::wstring();
+    const int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
+    if (size <= 1) return std::wstring();
+    std::wstring result(size - 1, 0);
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &result[0], size);
+    return result;
+}
 
 // Subclass procedure for search box to support Esc to clear and Enter to focus list
 static LRESULT CALLBACK SearchSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR /*uIdSubclass*/, DWORD_PTR dwRefData) {
@@ -112,7 +117,14 @@ LRESULT CALLBACK MainWindow::SplitterWndProc(HWND hWnd, UINT uMsg, WPARAM wParam
         HDC hdc = BeginPaint(hWnd, &ps);
         RECT rc;
         GetClientRect(hWnd, &rc);
-        FillRect(hdc, &rc, GetSysColorBrush(COLOR_BTNFACE));
+        const bool isDark = DarkMode::IsDarkModeActive();
+        if (isDark) {
+            HBRUSH hDarkBg = CreateSolidBrush(RGB(32, 32, 32));
+            FillRect(hdc, &rc, hDarkBg);
+            DeleteObject(hDarkBg);
+        } else {
+            FillRect(hdc, &rc, GetSysColorBrush(COLOR_BTNFACE));
+        }
 
         UINT dpi = 96;
         if (hWnd) {
@@ -124,7 +136,7 @@ LRESULT CALLBACK MainWindow::SplitterWndProc(HWND hWnd, UINT uMsg, WPARAM wParam
         const int midY = (rc.top + rc.bottom) / 2;
 
         // 1. Subtle horizontal divider line across the bar
-        HPEN hPenLine = CreatePen(PS_SOLID, 1, RGB(214, 216, 220));
+        HPEN hPenLine = CreatePen(PS_SOLID, 1, isDark ? RGB(62, 62, 66) : RGB(214, 216, 220));
         HGDIOBJ hOldPen = SelectObject(hdc, hPenLine);
         MoveToEx(hdc, rc.left, midY, nullptr);
         LineTo(hdc, rc.right, midY);
@@ -140,7 +152,9 @@ LRESULT CALLBACK MainWindow::SplitterWndProc(HWND hWnd, UINT uMsg, WPARAM wParam
             midY + halfH + (handleH % 2 == 0 ? 0 : 1)
         };
 
-        COLORREF fillColor = s_isSplitterHovered ? RGB(90, 95, 105) : RGB(165, 170, 178);
+        COLORREF fillColor = s_isSplitterHovered
+            ? (isDark ? RGB(150, 155, 165) : RGB(90, 95, 105))
+            : (isDark ? RGB(95, 98, 105) : RGB(165, 170, 178));
         HBRUSH hHandleBrush = CreateSolidBrush(fillColor);
         HPEN hHandlePen = CreatePen(PS_SOLID, 1, fillColor);
 
@@ -150,7 +164,9 @@ LRESULT CALLBACK MainWindow::SplitterWndProc(HWND hWnd, UINT uMsg, WPARAM wParam
         RoundRect(hdc, rcHandle.left, rcHandle.top, rcHandle.right, rcHandle.bottom, cornerR, cornerR);
 
         // 3. Inner grip ribs for instant "draggable" recognition:
-        COLORREF ribColor = s_isSplitterHovered ? RGB(255, 255, 255) : RGB(236, 238, 242);
+        COLORREF ribColor = s_isSplitterHovered
+            ? RGB(255, 255, 255)
+            : (isDark ? RGB(50, 50, 54) : RGB(236, 238, 242));
         HPEN hRibPen = CreatePen(PS_SOLID, 1, ribColor);
         SelectObject(hdc, hRibPen);
 
@@ -222,6 +238,30 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
         case WM_SIZE:
             pThis->OnSize(LOWORD(lParam), HIWORD(lParam));
             return 0;
+        case WM_DPICHANGED: {
+            pThis->InitializeFonts();
+            pThis->CreateStateImages();
+            if (pThis->m_hListView) {
+                ListView_SetImageList(pThis->m_hListView, pThis->m_hStateImageList, LVSIL_STATE);
+                SendMessageW(pThis->m_hListView, WM_SETFONT, reinterpret_cast<WPARAM>(pThis->m_hFontRegular), TRUE);
+            }
+            if (pThis->m_hSearchEdit) SendMessageW(pThis->m_hSearchEdit, WM_SETFONT, reinterpret_cast<WPARAM>(pThis->m_hFontRegular), TRUE);
+            if (pThis->m_hFilterCombo) SendMessageW(pThis->m_hFilterCombo, WM_SETFONT, reinterpret_cast<WPARAM>(pThis->m_hFontRegular), TRUE);
+            if (pThis->m_hLblMatchCount) SendMessageW(pThis->m_hLblMatchCount, WM_SETFONT, reinterpret_cast<WPARAM>(pThis->m_hFontRegular), TRUE);
+            if (pThis->m_hTemplateCombo) SendMessageW(pThis->m_hTemplateCombo, WM_SETFONT, reinterpret_cast<WPARAM>(pThis->m_hFontRegular), TRUE);
+            if (pThis->m_hBtnSelectPreset) SendMessageW(pThis->m_hBtnSelectPreset, WM_SETFONT, reinterpret_cast<WPARAM>(pThis->m_hFontRegular), TRUE);
+            if (pThis->m_hBtnRevert) SendMessageW(pThis->m_hBtnRevert, WM_SETFONT, reinterpret_cast<WPARAM>(pThis->m_hFontRegular), TRUE);
+            if (pThis->m_hBtnApply) SendMessageW(pThis->m_hBtnApply, WM_SETFONT, reinterpret_cast<WPARAM>(pThis->m_hFontBold), TRUE);
+            if (pThis->m_hDetailsEdit) SendMessageW(pThis->m_hDetailsEdit, WM_SETFONT, reinterpret_cast<WPARAM>(pThis->m_hFontRegular), TRUE);
+            if (pThis->m_hStatusBar) SendMessageW(pThis->m_hStatusBar, WM_SETFONT, reinterpret_cast<WPARAM>(pThis->m_hFontRegular), TRUE);
+            auto* prcNew = reinterpret_cast<RECT*>(lParam);
+            if (prcNew) {
+                SetWindowPos(hWnd, nullptr, prcNew->left, prcNew->top,
+                    prcNew->right - prcNew->left, prcNew->bottom - prcNew->top,
+                    SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            return 0;
+        }
         case WM_GETMINMAXINFO: {
             auto* pMMI = reinterpret_cast<MINMAXINFO*>(lParam);
             pMMI->ptMinTrackSize.x = 1060;
@@ -277,6 +317,16 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             }
             break;
         }
+        case WM_CTLCOLORSTATIC:
+        case WM_CTLCOLOREDIT: {
+            if (pThis->m_hDarkBgBrush && DarkMode::IsDarkModeActive()) {
+                HDC hdc = reinterpret_cast<HDC>(wParam);
+                SetTextColor(hdc, RGB(230, 230, 230));
+                SetBkColor(hdc, RGB(32, 32, 32));
+                return reinterpret_cast<LRESULT>(pThis->m_hDarkBgBrush);
+            }
+            break;
+        }
         case WM_ERASEBKGND:
             return 1;
         case WM_PAINT: {
@@ -284,7 +334,11 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
             HDC hdc = BeginPaint(hWnd, &ps);
             RECT rc;
             GetClientRect(hWnd, &rc);
-            FillRect(hdc, &rc, GetSysColorBrush(COLOR_BTNFACE));
+            if (pThis->m_hDarkBgBrush && DarkMode::IsDarkModeActive()) {
+                FillRect(hdc, &rc, pThis->m_hDarkBgBrush);
+            } else {
+                FillRect(hdc, &rc, GetSysColorBrush(COLOR_BTNFACE));
+            }
             EndPaint(hWnd, &ps);
             return 0;
         }
@@ -305,6 +359,9 @@ LRESULT CALLBACK MainWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 
 MainWindow::MainWindow(HWND hWnd) : m_hWnd(hWnd) {
     m_hRichEditLib = LoadLibraryW(L"msftedit.dll");
+    if (DarkMode::IsDarkModeActive()) {
+        m_hDarkBgBrush = CreateSolidBrush(RGB(32, 32, 32));
+    }
 }
 
 MainWindow::~MainWindow() {
@@ -312,6 +369,7 @@ MainWindow::~MainWindow() {
     if (m_hFontBold) DeleteObject(m_hFontBold);
     if (m_hFontTitle) DeleteObject(m_hFontTitle);
     if (m_hFontCode) DeleteObject(m_hFontCode);
+    if (m_hDarkBgBrush) DeleteObject(m_hDarkBgBrush);
     if (m_hRichEditLib) FreeLibrary(m_hRichEditLib);
     if (m_hStateImageList) {
         ImageList_Destroy(m_hStateImageList);
@@ -326,6 +384,11 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::InitializeFonts() {
+    if (m_hFontRegular) { DeleteObject(m_hFontRegular); m_hFontRegular = nullptr; }
+    if (m_hFontBold) { DeleteObject(m_hFontBold); m_hFontBold = nullptr; }
+    if (m_hFontTitle) { DeleteObject(m_hFontTitle); m_hFontTitle = nullptr; }
+    if (m_hFontCode) { DeleteObject(m_hFontCode); m_hFontCode = nullptr; }
+
     NONCLIENTMETRICSW ncm{ sizeof(ncm) };
     SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
 
@@ -487,6 +550,7 @@ void MainWindow::OnCreate() {
     TweakRegistry::Instance().InitializeDefaultTweaks();
     TemplateManager::Instance().InitializeBuiltinTemplates();
 
+    RefreshAuditCache();
     LoadPreferences();
 
     const bool resumeAttempted = !s_resumePendingFile.empty();
@@ -542,7 +606,7 @@ void MainWindow::InitializeControls() {
         342, 13, 80, 20, m_hWnd, reinterpret_cast<HMENU>(IDC_LBL_MATCH_COUNT), hInst, nullptr);
     SendMessage(m_hLblMatchCount, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
-    // 4. Preset Dropdown & "Apply Preset" Button
+    // 4. Preset Dropdown & "Select Preset" Button
     m_hTemplateCombo = CreateWindowW(WC_COMBOBOXW, L"",
         WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
         432, 10, 140, 200, m_hWnd, reinterpret_cast<HMENU>(IDC_TPL_COMBO), hInst, nullptr);
@@ -553,13 +617,13 @@ void MainWindow::InitializeControls() {
     SendMessage(m_hTemplateCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Minimal"));
     SendMessage(m_hTemplateCombo, CB_SETCURSEL, 0, 0);
 
-    m_hBtnSelectPreset = CreateWindowW(WC_BUTTONW, L"Apply Preset",
+    m_hBtnSelectPreset = CreateWindowW(WC_BUTTONW, L"Select Preset",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
         578, 10, 95, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_SELECT_PRESET), hInst, nullptr);
     SendMessage(m_hBtnSelectPreset, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
 
-    // 5. "Apply Defaults" Button (placed to the right of "Apply Preset")
-    m_hBtnRevert = CreateWindowW(WC_BUTTONW, L"Apply Defaults",
+    // 5. "Stage Defaults" Button (placed to the right of "Select Preset")
+    m_hBtnRevert = CreateWindowW(WC_BUTTONW, L"Stage Defaults",
         WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP,
         679, 10, 105, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_REVERT), hInst, nullptr);
     SendMessage(m_hBtnRevert, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
@@ -570,12 +634,12 @@ void MainWindow::InitializeControls() {
         890, 10, 145, 26, m_hWnd, reinterpret_cast<HMENU>(IDC_BTN_APPLY), hInst, nullptr);
     SendMessage(m_hBtnApply, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontBold), TRUE);
 
-    // 7. Grouped ListView (SysListView32)
+    // 7. Grouped ListView (SysListView32) - Multi-selection enabled
     m_hListView = CreateWindowExW(
         WS_EX_CLIENTEDGE,
         WC_LISTVIEWW,
         L"",
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS,
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS,
         10, 46, 1040, 360,
         m_hWnd,
         reinterpret_cast<HMENU>(IDC_LIST_TWEAKS),
@@ -653,8 +717,18 @@ void MainWindow::InitializeControls() {
     );
     SendMessage(m_hDetailsEdit, WM_SETFONT, reinterpret_cast<WPARAM>(m_hFontRegular), TRUE);
     SendMessage(m_hDetailsEdit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELONG(8, 8));
+    SetWindowSubclass(m_hDetailsEdit, DetailsSubclassProc, 2, reinterpret_cast<DWORD_PTR>(this));
 
-    // 9. Status Bar (Item 14: Factual counts)
+    if (DarkMode::IsDarkModeActive()) {
+        ListView_SetBkColor(m_hListView, RGB(28, 28, 28));
+        ListView_SetTextBkColor(m_hListView, RGB(28, 28, 28));
+        ListView_SetTextColor(m_hListView, RGB(230, 230, 230));
+        SendMessageW(m_hDetailsEdit, EM_SETBKGNDCOLOR, 0, RGB(28, 28, 28));
+        DarkMode::ApplyToControl(m_hListView);
+        DarkMode::ApplyToControl(m_hDetailsEdit);
+    }
+
+    // 10. Status Bar (Item 14: Factual counts)
     m_hStatusBar = CreateWindowExW(0, STATUSCLASSNAMEW, nullptr,
         WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
         0, 0, 0, 0, m_hWnd, reinterpret_cast<HMENU>(IDC_STATUSBAR), hInst, nullptr);
@@ -675,7 +749,12 @@ void MainWindow::CreateStateImages() {
         m_hStateImageList = nullptr;
     }
 
-    const int iconSize = 16;
+    UINT dpi = 96;
+    if (m_hWnd) {
+        dpi = GetDpiForWindow(m_hWnd);
+        if (dpi == 0) dpi = 96;
+    }
+    const int iconSize = std::max(16, MulDiv(16, static_cast<int>(dpi), 96));
     m_hStateImageList = ImageList_Create(iconSize, iconSize, ILC_COLOR32 | ILC_MASK, 5, 1);
     if (!m_hStateImageList) return;
 
@@ -684,6 +763,13 @@ void MainWindow::CreateStateImages() {
 
     const COLORREF clrMask = RGB(255, 0, 255); // Magenta transparency mask
     const bool isDark = DarkMode::IsDarkModeActive();
+    auto sc = [iconSize](int v) -> int {
+        return MulDiv(v, iconSize, 16);
+    };
+    const int boxL = sc(1);
+    const int boxR = iconSize - sc(1);
+    const int corner = std::max(3, sc(3));
+    const int penW = std::max(2, sc(2));
 
     auto addStateBitmap = [&](auto drawFunc) {
         HBITMAP hBmp = CreateCompatibleBitmap(hdcScreen, iconSize, iconSize);
@@ -702,15 +788,15 @@ void MainWindow::CreateStateImages() {
     };
 
     // State 1: Unchecked [ ] (Empty outline box, Windows default / not applied)
-    addStateBitmap([](HDC hdc, bool dark) {
-        COLORREF clrBorder = dark ? RGB(160, 160, 160) : RGB(120, 120, 120);
-        COLORREF clrBg = dark ? RGB(32, 32, 32) : RGB(255, 255, 255);
+    addStateBitmap([&](HDC hdc, bool dark) {
+        COLORREF clrBorder = dark ? RGB(150, 150, 155) : RGB(120, 120, 120);
+        COLORREF clrBg = dark ? RGB(34, 34, 36) : RGB(255, 255, 255);
         HPEN hPen = CreatePen(PS_SOLID, 1, clrBorder);
         HBRUSH hBrush = CreateSolidBrush(clrBg);
         HPEN hOldPen = static_cast<HPEN>(SelectObject(hdc, hPen));
         HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(hdc, hBrush));
 
-        RoundRect(hdc, 1, 1, 15, 15, 3, 3);
+        RoundRect(hdc, boxL, boxL, boxR, boxR, corner, corner);
 
         SelectObject(hdc, hOldPen);
         SelectObject(hdc, hOldBrush);
@@ -719,7 +805,7 @@ void MainWindow::CreateStateImages() {
     });
 
     // State 2: AlreadyEnabled [✔] (Solid green with white checkmark)
-    addStateBitmap([](HDC hdc, bool /*dark*/) {
+    addStateBitmap([&](HDC hdc, bool /*dark*/) {
         COLORREF clrGreen = RGB(16, 137, 62);
         COLORREF clrBorder = RGB(12, 110, 50);
         HPEN hPen = CreatePen(PS_SOLID, 1, clrBorder);
@@ -727,13 +813,13 @@ void MainWindow::CreateStateImages() {
         HPEN hOldPen = static_cast<HPEN>(SelectObject(hdc, hPen));
         HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(hdc, hBrush));
 
-        RoundRect(hdc, 1, 1, 15, 15, 3, 3);
+        RoundRect(hdc, boxL, boxL, boxR, boxR, corner, corner);
 
-        HPEN hCheckPen = CreatePen(PS_SOLID, 2, RGB(255, 255, 255));
+        HPEN hCheckPen = CreatePen(PS_SOLID, penW, RGB(255, 255, 255));
         SelectObject(hdc, hCheckPen);
-        MoveToEx(hdc, 4, 8, nullptr);
-        LineTo(hdc, 7, 11);
-        LineTo(hdc, 12, 5);
+        MoveToEx(hdc, sc(4), sc(8), nullptr);
+        LineTo(hdc, sc(7), sc(11));
+        LineTo(hdc, sc(12), sc(5));
 
         SelectObject(hdc, hOldPen);
         SelectObject(hdc, hOldBrush);
@@ -743,7 +829,7 @@ void MainWindow::CreateStateImages() {
     });
 
     // State 3: PendingEnable [☑] (Solid accent blue with white checkmark)
-    addStateBitmap([](HDC hdc, bool /*dark*/) {
+    addStateBitmap([&](HDC hdc, bool /*dark*/) {
         COLORREF clrBlue = RGB(0, 120, 215);
         COLORREF clrBorder = RGB(0, 95, 175);
         HPEN hPen = CreatePen(PS_SOLID, 1, clrBorder);
@@ -751,13 +837,13 @@ void MainWindow::CreateStateImages() {
         HPEN hOldPen = static_cast<HPEN>(SelectObject(hdc, hPen));
         HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(hdc, hBrush));
 
-        RoundRect(hdc, 1, 1, 15, 15, 3, 3);
+        RoundRect(hdc, boxL, boxL, boxR, boxR, corner, corner);
 
-        HPEN hCheckPen = CreatePen(PS_SOLID, 2, RGB(255, 255, 255));
+        HPEN hCheckPen = CreatePen(PS_SOLID, penW, RGB(255, 255, 255));
         SelectObject(hdc, hCheckPen);
-        MoveToEx(hdc, 4, 8, nullptr);
-        LineTo(hdc, 7, 11);
-        LineTo(hdc, 12, 5);
+        MoveToEx(hdc, sc(4), sc(8), nullptr);
+        LineTo(hdc, sc(7), sc(11));
+        LineTo(hdc, sc(12), sc(5));
 
         SelectObject(hdc, hOldPen);
         SelectObject(hdc, hOldBrush);
@@ -767,7 +853,7 @@ void MainWindow::CreateStateImages() {
     });
 
     // State 4: PendingRevert [-] (Solid red with white horizontal minus bar)
-    addStateBitmap([](HDC hdc, bool /*dark*/) {
+    addStateBitmap([&](HDC hdc, bool /*dark*/) {
         COLORREF clrRed = RGB(209, 52, 56);
         COLORREF clrBorder = RGB(165, 35, 40);
         HPEN hPen = CreatePen(PS_SOLID, 1, clrBorder);
@@ -775,9 +861,9 @@ void MainWindow::CreateStateImages() {
         HPEN hOldPen = static_cast<HPEN>(SelectObject(hdc, hPen));
         HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(hdc, hBrush));
 
-        RoundRect(hdc, 1, 1, 15, 15, 3, 3);
+        RoundRect(hdc, boxL, boxL, boxR, boxR, corner, corner);
 
-        RECT rcMinus{ 4, 7, 12, 9 };
+        RECT rcMinus{ sc(4), sc(7), sc(12), std::max(sc(9), sc(7) + 2) };
         HBRUSH hWhiteBrush = CreateSolidBrush(RGB(255, 255, 255));
         FillRect(hdc, &rcMinus, hWhiteBrush);
         DeleteObject(hWhiteBrush);
@@ -789,15 +875,15 @@ void MainWindow::CreateStateImages() {
     });
 
     // State 5: Disabled (Faint grey outline box, cannot be checked/toggled)
-    addStateBitmap([](HDC hdc, bool dark) {
-        COLORREF clrBorder = dark ? RGB(75, 75, 75) : RGB(190, 190, 190);
-        COLORREF clrBg = dark ? RGB(40, 40, 40) : RGB(235, 235, 235);
+    addStateBitmap([&](HDC hdc, bool dark) {
+        COLORREF clrBorder = dark ? RGB(75, 75, 78) : RGB(190, 190, 190);
+        COLORREF clrBg = dark ? RGB(42, 42, 45) : RGB(235, 235, 235);
         HPEN hPen = CreatePen(PS_SOLID, 1, clrBorder);
         HBRUSH hBrush = CreateSolidBrush(clrBg);
         HPEN hOldPen = static_cast<HPEN>(SelectObject(hdc, hPen));
         HBRUSH hOldBrush = static_cast<HBRUSH>(SelectObject(hdc, hBrush));
 
-        RoundRect(hdc, 1, 1, 15, 15, 3, 3);
+        RoundRect(hdc, boxL, boxL, boxR, boxR, corner, corner);
 
         SelectObject(hdc, hOldPen);
         SelectObject(hdc, hOldBrush);
@@ -807,6 +893,49 @@ void MainWindow::CreateStateImages() {
 
     DeleteDC(hdcMem);
     ReleaseDC(nullptr, hdcScreen);
+}
+
+void MainWindow::RefreshAuditCache() {
+    m_auditCache.clear();
+    m_notApplicableIds.clear();
+    m_appliedCount = 0;
+
+    const auto& catalog = TweakRegistry::Instance().GetAllTweaks();
+    m_auditCache.reserve(catalog.size());
+    for (const auto& t : catalog) {
+        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        m_auditCache[t.id] = st;
+        if (st == SettingStatus::NotApplicable) {
+            m_notApplicableIds.insert(t.id);
+            m_pendingEnableIds.erase(t.id);
+            m_pendingRevertIds.erase(t.id);
+        } else if (st == SettingStatus::Applied) {
+            m_appliedCount++;
+        }
+    }
+}
+
+SettingStatus MainWindow::GetCachedAuditStatus(const std::string& id) const {
+    auto it = m_auditCache.find(id);
+    if (it != m_auditCache.end()) {
+        return it->second;
+    }
+    return TweakRegistry::Instance().AuditTweak(id, UserSelectionMode::CurrentUser, {});
+}
+
+void MainWindow::ExpandAllGroups(bool expand) {
+    if (!m_hListView) return;
+    const UINT newState = expand ? 0 : LVGS_COLLAPSED;
+    for (int groupId = 1; groupId <= 30; ++groupId) {
+        if (ListView_HasGroup(m_hListView, groupId)) {
+            LVGROUP grp{};
+            grp.cbSize = sizeof(grp);
+            grp.mask = LVGF_STATE;
+            grp.stateMask = LVGS_COLLAPSED;
+            grp.state = newState;
+            ListView_SetGroupInfo(m_hListView, groupId, &grp);
+        }
+    }
 }
 
 void MainWindow::SetRowCheckboxState(int itemIndex, CheckboxState state) {
@@ -828,7 +957,7 @@ void MainWindow::ToggleRowCheckbox(int itemIndex) {
     if (itemIndex < 0 || itemIndex >= static_cast<int>(m_displayedTweaks.size())) return;
     const auto& t = m_displayedTweaks[itemIndex];
     if (m_notApplicableIds.count(t.id) > 0) return;
-    const SettingStatus auditSt = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+    const SettingStatus auditSt = GetCachedAuditStatus(t.id);
     if (auditSt == SettingStatus::NotApplicable) return;
     const CheckboxState cur = GetRowCheckboxState(itemIndex);
     if (cur == CheckboxState::Disabled) return;
@@ -857,6 +986,7 @@ void MainWindow::ToggleRowCheckbox(int itemIndex) {
     }
 
     SetRowCheckboxState(itemIndex, nextState);
+    InvalidateRect(m_hListView, nullptr, FALSE);
     UpdateSelectionCounts();
     UpdateStatusBar();
 }
@@ -1112,6 +1242,9 @@ void MainWindow::UpdateHeaderTooltips() {
 }
 
 void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode filterMode) {
+    if (m_auditCache.empty()) {
+        RefreshAuditCache();
+    }
 
     SendMessage(m_hListView, WM_SETREDRAW, FALSE, 0);
     ListView_DeleteAllItems(m_hListView);
@@ -1119,6 +1252,22 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
 
     const auto& catalog = TweakRegistry::Instance().GetAllTweaks();
     const auto categories = TweakRegistry::Instance().GetCategories();
+
+    // Update header sort indicator
+    HWND hHeader = ListView_GetHeader(m_hListView);
+    if (hHeader) {
+        for (int col = 0; col < 4; ++col) {
+            HDITEMW hdi{};
+            hdi.mask = HDI_FORMAT;
+            if (Header_GetItem(hHeader, col, &hdi)) {
+                hdi.fmt &= ~(HDF_SORTUP | HDF_SORTDOWN);
+                if (col == m_sortColumn) {
+                    hdi.fmt |= (m_sortAscending ? HDF_SORTUP : HDF_SORTDOWN);
+                }
+                Header_SetItem(hHeader, col, &hdi);
+            }
+        }
+    }
 
     // 1. Insert Category Groups
     ListView_EnableGroupView(m_hListView, TRUE);
@@ -1142,30 +1291,18 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
         groupId++;
     }
 
-    // 2. Populate Tweaks into their Groups
+    // 2. Filter Tweaks using cached audit results
     m_displayedTweaks.clear();
-    m_notApplicableIds.clear();
-    m_appliedCount = 0;
 
     std::wstring lowerSearch(searchFilter);
     std::transform(lowerSearch.begin(), lowerSearch.end(), lowerSearch.begin(), ::towlower);
 
-    int itemIndex = 0;
     for (const auto& t : catalog) {
-        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
-        if (st == SettingStatus::NotApplicable) {
-            m_notApplicableIds.insert(t.id);
-            m_pendingEnableIds.erase(t.id);
-            m_pendingRevertIds.erase(t.id);
-        }
+        const SettingStatus st = GetCachedAuditStatus(t.id);
         const bool isApplied = (st == SettingStatus::Applied);
-        if (isApplied) {
-            m_appliedCount++;
-        }
 
         std::wstring locTitle = Localization::Instance().GetTweakTitle(t.id, t.title);
 
-        // Filter logic
         if (!lowerSearch.empty()) {
             std::wstring lowerTitle = t.title;
             std::transform(lowerTitle.begin(), lowerTitle.end(), lowerTitle.begin(), ::towlower);
@@ -1188,6 +1325,39 @@ void MainWindow::PopulateListView(std::wstring_view searchFilter, FilterMode fil
         if (filterMode == FilterMode::AppliedOnly && !isApplied) continue;
 
         m_displayedTweaks.push_back(t);
+    }
+
+    // 3. Apply column sorting if active
+    if (m_sortColumn >= 0 && m_sortColumn < 4) {
+        std::stable_sort(m_displayedTweaks.begin(), m_displayedTweaks.end(),
+            [this](const Tweak& a, const Tweak& b) {
+                int cmp = 0;
+                if (m_sortColumn == 0) {
+                    std::wstring titleA = Localization::Instance().GetTweakTitle(a.id, a.title);
+                    std::wstring titleB = Localization::Instance().GetTweakTitle(b.id, b.title);
+                    cmp = _wcsicmp(titleA.c_str(), titleB.c_str());
+                } else if (m_sortColumn == 1) {
+                    int stA = static_cast<int>(GetCachedAuditStatus(a.id));
+                    int stB = static_cast<int>(GetCachedAuditStatus(b.id));
+                    cmp = (stA < stB) ? -1 : (stA > stB ? 1 : 0);
+                } else if (m_sortColumn == 2) {
+                    int impA = static_cast<int>(a.impactLevel);
+                    int impB = static_cast<int>(b.impactLevel);
+                    cmp = (impA < impB) ? -1 : (impA > impB ? 1 : 0);
+                } else if (m_sortColumn == 3) {
+                    int scA = static_cast<int>(a.scope);
+                    int scB = static_cast<int>(b.scope);
+                    cmp = (scA < scB) ? -1 : (scA > scB ? 1 : 0);
+                }
+                return m_sortAscending ? (cmp < 0) : (cmp > 0);
+            });
+    }
+
+    // 4. Insert Filtered & Sorted Tweaks into ListView
+    int itemIndex = 0;
+    for (const auto& t : m_displayedTweaks) {
+        const SettingStatus st = GetCachedAuditStatus(t.id);
+        std::wstring locTitle = Localization::Instance().GetTweakTitle(t.id, t.title);
 
         LVITEMW lvi{};
         lvi.mask = LVIF_TEXT | LVIF_GROUPID | LVIF_PARAM;
@@ -1301,11 +1471,8 @@ void MainWindow::UpdateSelectionCounts() {
     if (m_hLblMatchCount) {
         std::wstringstream ss;
         ss << LocFmt("match_shown", m_displayedTweaks.size());
-        if (totalSelected > 0) {
-            ss << L" \u00B7 " << LocFmt("match_selected", totalSelected);
-            if (hiddenSelected > 0) {
-                ss << L" " << LocFmt("match_hidden", hiddenSelected);
-            }
+        if (hiddenSelected > 0) {
+            ss << L" \u00B7 " << LocFmt("match_hidden", hiddenSelected);
         }
         SetWindowTextW(m_hLblMatchCount, ss.str().c_str());
     }
@@ -1320,7 +1487,7 @@ int MainWindow::GetApplyButtonWidth() const {
         if (dpi == 0) dpi = 96;
     }
     const int baseMinW = MulDiv(145, dpi, 96);
-    const int padH = MulDiv(36, dpi, 96);
+    const int padH = MulDiv(28, dpi, 96);
 
     int w = baseMinW;
     if (m_hBtnApply) {
@@ -1358,27 +1525,14 @@ void MainWindow::UpdateActionButtonsLayout(int clientWidth) {
 
     const int topMargin = MulDiv(10, dpi, 96);
     const int ctrlH = MulDiv(26, dpi, 96);
-    const int gap = MulDiv(6, dpi, 96);
     const int rightEdge = clientWidth - 10;
     const int btnApplyW = GetApplyButtonWidth();
-
-    int applyX = rightEdge - btnApplyW;
-    if (m_hBtnRevert) {
-        RECT rcDefaults{};
-        GetWindowRect(m_hBtnRevert, &rcDefaults);
-        POINT pt{ rcDefaults.right, rcDefaults.top };
-        ScreenToClient(m_hWnd, &pt);
-        if (applyX < pt.x + gap) {
-            applyX = pt.x + gap;
-        }
-    }
+    const int applyX = rightEdge - btnApplyW;
 
     SetWindowPos(m_hBtnApply, nullptr, applyX, topMargin, btnApplyW, ctrlH, SWP_NOZORDER | SWP_NOACTIVATE);
 
-    // Repaint toolbar background area around apply button to cleanly erase any vacated background
     RECT rcToolbar{ 0, topMargin - 2, clientWidth, topMargin + ctrlH + 4 };
-    InvalidateRect(m_hWnd, &rcToolbar, TRUE);
-    UpdateWindow(m_hBtnApply);
+    RedrawWindow(m_hWnd, &rcToolbar, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 }
 
 static int MeasureWindowTextWidth(HWND hCtrl, HFONT hFont, int padding = 20) {
@@ -1440,42 +1594,42 @@ void MainWindow::UpdateToolbarLayout(int clientWidth) {
 
     // Measure combo boxes content width
     int filterContentW = MeasureComboMaxTextWidth(m_hFilterCombo, m_hFontRegular);
-    int wFilter = std::max(MulDiv(140, dpi, 96), filterContentW + MulDiv(32, dpi, 96));
+    int wFilter = std::max(MulDiv(125, dpi, 96), filterContentW + MulDiv(26, dpi, 96));
     SendMessageW(m_hFilterCombo, CB_SETDROPPEDWIDTH, std::max(wFilter, filterContentW + MulDiv(28, dpi, 96)), 0);
 
     int tplContentW = MeasureComboMaxTextWidth(m_hTemplateCombo, m_hFontRegular);
-    int wPresetCombo = std::max(MulDiv(130, dpi, 96), tplContentW + MulDiv(32, dpi, 96));
+    int wPresetCombo = std::max(MulDiv(118, dpi, 96), tplContentW + MulDiv(26, dpi, 96));
     SendMessageW(m_hTemplateCombo, CB_SETDROPPEDWIDTH, std::max(wPresetCombo, tplContentW + MulDiv(28, dpi, 96)), 0);
 
     // Measure buttons
-    int wPresetBtn = std::max(MulDiv(95, dpi, 96), MeasureWindowTextWidth(m_hBtnSelectPreset, m_hFontRegular, MulDiv(22, dpi, 96)));
-    int wDefaultsBtn = std::max(MulDiv(105, dpi, 96), MeasureWindowTextWidth(m_hBtnRevert, m_hFontRegular, MulDiv(22, dpi, 96)));
+    int wPresetBtn = std::max(MulDiv(86, dpi, 96), MeasureWindowTextWidth(m_hBtnSelectPreset, m_hFontRegular, MulDiv(16, dpi, 96)));
+    int wDefaultsBtn = std::max(MulDiv(94, dpi, 96), MeasureWindowTextWidth(m_hBtnRevert, m_hFontRegular, MulDiv(16, dpi, 96)));
 
     // Match count label
-    int wCount = std::max(MulDiv(75, dpi, 96), MeasureWindowTextWidth(m_hLblMatchCount, m_hFontRegular, MulDiv(10, dpi, 96)));
+    int wCount = std::max(MulDiv(62, dpi, 96), MeasureWindowTextWidth(m_hLblMatchCount, m_hFontRegular, MulDiv(6, dpi, 96)));
 
-    // Search box: base 170
-    int wSearch = MulDiv(170, dpi, 96);
+    // Search box: base 175
+    int wSearch = MulDiv(175, dpi, 96);
 
     const int applyBtnW = GetApplyButtonWidth();
     const int rightAvail = clientWidth - 10 - applyBtnW - gap;
-    int totalLeftW = 10 + wSearch + gap + wFilter + gap + wCount + MulDiv(10, dpi, 96) + wPresetCombo + gap + wPresetBtn + gap + wDefaultsBtn;
+    int totalLeftW = 10 + wSearch + gap + wFilter + gap + wCount + gap + wPresetCombo + gap + wPresetBtn + gap + wDefaultsBtn;
 
     int excess = totalLeftW - rightAvail;
     if (excess > 0) {
-        int shrinkSearch = std::min(wSearch - MulDiv(90, dpi, 96), excess);
-        wSearch -= shrinkSearch;
-        excess -= shrinkSearch;
-    }
-    if (excess > 0) {
-        int shrinkFilter = std::min(wFilter - MulDiv(130, dpi, 96), excess);
+        int shrinkFilter = std::min(wFilter - MulDiv(112, dpi, 96), excess);
         wFilter -= shrinkFilter;
         excess -= shrinkFilter;
     }
     if (excess > 0) {
-        int shrinkPreset = std::min(wPresetCombo - MulDiv(120, dpi, 96), excess);
+        int shrinkPreset = std::min(wPresetCombo - MulDiv(108, dpi, 96), excess);
         wPresetCombo -= shrinkPreset;
         excess -= shrinkPreset;
+    }
+    if (excess > 0) {
+        int shrinkSearch = std::min(wSearch - MulDiv(95, dpi, 96), excess);
+        wSearch -= shrinkSearch;
+        excess -= shrinkSearch;
     }
 
     int x = 10;
@@ -1486,7 +1640,7 @@ void MainWindow::UpdateToolbarLayout(int clientWidth) {
     x += wFilter + gap;
 
     SetWindowPos(m_hLblMatchCount, nullptr, x, topMargin + MulDiv(3, dpi, 96), wCount, MulDiv(20, dpi, 96), SWP_NOZORDER | SWP_NOACTIVATE);
-    x += wCount + MulDiv(10, dpi, 96);
+    x += wCount + gap;
 
     SetWindowPos(m_hTemplateCombo, nullptr, x, topMargin, wPresetCombo, MulDiv(200, dpi, 96), SWP_NOZORDER | SWP_NOACTIVATE);
     x += wPresetCombo + gap;
@@ -1574,7 +1728,8 @@ void MainWindow::UpdateLocalization() {
 
     // Search cue banner
     if (m_hSearchEdit) {
-        SendMessageW(m_hSearchEdit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(Loc("search_cue").c_str()));
+        std::wstring cue = Loc("search_cue");
+        SendMessageW(m_hSearchEdit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(cue.c_str()));
     }
 
     // Filter combo
@@ -1602,10 +1757,10 @@ void MainWindow::UpdateLocalization() {
 
     // Buttons
     if (m_hBtnSelectPreset) {
-        SetWindowTextW(m_hBtnSelectPreset, Loc("btn_apply_preset").c_str());
+        SetWindowTextW(m_hBtnSelectPreset, Loc("btn_select_preset").c_str());
     }
     if (m_hBtnRevert) {
-        SetWindowTextW(m_hBtnRevert, Loc("btn_apply_defaults").c_str());
+        SetWindowTextW(m_hBtnRevert, Loc("btn_stage_defaults").c_str());
     }
 
     // ListView columns
@@ -1613,16 +1768,20 @@ void MainWindow::UpdateLocalization() {
         LVCOLUMNW col{};
         col.mask = LVCF_TEXT;
 
-        col.pszText = const_cast<LPWSTR>(Loc("col_setting").c_str());
+        std::wstring col0 = Loc("col_setting");
+        col.pszText = col0.data();
         ListView_SetColumn(m_hListView, 0, &col);
 
-        col.pszText = const_cast<LPWSTR>(Loc("col_status").c_str());
+        std::wstring col1 = Loc("col_status");
+        col.pszText = col1.data();
         ListView_SetColumn(m_hListView, 1, &col);
 
-        col.pszText = const_cast<LPWSTR>(Loc("col_impact").c_str());
+        std::wstring col2 = Loc("col_impact");
+        col.pszText = col2.data();
         ListView_SetColumn(m_hListView, 2, &col);
 
-        col.pszText = const_cast<LPWSTR>(Loc("col_scope").c_str());
+        std::wstring col3 = Loc("col_scope");
+        col.pszText = col3.data();
         ListView_SetColumn(m_hListView, 3, &col);
     }
 
@@ -1656,15 +1815,11 @@ void MainWindow::UpdateDetailsPane(int selectedIndex) {
     }
 
     const auto& t = m_displayedTweaks[selectedIndex];
-    const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+    const SettingStatus st = GetCachedAuditStatus(t.id);
 
     std::wstring locTitle = Localization::Instance().GetTweakTitle(t.id, t.title);
     std::wstring locCat = Localization::Instance().GetCategory(t.category);
 
-    std::wstringstream ss;
-    ss << locTitle << L"\r\n";
-
-    // State, impact, scope metadata line
     std::wstring stStr;
     switch (st) {
     case SettingStatus::Applied:       stStr = Loc("status_raw_applied"); break;
@@ -1690,22 +1845,33 @@ void MainWindow::UpdateDetailsPane(int selectedIndex) {
     case TargetScope::Service: scopeStr = Loc("scope_service"); break;
     }
 
-    ss << Loc("label_state") << stStr
-       << Loc("label_impact") << impactStr
-       << Loc("label_scope") << scopeStr
-       << Loc("label_recommended") << (t.isRecommended ? Loc("yes") : Loc("no"))
-       << Loc("label_category") << locCat << L"\r\n\r\n";
+    const std::wstring wideId(t.id.begin(), t.id.end());
+    const std::wstring titleLine = locTitle + L"  [" + wideId + L"]";
+    const std::wstring metaLine = Loc("label_state") + stStr +
+        Loc("label_impact") + impactStr +
+        Loc("label_scope") + scopeStr +
+        Loc("label_recommended") + (t.isRecommended ? Loc("yes") : Loc("no")) +
+        Loc("label_category") + locCat;
+
+    const std::wstring hdrWhat = Loc("what_it_does");
+    const std::wstring hdrFeatures = Loc("features_affected");
+    const std::wstring hdrRestart = Loc("restart_requirement");
+    const std::wstring hdrTech = Loc("technical_info");
+
+    std::wstringstream ss;
+    ss << titleLine << L"\r\n";
+    ss << metaLine << L"\r\n\r\n";
 
     // 1. What applying it does (practical explanation first)
-    ss << Loc("what_it_does") << L"\r\n" << t.description << L"\r\n\r\n";
+    ss << hdrWhat << L"\r\n" << t.description << L"\r\n\r\n";
 
     // 2. Features it may affect (specific consequence & tradeoff)
     if (!t.impact.empty()) {
-        ss << Loc("features_affected") << L"\r\n" << t.impact << L"\r\n\r\n";
+        ss << hdrFeatures << L"\r\n" << t.impact << L"\r\n\r\n";
     }
 
     // 3. Restart/sign-out requirement
-    ss << Loc("restart_requirement") << L"\r\n";
+    ss << hdrRestart << L"\r\n";
     if (t.requiresReboot) {
         ss << Loc("reboot_system") << L"\r\n\r\n";
     } else if (t.requiresSignOut) {
@@ -1715,23 +1881,100 @@ void MainWindow::UpdateDetailsPane(int selectedIndex) {
     }
 
     // 4. Technical information below practical explanation
+    std::wstring techBlock;
     if (!t.regActions.empty() || !t.serviceActions.empty()) {
-        ss << Loc("technical_info") << L"\r\n";
+        ss << hdrTech << L"\r\n";
+        std::wstringstream techSs;
         for (const auto& reg : t.regActions) {
-            ss << L"  [" << (reg.scope == TargetScope::Machine ? L"HKLM\\" : L"HKCU\\") << reg.subKey << L"]\r\n";
+            techSs << L"  [" << (reg.scope == TargetScope::Machine ? L"HKLM\\" : L"HKCU\\") << reg.subKey << L"]\r\n";
             if (reg.type == RegType::Dword) {
-                ss << L"    " << reg.valueName << L" = " << reg.dwordProtected << L" (REG_DWORD)\r\n";
+                techSs << L"    " << reg.valueName << L" = " << reg.dwordProtected << L" (REG_DWORD)\r\n";
             } else {
-                ss << L"    " << reg.valueName << L" = \"" << reg.strProtected << L"\" (REG_SZ)\r\n";
+                techSs << L"    " << reg.valueName << L" = \"" << reg.strProtected << L"\" (REG_SZ)\r\n";
             }
         }
         for (const auto& svc : t.serviceActions) {
-            ss << L"  [Service] " << svc.serviceName << L" -> Startup: "
-               << (svc.startupTypeProtected == 4 ? L"Disabled (4)" : std::to_wstring(svc.startupTypeProtected)) << L"\r\n";
+            techSs << L"  [Service] " << svc.serviceName << L" -> Startup: "
+                   << (svc.startupTypeProtected == 4 ? L"Disabled (4)" : std::to_wstring(svc.startupTypeProtected)) << L"\r\n";
         }
+        techBlock = techSs.str();
+        ss << techBlock;
     }
 
-    SetWindowTextW(m_hDetailsEdit, ss.str().c_str());
+    const std::wstring fullText = ss.str();
+    SendMessageW(m_hDetailsEdit, WM_SETREDRAW, FALSE, 0);
+    SetWindowTextW(m_hDetailsEdit, fullText.c_str());
+
+    const bool isDark = DarkMode::IsDarkModeActive();
+    const COLORREF clrPrimary = isDark ? RGB(235, 235, 235) : RGB(25, 28, 32);
+    const COLORREF clrHeading = isDark ? RGB(105, 180, 255) : RGB(0, 90, 175);
+    const COLORREF clrCode    = isDark ? RGB(195, 215, 235) : RGB(45, 55, 72);
+
+    // Base formatting for entire text
+    CHARFORMAT2W cfBase{};
+    cfBase.cbSize = sizeof(cfBase);
+    cfBase.dwMask = CFM_COLOR | CFM_BOLD | CFM_SIZE | CFM_FACE;
+    cfBase.crTextColor = clrPrimary;
+    cfBase.dwEffects = 0;
+    cfBase.yHeight = 190; // 9.5pt
+    wcscpy_s(cfBase.szFaceName, L"Segoe UI");
+    SendMessageW(m_hDetailsEdit, EM_SETSEL, 0, -1);
+    SendMessageW(m_hDetailsEdit, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&cfBase));
+
+    // Note: RichEdit 5.0 character indices treat \r\n as a single character position in EM_SETSEL.
+    auto toRichEditPos = [&fullText](size_t wstrPos) -> LONG {
+        LONG pos = 0;
+        for (size_t i = 0; i < wstrPos && i < fullText.size(); ++i) {
+            if (fullText[i] == L'\r' && i + 1 < fullText.size() && fullText[i + 1] == L'\n') {
+                continue;
+            }
+            pos++;
+        }
+        return pos;
+    };
+
+    auto formatSubstring = [&](const std::wstring& needle, bool bold, COLORREF color, LONG yHeight = 0, const wchar_t* face = nullptr) {
+        if (needle.empty()) return;
+        const size_t pos = fullText.find(needle);
+        if (pos == std::wstring::npos) return;
+        const LONG start = toRichEditPos(pos);
+        const LONG end = toRichEditPos(pos + needle.size());
+        SendMessageW(m_hDetailsEdit, EM_SETSEL, start, end);
+
+        CHARFORMAT2W cf{};
+        cf.cbSize = sizeof(cf);
+        cf.dwMask = CFM_COLOR | CFM_BOLD;
+        cf.crTextColor = color;
+        cf.dwEffects = bold ? CFE_BOLD : 0;
+        if (yHeight > 0) {
+            cf.dwMask |= CFM_SIZE;
+            cf.yHeight = yHeight;
+        }
+        if (face) {
+            cf.dwMask |= CFM_FACE;
+            wcscpy_s(cf.szFaceName, face);
+        }
+        SendMessageW(m_hDetailsEdit, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&cf));
+    };
+
+    // Format Title
+    formatSubstring(titleLine, true, clrPrimary, 220);
+
+    // Format Section Headers
+    formatSubstring(hdrWhat, true, clrHeading);
+    if (!t.impact.empty()) {
+        formatSubstring(hdrFeatures, true, clrHeading);
+    }
+    formatSubstring(hdrRestart, true, clrHeading);
+    if (!techBlock.empty()) {
+        formatSubstring(hdrTech, true, clrHeading);
+        formatSubstring(techBlock, false, clrCode, 185, L"Consolas");
+    }
+
+    SendMessageW(m_hDetailsEdit, EM_SETSEL, 0, 0);
+    SendMessageW(m_hDetailsEdit, EM_SCROLLCARET, 0, 0);
+    SendMessageW(m_hDetailsEdit, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(m_hDetailsEdit, nullptr, TRUE);
 }
 
 void MainWindow::UpdateStatusBar() {
@@ -1790,18 +2033,21 @@ void MainWindow::SelectPreset(std::string_view templateName) {
 
     for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
         const auto& t = m_displayedTweaks[i];
-        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        const SettingStatus st = GetCachedAuditStatus(t.id);
         CheckboxState cbState = CheckboxState::Unchecked;
         if (st == SettingStatus::NotApplicable || m_notApplicableIds.count(t.id) > 0) {
             cbState = CheckboxState::Disabled;
         } else if (m_pendingEnableIds.count(t.id) > 0) {
             cbState = CheckboxState::PendingEnable;
+        } else if (m_pendingRevertIds.count(t.id) > 0) {
+            cbState = CheckboxState::PendingRevert;
         } else if (st == SettingStatus::Applied) {
             cbState = CheckboxState::AlreadyEnabled;
         }
         SetRowCheckboxState(i, cbState);
     }
 
+    InvalidateRect(m_hListView, nullptr, FALSE);
     UpdateSelectionCounts();
     UpdateStatusBar();
 
@@ -1819,7 +2065,7 @@ void MainWindow::SelectAllShown() {
     for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
         const auto& t = m_displayedTweaks[i];
         if (m_notApplicableIds.count(t.id) > 0) continue;
-        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        const SettingStatus st = GetCachedAuditStatus(t.id);
         if (st == SettingStatus::NotApplicable) continue;
         if (st != SettingStatus::Applied) {
             m_pendingEnableIds.insert(t.id);
@@ -1827,6 +2073,7 @@ void MainWindow::SelectAllShown() {
             SetRowCheckboxState(i, CheckboxState::PendingEnable);
         }
     }
+    InvalidateRect(m_hListView, nullptr, FALSE);
     UpdateSelectionCounts();
     UpdateStatusBar();
 }
@@ -1835,7 +2082,7 @@ void MainWindow::InvertShownSelection() {
     for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
         const auto& t = m_displayedTweaks[i];
         if (m_notApplicableIds.count(t.id) > 0) continue;
-        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        const SettingStatus st = GetCachedAuditStatus(t.id);
         if (st == SettingStatus::NotApplicable) continue;
         const CheckboxState cur = GetRowCheckboxState(i);
         if (cur == CheckboxState::Disabled) continue;
@@ -1853,6 +2100,7 @@ void MainWindow::InvertShownSelection() {
             SetRowCheckboxState(i, CheckboxState::PendingEnable);
         }
     }
+    InvalidateRect(m_hListView, nullptr, FALSE);
     UpdateSelectionCounts();
     UpdateStatusBar();
 }
@@ -1863,7 +2111,7 @@ void MainWindow::ClearSelection() {
 
     for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
         const auto& t = m_displayedTweaks[i];
-        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        const SettingStatus st = GetCachedAuditStatus(t.id);
         CheckboxState cbState = CheckboxState::Unchecked;
         if (st == SettingStatus::NotApplicable || m_notApplicableIds.count(t.id) > 0) {
             cbState = CheckboxState::Disabled;
@@ -1872,6 +2120,7 @@ void MainWindow::ClearSelection() {
         }
         SetRowCheckboxState(i, cbState);
     }
+    InvalidateRect(m_hListView, nullptr, FALSE);
     UpdateSelectionCounts();
     UpdateStatusBar();
 }
@@ -1887,7 +2136,7 @@ void MainWindow::ApplySelectedTweaks() {
 
     std::string conflictErr;
     if (!ValidateStagedPlan(&conflictErr)) {
-        std::wstring wErr(conflictErr.begin(), conflictErr.end());
+        std::wstring wErr = Utf8ToWString(conflictErr);
         MessageBoxW(m_hWnd, wErr.c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONERROR);
         return;
     }
@@ -2080,6 +2329,7 @@ void MainWindow::RestoreSelectedDefaults() {
         }
     }
 
+    InvalidateRect(m_hListView, nullptr, FALSE);
     UpdateSelectionCounts();
     UpdateStatusBar();
 
@@ -2109,7 +2359,7 @@ void MainWindow::RestoreAllDefaults() {
         } else if (m_pendingRevertIds.count(t.id) > 0) {
             cbState = CheckboxState::PendingRevert;
         } else {
-            const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+            const SettingStatus st = GetCachedAuditStatus(t.id);
             if (st == SettingStatus::Applied) {
                 cbState = CheckboxState::AlreadyEnabled;
             } else if (st == SettingStatus::NotApplicable) {
@@ -2119,6 +2369,7 @@ void MainWindow::RestoreAllDefaults() {
         SetRowCheckboxState(i, cbState);
     }
 
+    InvalidateRect(m_hListView, nullptr, FALSE);
     UpdateSelectionCounts();
     UpdateStatusBar();
 
@@ -2129,22 +2380,12 @@ void MainWindow::RestoreAllDefaults() {
 }
 
 void MainWindow::RefreshAuditState() {
-    m_appliedCount = 0;
-    m_notApplicableIds.clear();
-    const auto& catalog = TweakRegistry::Instance().GetAllTweaks();
-    for (const auto& t : catalog) {
-        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
-        if (st == SettingStatus::Applied) {
-            m_appliedCount++;
-        } else if (st == SettingStatus::NotApplicable) {
-            m_notApplicableIds.insert(t.id);
-        }
-    }
+    RefreshAuditCache();
 
     m_isProgrammaticCheckChange = true;
     for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
         const auto& t = m_displayedTweaks[i];
-        const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+        const SettingStatus st = GetCachedAuditStatus(t.id);
 
         std::wstring stStr;
         switch (st) {
@@ -2212,6 +2453,9 @@ void MainWindow::OnContextMenu(HWND hWnd, int x, int y) {
     HMENU hMenu = CreatePopupMenu();
     AppendMenuW(hMenu, actionFlag, IDM_CTX_PROTECT_SELECTED, Loc("ctx_select").c_str());
     AppendMenuW(hMenu, actionFlag, IDM_CTX_DEFAULT_SELECTED, Loc("ctx_deselect").c_str());
+    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(hMenu, MF_STRING, IDM_CTX_EXPAND_ALL, Loc("ctx_expand_all").c_str());
+    AppendMenuW(hMenu, MF_STRING, IDM_CTX_COLLAPSE_ALL, Loc("ctx_collapse_all").c_str());
     AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(hMenu, MF_STRING, IDM_CTX_COPY_ID, Loc("ctx_copy_id").c_str());
     AppendMenuW(hMenu, MF_STRING, IDM_CTX_COPY_DETAILS, Loc("ctx_copy_details").c_str());
@@ -2359,8 +2603,9 @@ void MainWindow::OnCommand(int id, int notifyCode, HWND /*hCtrl*/) {
         break;
     case IDM_HELP_ABOUT:
         MessageBoxW(m_hWnd,
-            L"PrivatizeWin v1.3\n"
-            L"Open-source Windows privacy and telemetry configuration tool.\n\n"
+            L"PrivatizeWin v1.4.0\n"
+            L"Modern, Transparent Windows Privacy & Telemetry Silencer.\n\n"
+            L"354 Privacy & Security Settings | Native C++20 Win32 + CLI\n"
             L"MIT License",
             L"About PrivatizeWin", MB_OK | MB_ICONINFORMATION);
         break;
@@ -2376,6 +2621,7 @@ void MainWindow::OnCommand(int id, int notifyCode, HWND /*hCtrl*/) {
             m_pendingRevertIds.erase(t.id);
             SetRowCheckboxState(i, CheckboxState::PendingEnable);
         }
+        InvalidateRect(m_hListView, nullptr, FALSE);
         UpdateSelectionCounts();
         UpdateStatusBar();
         break;
@@ -2387,17 +2633,24 @@ void MainWindow::OnCommand(int id, int notifyCode, HWND /*hCtrl*/) {
             if (m_notApplicableIds.count(t.id) > 0) continue;
             m_pendingEnableIds.erase(t.id);
             m_pendingRevertIds.erase(t.id);
-            const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+            const SettingStatus st = GetCachedAuditStatus(t.id);
             if (st == SettingStatus::Applied) {
                 SetRowCheckboxState(i, CheckboxState::AlreadyEnabled);
             } else {
                 SetRowCheckboxState(i, CheckboxState::Unchecked);
             }
         }
+        InvalidateRect(m_hListView, nullptr, FALSE);
         UpdateSelectionCounts();
         UpdateStatusBar();
         break;
     }
+    case IDM_CTX_EXPAND_ALL:
+        ExpandAllGroups(true);
+        break;
+    case IDM_CTX_COLLAPSE_ALL:
+        ExpandAllGroups(false);
+        break;
     case IDM_CTX_COPY_ID:
         CopySelectedTweakIds();
         break;
@@ -2446,7 +2699,23 @@ void MainWindow::OnNotify(NMHDR* pnmhdr) {
     }
 
     if (pnmhdr->idFrom == IDC_LIST_TWEAKS) {
-        if (pnmhdr->code == LVN_ITEMCHANGED) {
+        if (pnmhdr->code == LVN_COLUMNCLICK) {
+            auto* pnmv = reinterpret_cast<NMLISTVIEW*>(pnmhdr);
+            if (pnmv->iSubItem >= 0 && pnmv->iSubItem < 4) {
+                if (m_sortColumn == pnmv->iSubItem) {
+                    if (m_sortAscending) {
+                        m_sortAscending = false;
+                    } else {
+                        m_sortColumn = -1; // Reset to default catalog order on third click
+                        m_sortAscending = true;
+                    }
+                } else {
+                    m_sortColumn = pnmv->iSubItem;
+                    m_sortAscending = true;
+                }
+                PopulateListView(m_currentFilter, m_filterMode);
+            }
+        } else if (pnmhdr->code == LVN_ITEMCHANGED) {
             auto* pItem = reinterpret_cast<NMLISTVIEW*>(pnmhdr);
             if (pItem->iItem >= 0 && pItem->iItem < static_cast<int>(m_displayedTweaks.size())) {
                 // Selection change in ListView
@@ -2457,13 +2726,22 @@ void MainWindow::OnNotify(NMHDR* pnmhdr) {
         } else if (pnmhdr->code == LVN_KEYDOWN) {
             auto* pnkd = reinterpret_cast<NMLVKEYDOWN*>(pnmhdr);
             if (pnkd->wVKey == VK_SPACE) {
-                // Item 15: Space toggles checkbox of focused row
-                const int focused = ListView_GetNextItem(m_hListView, -1, LVNI_FOCUSED);
-                if (focused >= 0 && focused < static_cast<int>(m_displayedTweaks.size())) {
-                    if (m_notApplicableIds.count(m_displayedTweaks[focused].id) > 0) {
-                        return;
+                if (ListView_GetSelectedCount(m_hListView) > 1) {
+                    int idx = -1;
+                    while ((idx = ListView_GetNextItem(m_hListView, idx, LVNI_SELECTED)) != -1) {
+                        if (idx >= 0 && idx < static_cast<int>(m_displayedTweaks.size()) &&
+                            m_notApplicableIds.count(m_displayedTweaks[idx].id) == 0) {
+                            ToggleRowCheckbox(idx);
+                        }
                     }
-                    ToggleRowCheckbox(focused);
+                } else {
+                    const int focused = ListView_GetNextItem(m_hListView, -1, LVNI_FOCUSED);
+                    if (focused >= 0 && focused < static_cast<int>(m_displayedTweaks.size())) {
+                        if (m_notApplicableIds.count(m_displayedTweaks[focused].id) > 0) {
+                            return;
+                        }
+                        ToggleRowCheckbox(focused);
+                    }
                 }
             } else if (pnkd->wVKey == 'A' && (GetKeyState(VK_CONTROL) & 0x8000)) {
                 SelectAllShown();
@@ -2486,15 +2764,23 @@ LRESULT MainWindow::OnCustomDraw(NMHDR* pnmhdr) {
         const int itemIndex = static_cast<int>(pCustomDraw->nmcd.dwItemSpec);
         if (itemIndex >= 0 && itemIndex < static_cast<int>(m_displayedTweaks.size())) {
             const auto& t = m_displayedTweaks[itemIndex];
+            const bool isDark = DarkMode::IsDarkModeActive();
             if (m_notApplicableIds.count(t.id) > 0) {
                 if (DarkMode::IsHighContrastActive()) {
                     pCustomDraw->clrText = GetSysColor(COLOR_GRAYTEXT);
                 } else {
-                    const bool isDark = DarkMode::IsDarkModeActive();
                     pCustomDraw->clrText = isDark ? RGB(115, 115, 115) : RGB(145, 145, 145);
                 }
                 return CDRF_NEWFONT | CDRF_NOTIFYSUBITEMDRAW;
             }
+            if (!DarkMode::IsHighContrastActive()) {
+                if (m_pendingEnableIds.count(t.id) > 0) {
+                    pCustomDraw->clrTextBk = isDark ? RGB(20, 42, 68) : RGB(235, 245, 255);
+                } else if (m_pendingRevertIds.count(t.id) > 0) {
+                    pCustomDraw->clrTextBk = isDark ? RGB(62, 26, 28) : RGB(255, 238, 238);
+                }
+            }
+            return CDRF_NEWFONT | CDRF_NOTIFYSUBITEMDRAW;
         }
         return CDRF_DODEFAULT;
     }
@@ -2503,14 +2789,41 @@ LRESULT MainWindow::OnCustomDraw(NMHDR* pnmhdr) {
         const int itemIndex = static_cast<int>(pCustomDraw->nmcd.dwItemSpec);
         if (itemIndex >= 0 && itemIndex < static_cast<int>(m_displayedTweaks.size())) {
             const auto& t = m_displayedTweaks[itemIndex];
+            const bool isDark = DarkMode::IsDarkModeActive();
             if (m_notApplicableIds.count(t.id) > 0) {
                 if (DarkMode::IsHighContrastActive()) {
                     pCustomDraw->clrText = GetSysColor(COLOR_GRAYTEXT);
                 } else {
-                    const bool isDark = DarkMode::IsDarkModeActive();
                     pCustomDraw->clrText = isDark ? RGB(115, 115, 115) : RGB(145, 145, 145);
                 }
                 return CDRF_NEWFONT;
+            }
+
+            if (!DarkMode::IsHighContrastActive()) {
+                const int subItem = pCustomDraw->iSubItem;
+                if (subItem == 1) { // Status column
+                    const SettingStatus st = GetCachedAuditStatus(t.id);
+                    if (st == SettingStatus::Applied) {
+                        pCustomDraw->clrText = isDark ? RGB(80, 205, 120) : RGB(16, 124, 65);
+                    } else if (st == SettingStatus::Partial || st == SettingStatus::Custom) {
+                        pCustomDraw->clrText = isDark ? RGB(240, 180, 65) : RGB(175, 95, 0);
+                    } else {
+                        pCustomDraw->clrText = isDark ? RGB(210, 210, 210) : RGB(60, 65, 72);
+                    }
+                    return CDRF_NEWFONT;
+                } else if (subItem == 2) { // Impact column
+                    if (t.impactLevel == ImpactLevel::High) {
+                        pCustomDraw->clrText = isDark ? RGB(245, 105, 105) : RGB(185, 32, 38);
+                    } else if (t.impactLevel == ImpactLevel::Moderate) {
+                        pCustomDraw->clrText = isDark ? RGB(235, 175, 65) : RGB(165, 90, 0);
+                    } else {
+                        pCustomDraw->clrText = isDark ? RGB(130, 200, 150) : RGB(35, 120, 65);
+                    }
+                    return CDRF_NEWFONT;
+                } else {
+                    pCustomDraw->clrText = isDark ? RGB(230, 230, 230) : RGB(25, 28, 32);
+                    return CDRF_NEWFONT;
+                }
             }
         }
         return CDRF_DODEFAULT;
@@ -2544,7 +2857,7 @@ void MainWindow::ExportConfiguration() {
             } else if (m_pendingRevertIds.count(t.id) > 0) {
                 p.tweakStates[t.id] = false;
             } else {
-                const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+                const SettingStatus st = GetCachedAuditStatus(t.id);
                 if (st == SettingStatus::Applied) {
                     p.tweakStates[t.id] = true;
                 }
@@ -2575,7 +2888,7 @@ void MainWindow::ImportConfiguration() {
         if (TemplateManager::Instance().LoadTemplateFromFile(szFile, p, &loadErr)) {
             std::string conflictErr;
             if (!TweakRegistry::Instance().ValidatePlanConflicts(p.tweakStates, conflictErr)) {
-                std::wstring wErr(conflictErr.begin(), conflictErr.end());
+                std::wstring wErr = Utf8ToWString(conflictErr);
                 MessageBoxW(m_hWnd, wErr.c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONERROR);
                 return;
             }
@@ -2584,6 +2897,7 @@ void MainWindow::ImportConfiguration() {
             m_pendingRevertIds.clear();
 
             for (const auto& [id, shouldEnable] : p.tweakStates) {
+                if (m_notApplicableIds.count(id) > 0) continue;
                 if (shouldEnable) {
                     if (!TweakRegistry::Instance().MatchesTargetState(id, true, UserSelectionMode::CurrentUser, {})) {
                         m_pendingEnableIds.insert(id);
@@ -2597,9 +2911,11 @@ void MainWindow::ImportConfiguration() {
 
             for (int i = 0; i < static_cast<int>(m_displayedTweaks.size()); ++i) {
                 const auto& t = m_displayedTweaks[i];
-                const SettingStatus st = TweakRegistry::Instance().AuditTweak(t.id, UserSelectionMode::CurrentUser, {});
+                const SettingStatus st = GetCachedAuditStatus(t.id);
                 CheckboxState cbState = CheckboxState::Unchecked;
-                if (m_pendingEnableIds.count(t.id) > 0) {
+                if (st == SettingStatus::NotApplicable || m_notApplicableIds.count(t.id) > 0) {
+                    cbState = CheckboxState::Disabled;
+                } else if (m_pendingEnableIds.count(t.id) > 0) {
                     cbState = CheckboxState::PendingEnable;
                 } else if (m_pendingRevertIds.count(t.id) > 0) {
                     cbState = CheckboxState::PendingRevert;
@@ -2609,6 +2925,7 @@ void MainWindow::ImportConfiguration() {
                 SetRowCheckboxState(i, cbState);
             }
 
+            InvalidateRect(m_hListView, nullptr, FALSE);
             UpdateSelectionCounts();
             UpdateStatusBar();
 
@@ -2620,7 +2937,11 @@ void MainWindow::ImportConfiguration() {
             std::wstring msg = LocFmt("import_success", m_pendingEnableIds.size(), m_pendingRevertIds.size());
             MessageBoxW(m_hWnd, msg.c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONINFORMATION);
         } else {
-            MessageBoxW(m_hWnd, Loc("import_fail").c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONERROR);
+            std::wstring errMsg = Loc("import_fail");
+            if (!loadErr.empty()) {
+                errMsg += L"\n\n" + Utf8ToWString(loadErr);
+            }
+            MessageBoxW(m_hWnd, errMsg.c_str(), Loc("app_title").c_str(), MB_OK | MB_ICONERROR);
         }
     }
 }
@@ -2762,6 +3083,16 @@ LRESULT CALLBACK MainWindow::ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM w
             return 0;
         }
         if (wParam == VK_SPACE) {
+            if (ListView_GetSelectedCount(hWnd) > 1) {
+                int idx = -1;
+                while ((idx = ListView_GetNextItem(hWnd, idx, LVNI_SELECTED)) != -1) {
+                    if (idx >= 0 && idx < static_cast<int>(pThis->m_displayedTweaks.size()) &&
+                        pThis->m_notApplicableIds.count(pThis->m_displayedTweaks[idx].id) == 0) {
+                        pThis->ToggleRowCheckbox(idx);
+                    }
+                }
+                return 0;
+            }
             const int focused = ListView_GetNextItem(hWnd, -1, LVNI_FOCUSED);
             if (focused >= 0 && focused < static_cast<int>(pThis->m_displayedTweaks.size())) {
                 if (pThis->m_notApplicableIds.count(pThis->m_displayedTweaks[focused].id) > 0) {
